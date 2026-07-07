@@ -200,6 +200,7 @@ export default function Home() {
     <main className="relative min-h-screen overflow-hidden bg-transparent text-gray-900 transition-colors duration-300 dark:text-gray-100">
       <div className="pointer-events-none fixed inset-0 z-0 opacity-100">
         <Grainient
+          className="relative h-full min-h-dvh w-full overflow-hidden"
           color1="#ff9ffc"
           color2="#5227ff"
           color3="#030712"
@@ -406,7 +407,7 @@ function Header() {
         </div>
 
         {mobileMenuOpen ? (
-          <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 rounded-3xl border border-white/50 bg-white/[0.82] p-2 shadow-2xl shadow-gray-950/10 backdrop-blur-2xl md:hidden dark:border-white/10 dark:bg-gray-950/[0.82] dark:shadow-black/30">
+          <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 rounded-3xl border border-white/60 bg-white/[0.94] p-2 shadow-2xl shadow-gray-950/10 backdrop-blur-xl md:hidden dark:border-white/10 dark:bg-gray-950/[0.94] dark:shadow-black/30">
             <nav className="grid gap-1 text-sm font-medium">
               <Link
                 className="rounded-2xl px-4 py-3 transition hover:bg-gray-900/5 dark:hover:bg-white/10"
