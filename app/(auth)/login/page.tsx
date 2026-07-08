@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ArrowLeft, LockKeyhole, LogIn, Mail, Phone, User, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [state, setState] = useState<SubmitState>("idle");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const isRegisterMode = mode === "register";
+
+  useEffect(() => {
+    let active = true;
+
+    async function redirectIfAuthenticated() {
+      try {
+        const result = await api.auth.me();
+        if (!active) return;
+        const dashboard = result.user.role === "ADMIN" ? "/admin" : "/dashboard";
+        router.replace(dashboard);
+      } catch {
+        if (active) {
+          setIsCheckingAuth(false);
+        }
+      }
+    }
+
+    redirectIfAuthenticated();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
@@ -57,6 +81,16 @@ export default function LoginPage() {
             : "ورود انجام نشد. وضعیت بک اند را بررسی کنید.",
       );
     }
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <main className="min-h-screen bg-muted/30 px-4 py-8 text-foreground" dir="rtl">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
+          <p className="text-sm text-muted-foreground">در حال بررسی وضعیت ورود...</p>
+        </div>
+      </main>
+    );
   }
 
   return (

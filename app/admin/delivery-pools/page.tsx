@@ -1,108 +1,47 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Boxes, PackageOpen, Plus, Search } from "lucide-react";
 
 import { formatDate, shortId } from "@/components/admin/admin-formatters";
+import { DeliveryAdminNav } from "@/components/admin/delivery-admin-nav";
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
-import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
-import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
-import type { AdminDeliveryItem, AdminDeliveryPool } from "@/types/api";
+import type { AdminDeliveryPool } from "@/types/api";
 
-const ITEMS_PER_PAGE = 10;
 const POOLS_PER_PAGE = 10;
-
-type PoolForm = {
-  slug: string;
-  title: string;
-  description: string;
-};
-
-const initialPoolForm: PoolForm = {
-  description: "",
-  slug: "",
-  title: "",
-};
-
-function optionalText(value: string) {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-}
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError
     ? error.message
-    : "عملیات موجودی تحویل انجام نشد.";
+    : "عملیات تحویل فوری انجام نشد.";
 }
 
 export default function AdminDeliveryPoolsPage() {
   const [pools, setPools] = useState<AdminDeliveryPool[]>([]);
-  const [items, setItems] = useState<AdminDeliveryItem[]>([]);
-  const [selectedPoolId, setSelectedPoolId] = useState("");
-  const [poolForm, setPoolForm] = useState<PoolForm>(initialPoolForm);
-  const [itemsText, setItemsText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [itemsLoading, setItemsLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [itemsPage, setItemsPage] = useState(1);
+  const [query, setQuery] = useState("");
   const [poolsPage, setPoolsPage] = useState(1);
-
-  async function loadPools(nextSelectedId?: string) {
-    const result = await api.admin.deliveryPools.list();
-    setPools(result.pools);
-    setSelectedPoolId((current) => {
-      if (nextSelectedId) return nextSelectedId;
-      if (current && result.pools.some((pool) => pool.id === current)) {
-        return current;
-      }
-      return result.pools[0]?.id ?? "";
-    });
-  }
-
-  async function loadItems(poolId: string) {
-    if (!poolId) {
-      setItems([]);
-      return;
-    }
-
-    setItemsLoading(true);
-    try {
-      const result = await api.admin.deliveryPools.items(poolId);
-      setItems(result.items);
-      setError("");
-    } catch (loadError) {
-      setError(errorMessage(loadError));
-    } finally {
-      setItemsLoading(false);
-    }
-  }
-
-  function selectPool(poolId: string) {
-    setSelectedPoolId(poolId);
-    setItemsPage(1);
-    void loadItems(poolId);
-  }
 
   useEffect(() => {
     let active = true;
 
-    api.admin.deliveryPools
-      .list()
-      .then((result) => {
-        if (active) {
-          setPools(result.pools);
-          setSelectedPoolId(result.pools[0]?.id ?? "");
-          void loadItems(result.pools[0]?.id ?? "");
-          setError("");
-        }
-      })
+    async function loadInitialPools() {
+      const result = await api.admin.deliveryPools.list();
+
+      if (!active) return;
+
+      setPools(result.pools);
+      setError("");
+    }
+
+    loadInitialPools()
       .catch((loadError) => {
         if (active) setError(errorMessage(loadError));
       })
@@ -115,264 +54,180 @@ export default function AdminDeliveryPoolsPage() {
     };
   }, []);
 
-  async function createPool(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      const result = await api.admin.deliveryPools.create({
-        description: optionalText(poolForm.description),
-        slug: poolForm.slug.trim(),
-        title: poolForm.title.trim(),
-      });
-      setPoolForm(initialPoolForm);
-      await loadPools(result.pool.id);
-      setMessage("مخزن تحویل ایجاد شد.");
-      setError("");
-    } catch (createError) {
-      setError(errorMessage(createError));
-      setMessage("");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const filteredPools = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return pools;
 
-  async function addItems(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    return pools.filter((pool) =>
+      [pool.title, pool.slug, pool.description]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [pools, query]);
 
-    const nextItems = itemsText
-      .split(/\r?\n/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    if (!selectedPoolId || !nextItems.length) {
-      setError("حداقل یک آیتم برای مخزن انتخاب‌شده وارد کنید.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await api.admin.deliveryPools.addItems(selectedPoolId, {
-        items: nextItems,
-      });
-      setItemsText("");
-      await Promise.all([loadPools(), loadItems(selectedPoolId)]);
-      setItemsPage(1);
-      setMessage("آیتم ها اضافه شدند.");
-      setError("");
-    } catch (addError) {
-      setError(errorMessage(addError));
-      setMessage("");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const poolsTotalPages = Math.max(1, Math.ceil(pools.length / POOLS_PER_PAGE));
-  const paginatedPools = pools.slice(
+  const poolsTotalPages = Math.max(
+    1,
+    Math.ceil(filteredPools.length / POOLS_PER_PAGE),
+  );
+  const paginatedPools = filteredPools.slice(
     (poolsPage - 1) * POOLS_PER_PAGE,
     poolsPage * POOLS_PER_PAGE,
   );
-  const itemsTotalPages = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE));
-  const paginatedItems = items.slice(
-    (itemsPage - 1) * ITEMS_PER_PAGE,
-    itemsPage * ITEMS_PER_PAGE,
+  const totalItems = pools.reduce((sum, pool) => sum + (pool._count?.items ?? 0), 0);
+  const connectedProducts = pools.reduce(
+    (sum, pool) => sum + (pool._count?.products ?? 0),
+    0,
   );
 
   return (
     <div className="space-y-6">
-      {message ? <AdminState tone="success">{message}</AdminState> : null}
+      <DeliveryAdminNav />
+
       {error ? <AdminState tone="danger">{error}</AdminState> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[0.7fr_1.3fr]">
-        <AdminSection title="مخزن تحویل جدید">
-          <form className="space-y-4" onSubmit={createPool}>
-            <label className="block text-sm font-medium">
-              عنوان
-              <Input
-                className="mt-2"
-                required
-                value={poolForm.title}
-                onChange={(event) =>
-                  setPoolForm((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              اسلاگ
-              <Input
-                className="mt-2"
-                dir="ltr"
-                pattern="[a-z0-9-]+"
-                required
-                value={poolForm.slug}
-                onChange={(event) =>
-                  setPoolForm((current) => ({
-                    ...current,
-                    slug: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              توضیح
-              <textarea
-                className="mt-2 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={poolForm.description}
-                onChange={(event) =>
-                  setPoolForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <Button disabled={saving} type="submit">
-              <Plus className="size-4" />
-              ایجاد مخزن
-            </Button>
-          </form>
-        </AdminSection>
-
-        <AdminSection title="افزودن آیتم تحویل">
-          <form className="space-y-4" onSubmit={addItems}>
-            <label className="block text-sm font-medium">
-              مخزن تحویل
-              <Select
-                className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                required
-                value={selectedPoolId}
-                onChange={(event) => selectPool(event.target.value)}
-              >
-                <option value="">انتخاب کنید</option>
-                {pools.map((pool) => (
-                  <option key={pool.id} value={pool.id}>
-                    {pool.title}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="block text-sm font-medium">
-              هر آیتم در یک خط
-              <textarea
-                className="mt-2 min-h-36 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                dir="ltr"
-                required
-                value={itemsText}
-                onChange={(event) => setItemsText(event.target.value)}
-              />
-            </label>
-            <Button disabled={saving || !selectedPoolId} type="submit">
-              <Plus className="size-4" />
-              افزودن آیتم ها
-            </Button>
-          </form>
-        </AdminSection>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">استخرهای تحویل</p>
+          <p className="mt-2 text-2xl font-bold">{pools.length}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">آیتم آماده/ثبت شده</p>
+          <p className="mt-2 text-2xl font-bold">{totalItems}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">محصول متصل</p>
+          <p className="mt-2 text-2xl font-bold">{connectedProducts}</p>
+        </div>
       </div>
 
       <AdminSection
-        description="مخزن‌هایی که برای تحویل فوری محصولات استفاده می‌شوند."
-        title="مخزن‌های تحویل"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/admin/delivery-pools/items">
+                <Boxes className="size-4" />
+                مدیریت آیتم ها
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/admin/delivery-pools/new">
+                <Plus className="size-4" />
+                ایجاد استخر
+              </Link>
+            </Button>
+          </div>
+        }
+        description="استخرهایی که محصول تحویل فوری از موجودی آماده آن ها استفاده می کند"
+        title="لیست استخرهای تحویل"
       >
+        <label className="relative block max-w-md text-sm font-medium">
+          <span className="sr-only">جستجو</span>
+          <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pr-9"
+            placeholder="جستجو با عنوان یا اسلاگ"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPoolsPage(1);
+            }}
+          />
+        </label>
+
         {loading ? (
-          <AdminState>در حال دریافت مخزن‌ها...</AdminState>
-        ) : pools.length ? (
-          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
-            <table className="w-full min-w-[760px] text-right text-sm">
-              <thead className="text-xs text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="py-3 font-medium">شناسه</th>
-                  <th className="py-3 font-medium">عنوان</th>
-                  <th className="py-3 font-medium">اسلاگ</th>
-                  <th className="py-3 font-medium">آیتم</th>
-                  <th className="py-3 font-medium">محصول</th>
-                  <th className="py-3 font-medium">ثبت</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedPools.map((pool) => (
-                  <tr key={pool.id} className="border-b border-border last:border-0">
-                    <td className="py-3 font-medium" dir="ltr">
-                      {shortId(pool.id)}
-                    </td>
-                    <td className="py-3">{pool.title}</td>
-                    <td className="py-3" dir="ltr">
-                      {pool.slug}
-                    </td>
-                    <td className="py-3">{pool._count?.items ?? 0}</td>
-                    <td className="py-3">{pool._count?.products ?? 0}</td>
-                    <td className="py-3 text-muted-foreground">
-                      {formatDate(pool.createdAt)}
-                    </td>
+          <AdminState>در حال دریافت استخرهای تحویل...</AdminState>
+        ) : filteredPools.length ? (
+          <div className="mt-5 space-y-4">
+            <div className="grid gap-3 md:hidden">
+              {paginatedPools.map((pool) => (
+                <article
+                  className="rounded-lg border border-border bg-background p-4"
+                  key={pool.id}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-bold">{pool.title}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                        {pool.slug}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">{shortId(pool.id)}</Badge>
+                  </div>
+                  {pool.description ? (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {pool.description}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="outline">{pool._count?.items ?? 0} آیتم</Badge>
+                    <Badge variant="outline">
+                      {pool._count?.products ?? 0} محصول متصل
+                    </Badge>
+                    <Badge variant="outline">{formatDate(pool.createdAt)}</Badge>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/admin/delivery-pools/items?pool=${pool.id}`}>
+                        <PackageOpen className="size-4" />
+                        آیتم ها
+                      </Link>
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden w-full max-w-full overflow-x-auto overscroll-x-contain md:block">
+              <table className="w-full min-w-[860px] text-right text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="py-3 font-medium">شناسه</th>
+                    <th className="py-3 font-medium">عنوان</th>
+                    <th className="py-3 font-medium">اسلاگ</th>
+                    <th className="py-3 font-medium">آیتم</th>
+                    <th className="py-3 font-medium">محصول</th>
+                    <th className="py-3 font-medium">ثبت</th>
+                    <th className="py-3 font-medium">عملیات</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedPools.map((pool) => (
+                    <tr key={pool.id} className="border-b border-border last:border-0">
+                      <td className="py-3 font-medium" dir="ltr">
+                        {shortId(pool.id)}
+                      </td>
+                      <td className="py-3 font-medium">{pool.title}</td>
+                      <td className="py-3 text-muted-foreground" dir="ltr">
+                        {pool.slug}
+                      </td>
+                      <td className="py-3">{pool._count?.items ?? 0}</td>
+                      <td className="py-3">{pool._count?.products ?? 0}</td>
+                      <td className="py-3 text-muted-foreground">
+                        {formatDate(pool.createdAt)}
+                      </td>
+                      <td className="py-3">
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/admin/delivery-pools/items?pool=${pool.id}`}>
+                            <PackageOpen className="size-4" />
+                            آیتم ها
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <Pagination
               page={poolsPage}
-              totalItems={pools.length}
+              totalItems={filteredPools.length}
               totalPages={poolsTotalPages}
               onPageChange={setPoolsPage}
             />
           </div>
         ) : (
-          <AdminState>مخزنی ثبت نشده است.</AdminState>
-        )}
-      </AdminSection>
-
-      <AdminSection
-        description="محتواهای آماده‌ای که بعد از خرید به کاربر تحویل داده می‌شوند."
-        title="آیتم‌های مخزن انتخاب‌شده"
-      >
-        {itemsLoading ? (
-          <AdminState>در حال دریافت آیتم ها...</AdminState>
-        ) : items.length ? (
-          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
-            <table className="w-full min-w-[860px] text-right text-sm">
-              <thead className="text-xs text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="py-3 font-medium">شناسه</th>
-                  <th className="py-3 font-medium">محتوا</th>
-                  <th className="py-3 font-medium">وضعیت</th>
-                  <th className="py-3 font-medium">تحویل</th>
-                  <th className="py-3 font-medium">ثبت</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedItems.map((item) => (
-                  <tr key={item.id} className="border-b border-border last:border-0">
-                    <td className="py-3 font-medium" dir="ltr">
-                      {shortId(item.id)}
-                    </td>
-                    <td className="py-3">
-                      <code className="block max-w-lg whitespace-pre-wrap rounded-md bg-muted px-2 py-1 text-xs">
-                        {item.content}
-                      </code>
-                    </td>
-                    <td className="py-3">
-                      <AdminStatusBadge type="delivery" value={item.status} />
-                    </td>
-                    <td className="py-3 text-muted-foreground">
-                      {formatDate(item.deliveredAt)}
-                    </td>
-                    <td className="py-3 text-muted-foreground">
-                      {formatDate(item.createdAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <Pagination
-              page={itemsPage}
-              totalItems={items.length}
-              totalPages={itemsTotalPages}
-              onPageChange={setItemsPage}
-            />
-          </div>
-        ) : (
-          <AdminState>برای این مخزن آیتمی ثبت نشده است.</AdminState>
+          <AdminState>استخر تحویلی با این جستجو پیدا نشد.</AdminState>
         )}
       </AdminSection>
     </div>

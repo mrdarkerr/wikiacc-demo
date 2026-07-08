@@ -1,101 +1,27 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Pencil, Plus, Power, Search, Tags } from "lucide-react";
 
 import {
   formatCurrency,
   productTypeLabel,
   shortId,
 } from "@/components/admin/admin-formatters";
+import { ProductAdminNav } from "@/components/admin/product-admin-nav";
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
-import type {
-  AdminDeliveryPool,
-  FieldType,
-  Product,
-  ProductField,
-  ProductCategory,
-  ProductType,
-} from "@/types/api";
+import type { Product, ProductCategory, ProductType } from "@/types/api";
 
-const fieldTypes: FieldType[] = ["TEXT", "EMAIL", "PHONE", "TEXTAREA", "SELECT"];
 const PRODUCTS_PER_PAGE = 10;
-
-const fieldTypeLabels: Record<FieldType, string> = {
-  EMAIL: "ایمیل",
-  PHONE: "موبایل",
-  SELECT: "انتخابی",
-  TEXT: "متن کوتاه",
-  TEXTAREA: "متن بلند",
-};
-
-type ProductForm = {
-  slug: string;
-  title: string;
-  description: string;
-  type: ProductType;
-  price: string;
-  categoryId: string;
-  deliveryPoolId: string;
-  isActive: boolean;
-  sortOrder: string;
-};
-
-type CategoryForm = {
-  slug: string;
-  title: string;
-  description: string;
-};
-
-type FieldDraft = {
-  id: string;
-  key: string;
-  label: string;
-  type: FieldType;
-  required: boolean;
-  optionsText: string;
-};
-
-const initialProductForm: ProductForm = {
-  categoryId: "",
-  deliveryPoolId: "",
-  description: "",
-  isActive: true,
-  price: "",
-  slug: "",
-  sortOrder: "0",
-  title: "",
-  type: "CUSTOM_FORM",
-};
-
-const initialCategoryForm: CategoryForm = {
-  description: "",
-  slug: "",
-  title: "",
-};
-
-function createFieldDraft(field?: ProductField): FieldDraft {
-  return {
-    id: field?.id ?? `field-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    key: field?.key ?? "",
-    label: field?.label ?? "",
-    optionsText: field?.optionsJson ?? "",
-    required: field?.required ?? false,
-    type: field?.type ?? "TEXT",
-  };
-}
-
-function optionalText(value: string) {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-}
+type ProductTypeFilter = ProductType | "ALL";
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError
@@ -106,49 +32,42 @@ function errorMessage(error: unknown) {
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [pools, setPools] = useState<AdminDeliveryPool[]>([]);
-  const [productForm, setProductForm] =
-    useState<ProductForm>(initialProductForm);
-  const [fieldDrafts, setFieldDrafts] = useState<FieldDraft[]>([
-    createFieldDraft(),
-  ]);
-  const [categoryForm, setCategoryForm] =
-    useState<CategoryForm>(initialCategoryForm);
-  const [editingProductId, setEditingProductId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [productsPage, setProductsPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<ProductTypeFilter>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
 
   async function loadData() {
-    const [productsResult, categoriesResult, poolsResult] = await Promise.all([
+    const [productsResult, categoriesResult] = await Promise.all([
       api.admin.products.list(),
       api.admin.categories.list(),
-      api.admin.deliveryPools.list(),
     ]);
 
     setProducts(productsResult.products);
     setCategories(categoriesResult.categories);
-    setPools(poolsResult.pools);
   }
 
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      api.admin.products.list(),
-      api.admin.categories.list(),
-      api.admin.deliveryPools.list(),
-    ])
-      .then(([productsResult, categoriesResult, poolsResult]) => {
-        if (active) {
-          setProducts(productsResult.products);
-          setCategories(categoriesResult.categories);
-          setPools(poolsResult.pools);
-          setError("");
-        }
-      })
+    async function loadInitialData() {
+      const [productsResult, categoriesResult] = await Promise.all([
+        api.admin.products.list(),
+        api.admin.categories.list(),
+      ]);
+
+      if (!active) return;
+
+      setProducts(productsResult.products);
+      setCategories(categoriesResult.categories);
+      setError("");
+    }
+
+    loadInitialData()
       .catch((loadError) => {
         if (active) setError(errorMessage(loadError));
       })
@@ -160,126 +79,6 @@ export default function AdminProductsPage() {
       active = false;
     };
   }, []);
-
-  async function createCategory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await api.admin.categories.create({
-        description: optionalText(categoryForm.description),
-        isActive: true,
-        slug: categoryForm.slug.trim(),
-        title: categoryForm.title.trim(),
-      });
-      setCategoryForm(initialCategoryForm);
-      await loadData();
-      setMessage("دسته بندی ایجاد شد.");
-      setError("");
-    } catch (createError) {
-      setError(errorMessage(createError));
-      setMessage("");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveProduct(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-
-    const field =
-      productForm.type === "CUSTOM_FORM"
-        ? fieldDrafts
-            .filter((fieldDraft) => fieldDraft.key.trim() && fieldDraft.label.trim())
-            .map((fieldDraft, index) => ({
-              key: fieldDraft.key.trim(),
-              label: fieldDraft.label.trim(),
-              optionsJson: optionalText(fieldDraft.optionsText),
-              required: fieldDraft.required,
-              sortOrder: index,
-              type: fieldDraft.type,
-            }))
-        : [];
-
-    try {
-      const body = {
-        categoryId: optionalText(productForm.categoryId),
-        deliveryPoolId:
-          productForm.type === "INSTANT_DELIVERY"
-            ? optionalText(productForm.deliveryPoolId)
-            : undefined,
-        description: optionalText(productForm.description),
-        fields: field,
-        isActive: productForm.isActive,
-        price: Number(productForm.price),
-        slug: productForm.slug.trim(),
-        sortOrder: Number(productForm.sortOrder || 0),
-        title: productForm.title.trim(),
-        type: productForm.type,
-      };
-
-      if (editingProductId) {
-        await api.admin.products.update(editingProductId, body);
-      } else {
-        await api.admin.products.create(body);
-      }
-
-      setProductForm(initialProductForm);
-      setFieldDrafts([createFieldDraft()]);
-      setEditingProductId("");
-      await loadData();
-      setMessage(editingProductId ? "محصول به روز شد." : "محصول ایجاد شد.");
-      setError("");
-    } catch (createError) {
-      setError(errorMessage(createError));
-      setMessage("");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function updateFieldDraft(id: string, patch: Partial<FieldDraft>) {
-    setFieldDrafts((current) =>
-      current.map((fieldDraft) =>
-        fieldDraft.id === id ? { ...fieldDraft, ...patch } : fieldDraft,
-      ),
-    );
-  }
-
-  function removeFieldDraft(id: string) {
-    setFieldDrafts((current) =>
-      current.length > 1
-        ? current.filter((fieldDraft) => fieldDraft.id !== id)
-        : [createFieldDraft()],
-    );
-  }
-
-  function startEditProduct(product: Product) {
-    setEditingProductId(product.id);
-    setProductForm({
-      categoryId: product.category?.id ?? "",
-      deliveryPoolId: product.deliveryPool?.id ?? "",
-      description: product.description ?? "",
-      isActive: product.isActive,
-      price: String(product.price),
-      slug: product.slug,
-      sortOrder: String(product.sortOrder),
-      title: product.title,
-      type: product.type,
-    });
-    setFieldDrafts(
-      product.fields.length
-        ? product.fields.map(createFieldDraft)
-        : [createFieldDraft()],
-    );
-    window.scrollTo({ behavior: "smooth", top: 0 });
-  }
-
-  function resetProductForm() {
-    setProductForm(initialProductForm);
-    setFieldDrafts([createFieldDraft()]);
-    setEditingProductId("");
-  }
 
   async function toggleActive(product: Product) {
     setSaving(true);
@@ -298,435 +97,255 @@ export default function AdminProductsPage() {
     }
   }
 
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesQuery = normalizedQuery
+        ? [product.title, product.slug, product.category?.title]
+            .filter(Boolean)
+            .some((value) => value!.toLowerCase().includes(normalizedQuery))
+        : true;
+      const matchesType =
+        typeFilter === "ALL" ? true : product.type === typeFilter;
+      const matchesCategory =
+        categoryFilter === "ALL"
+          ? true
+          : categoryFilter === "NONE"
+            ? !product.category
+            : product.category?.id === categoryFilter;
+
+      return matchesQuery && matchesType && matchesCategory;
+    });
+  }, [categoryFilter, products, query, typeFilter]);
+
   const productsTotalPages = Math.max(
     1,
-    Math.ceil(products.length / PRODUCTS_PER_PAGE),
+    Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE),
   );
-  const paginatedProducts = products.slice(
+  const paginatedProducts = filteredProducts.slice(
     (productsPage - 1) * PRODUCTS_PER_PAGE,
     productsPage * PRODUCTS_PER_PAGE,
   );
+  const activeCount = products.filter((product) => product.isActive).length;
+  const customFormCount = products.filter(
+    (product) => product.type === "CUSTOM_FORM",
+  ).length;
+  const instantDeliveryCount = products.filter(
+    (product) => product.type === "INSTANT_DELIVERY",
+  ).length;
 
   return (
     <div className="space-y-6">
+      <ProductAdminNav />
+
       {message ? <AdminState tone="success">{message}</AdminState> : null}
       {error ? <AdminState tone="danger">{error}</AdminState> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[0.7fr_1.3fr]">
-        <AdminSection title="دسته بندی جدید">
-          <form className="space-y-4" onSubmit={createCategory}>
-            <label className="block text-sm font-medium">
-              عنوان
-              <Input
-                className="mt-2"
-                required
-                value={categoryForm.title}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              اسلاگ
-              <Input
-                className="mt-2"
-                dir="ltr"
-                pattern="[a-z0-9-]+"
-                required
-                value={categoryForm.slug}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    slug: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              توضیح
-              <textarea
-                className="mt-2 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={categoryForm.description}
-                onChange={(event) =>
-                  setCategoryForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <Button disabled={saving} type="submit">
-              <Plus className="size-4" />
-              ایجاد دسته بندی
-            </Button>
-          </form>
-        </AdminSection>
-
-        <AdminSection title={editingProductId ? "ویرایش محصول" : "محصول جدید"}>
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={saveProduct}>
-            <label className="block text-sm font-medium">
-              عنوان
-              <Input
-                className="mt-2"
-                required
-                value={productForm.title}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              اسلاگ
-              <Input
-                className="mt-2"
-                dir="ltr"
-                pattern="[a-z0-9-]+"
-                required
-                value={productForm.slug}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    slug: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              نوع
-              <Select
-                className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={productForm.type}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    deliveryPoolId: "",
-                    type: event.target.value as ProductType,
-                  }))
-                }
-              >
-                <option value="CUSTOM_FORM">فرم اختصاصی</option>
-                <option value="INSTANT_DELIVERY">تحویل فوری</option>
-              </Select>
-            </label>
-            <label className="block text-sm font-medium">
-              قیمت
-              <Input
-                className="mt-2"
-                min={0}
-                required
-                type="number"
-                value={productForm.price}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    price: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              دسته بندی
-              <Select
-                className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={productForm.categoryId}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    categoryId: event.target.value,
-                  }))
-                }
-              >
-                <option value="">بدون دسته بندی</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.title}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="block text-sm font-medium">
-              مخزن تحویل فوری
-              <Select
-                className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                disabled={productForm.type !== "INSTANT_DELIVERY"}
-                required={productForm.type === "INSTANT_DELIVERY"}
-                value={productForm.deliveryPoolId}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    deliveryPoolId: event.target.value,
-                  }))
-                }
-              >
-                <option value="">انتخاب نشده</option>
-                {pools.map((pool) => (
-                  <option key={pool.id} value={pool.id}>
-                    {pool.title}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="block text-sm font-medium">
-              ترتیب
-              <Input
-                className="mt-2"
-                type="number"
-                value={productForm.sortOrder}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    sortOrder: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="flex items-center gap-2 pt-8 text-sm font-medium">
-              <input
-                checked={productForm.isActive}
-                className="size-4"
-                type="checkbox"
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    isActive: event.target.checked,
-                  }))
-                }
-              />
-              فعال باشد
-            </label>
-            <label className="block text-sm font-medium md:col-span-2">
-              توضیح
-              <textarea
-                className="mt-2 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={productForm.description}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            {productForm.type === "CUSTOM_FORM" ? (
-              <div className="space-y-4 rounded-md border border-border p-4 md:col-span-2">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm font-medium">فیلدهای فرم سفارش</p>
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      setFieldDrafts((current) => [
-                        ...current,
-                        createFieldDraft(),
-                      ])
-                    }
-                  >
-                    <Plus className="size-4" />
-                    افزودن فیلد
-                  </Button>
-                </div>
-
-                {fieldDrafts.map((fieldDraft, index) => (
-                  <div
-                    className="grid gap-4 rounded-md bg-muted/40 p-3 md:grid-cols-2"
-                    key={fieldDraft.id}
-                  >
-                    <p className="text-xs font-medium text-muted-foreground md:col-span-2">
-                      فیلد {index + 1}
-                    </p>
-                    <label className="block text-sm font-medium">
-                      کلید
-                      <Input
-                        className="mt-2"
-                        dir="ltr"
-                        pattern="[A-Za-z0-9_]+"
-                        value={fieldDraft.key}
-                        onChange={(event) =>
-                          updateFieldDraft(fieldDraft.id, {
-                            key: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="block text-sm font-medium">
-                      عنوان قابل نمایش
-                      <Input
-                        className="mt-2"
-                        value={fieldDraft.label}
-                        onChange={(event) =>
-                          updateFieldDraft(fieldDraft.id, {
-                            label: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="block text-sm font-medium">
-                      نوع فیلد
-                      <Select
-                        className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        value={fieldDraft.type}
-                        onChange={(event) =>
-                          updateFieldDraft(fieldDraft.id, {
-                            type: event.target.value as FieldType,
-                          })
-                        }
-                      >
-                        {fieldTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {fieldTypeLabels[type]}
-                          </option>
-                        ))}
-                      </Select>
-                    </label>
-                    <label className="flex items-center gap-2 pt-8 text-sm font-medium">
-                      <input
-                        checked={fieldDraft.required}
-                        className="size-4"
-                        type="checkbox"
-                        onChange={(event) =>
-                          updateFieldDraft(fieldDraft.id, {
-                            required: event.target.checked,
-                          })
-                        }
-                      />
-                      اجباری
-                    </label>
-                    <label className="block text-sm font-medium md:col-span-2">
-                      گزینه‌های انتخابی
-                      <Input
-                        className="mt-2"
-                        dir="ltr"
-                        placeholder='["گزینه ۱","گزینه ۲"]'
-                        value={fieldDraft.optionsText}
-                        onChange={(event) =>
-                          updateFieldDraft(fieldDraft.id, {
-                            optionsText: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <div className="md:col-span-2">
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="ghost"
-                        onClick={() => removeFieldDraft(fieldDraft.id)}
-                      >
-                        حذف فیلد
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap gap-2 md:col-span-2">
-              <Button disabled={saving} type="submit">
-                <Plus className="size-4" />
-                {editingProductId ? "ذخیره تغییرات" : "ایجاد محصول"}
-              </Button>
-              {editingProductId ? (
-                <Button
-                  disabled={saving}
-                  type="button"
-                  variant="outline"
-                  onClick={resetProductForm}
-                >
-                  لغو ویرایش
-                </Button>
-              ) : null}
-            </div>
-          </form>
-        </AdminSection>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">محصولات فعال</p>
+          <p className="mt-2 text-2xl font-bold">{activeCount}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">فرم اختصاصی</p>
+          <p className="mt-2 text-2xl font-bold">{customFormCount}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">تحویل فوری</p>
+          <p className="mt-2 text-2xl font-bold">{instantDeliveryCount}</p>
+        </div>
       </div>
 
       <AdminSection
-        description="مدیریت قیمت، وضعیت، فرم سفارش و اتصال به موجودی تحویل فوری"
-        title="محصولات"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/admin/products/categories">
+                <Tags className="size-4" />
+                دسته بندی ها
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/admin/products/new">
+                <Plus className="size-4" />
+                ایجاد محصول
+              </Link>
+            </Button>
+          </div>
+        }
+        description="جستجو، فیلتر و مدیریت وضعیت محصولات فروشگاه"
+        title="لیست محصولات"
       >
+        <div className="grid gap-3 md:grid-cols-[1fr_220px_220px]">
+          <label className="relative block text-sm font-medium">
+            <span className="sr-only">جستجو</span>
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pr-9"
+              placeholder="جستجو با عنوان، اسلاگ یا دسته بندی"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setProductsPage(1);
+              }}
+            />
+          </label>
+          <Select
+            aria-label="فیلتر نوع محصول"
+            value={typeFilter}
+            onChange={(event) => {
+              setTypeFilter(event.target.value as ProductTypeFilter);
+              setProductsPage(1);
+            }}
+          >
+            <option value="ALL">همه نوع ها</option>
+            <option value="CUSTOM_FORM">فرم اختصاصی</option>
+            <option value="INSTANT_DELIVERY">تحویل فوری</option>
+          </Select>
+          <Select
+            aria-label="فیلتر دسته بندی"
+            value={categoryFilter}
+            onChange={(event) => {
+              setCategoryFilter(event.target.value);
+              setProductsPage(1);
+            }}
+          >
+            <option value="ALL">همه دسته بندی ها</option>
+            <option value="NONE">بدون دسته بندی</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.title}
+              </option>
+            ))}
+          </Select>
+        </div>
+
         {loading ? (
           <AdminState>در حال دریافت محصولات...</AdminState>
-        ) : products.length ? (
-          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
-            <table className="w-full min-w-[980px] text-right text-sm">
-              <thead className="text-xs text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="py-3 font-medium">شناسه</th>
-                  <th className="py-3 font-medium">عنوان</th>
-                  <th className="py-3 font-medium">اسلاگ</th>
-                  <th className="py-3 font-medium">نوع</th>
-                  <th className="py-3 font-medium">قیمت</th>
-                  <th className="py-3 font-medium">دسته</th>
-                  <th className="py-3 font-medium">مخزن تحویل</th>
-                  <th className="py-3 font-medium">وضعیت</th>
-                  <th className="py-3 font-medium">عملیات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedProducts.map((product) => (
-                  <tr
-                    key={product.id}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="py-3 font-medium" dir="ltr">
-                      {shortId(product.id)}
-                    </td>
-                    <td className="py-3">{product.title}</td>
-                    <td className="py-3" dir="ltr">
-                      {product.slug}
-                    </td>
-                    <td className="py-3">{productTypeLabel(product.type)}</td>
-                    <td className="py-3">{formatCurrency(product.price)}</td>
-                    <td className="py-3">{product.category?.title ?? "-"}</td>
-                    <td className="py-3">{product.deliveryPool?.title ?? "-"}</td>
-                    <td className="py-3">
-                      <AdminStatusBadge type="boolean" value={product.isActive} />
-                    </td>
-                    <td className="py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          disabled={saving}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                          onClick={() => startEditProduct(product)}
-                        >
-                          ویرایش
-                        </Button>
-                        <Button
-                          disabled={saving}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                          onClick={() => toggleActive(product)}
-                        >
-                          {product.isActive ? "غیرفعال" : "فعال"}
-                        </Button>
-                      </div>
-                    </td>
+        ) : filteredProducts.length ? (
+          <div className="mt-5 space-y-4">
+            <div className="grid gap-3 md:hidden">
+              {paginatedProducts.map((product) => (
+                <article
+                  className="rounded-lg border border-border bg-background p-4"
+                  key={product.id}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-bold">{product.title}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                        {product.slug}
+                      </p>
+                    </div>
+                    <AdminStatusBadge type="boolean" value={product.isActive} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="secondary">{productTypeLabel(product.type)}</Badge>
+                    <Badge variant="outline">
+                      {product.category?.title ?? "بدون دسته بندی"}
+                    </Badge>
+                    <Badge variant="outline">{product.fields.length} فیلد</Badge>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold">
+                    {formatCurrency(product.price)}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/admin/products/new?edit=${product.id}`}>
+                        <Pencil className="size-4" />
+                        ویرایش
+                      </Link>
+                    </Button>
+                    <Button
+                      disabled={saving}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={() => toggleActive(product)}
+                    >
+                      <Power className="size-4" />
+                      {product.isActive ? "غیرفعال" : "فعال"}
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden w-full max-w-full overflow-x-auto overscroll-x-contain md:block">
+              <table className="w-full min-w-[900px] text-right text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="py-3 font-medium">شناسه</th>
+                    <th className="py-3 font-medium">عنوان</th>
+                    <th className="py-3 font-medium">اسلاگ</th>
+                    <th className="py-3 font-medium">نوع</th>
+                    <th className="py-3 font-medium">قیمت</th>
+                    <th className="py-3 font-medium">دسته</th>
+                    <th className="py-3 font-medium">فیلد</th>
+                    <th className="py-3 font-medium">وضعیت</th>
+                    <th className="py-3 font-medium">عملیات</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedProducts.map((product) => (
+                    <tr
+                      key={product.id}
+                      className="border-b border-border last:border-0"
+                    >
+                      <td className="py-3 font-medium" dir="ltr">
+                        {shortId(product.id)}
+                      </td>
+                      <td className="py-3 font-medium">{product.title}</td>
+                      <td className="py-3 text-muted-foreground" dir="ltr">
+                        {product.slug}
+                      </td>
+                      <td className="py-3">{productTypeLabel(product.type)}</td>
+                      <td className="py-3">{formatCurrency(product.price)}</td>
+                      <td className="py-3">{product.category?.title ?? "-"}</td>
+                      <td className="py-3">{product.fields.length}</td>
+                      <td className="py-3">
+                        <AdminStatusBadge type="boolean" value={product.isActive} />
+                      </td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={`/admin/products/new?edit=${product.id}`}>
+                              <Pencil className="size-4" />
+                              ویرایش
+                            </Link>
+                          </Button>
+                          <Button
+                            disabled={saving}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            onClick={() => toggleActive(product)}
+                          >
+                            <Power className="size-4" />
+                            {product.isActive ? "غیرفعال" : "فعال"}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <Pagination
               page={productsPage}
-              totalItems={products.length}
+              totalItems={filteredProducts.length}
               totalPages={productsTotalPages}
               onPageChange={setProductsPage}
             />
           </div>
         ) : (
-          <AdminState>محصولی ثبت نشده است.</AdminState>
+          <AdminState>محصولی با این فیلترها پیدا نشد.</AdminState>
         )}
       </AdminSection>
     </div>
   );
 }
+
+
