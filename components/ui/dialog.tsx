@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
 
@@ -17,7 +18,32 @@ export function DialogOverlay({
   contentClassName,
   onClose,
 }: DialogOverlayProps) {
-  return (
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setPortalRoot(document.body);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!portalRoot) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [portalRoot]);
+
+  if (!portalRoot) return null;
+
+  return createPortal(
     <div
       aria-modal="true"
       className={cn(
@@ -25,6 +51,7 @@ export function DialogOverlay({
         className,
       )}
       role="dialog"
+      style={{ inset: 0, margin: 0 }}
       onClick={onClose}
     >
       <div className="flex h-full w-full items-center justify-center p-4">
@@ -35,6 +62,7 @@ export function DialogOverlay({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    portalRoot,
   );
 }

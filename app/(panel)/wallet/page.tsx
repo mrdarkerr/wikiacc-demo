@@ -37,6 +37,16 @@ function transactionDescription(transaction: WalletTransaction) {
   return note || "شارژ آنلاین کیف پول";
 }
 
+function transactionAmountClass(transaction: WalletTransaction) {
+  return transaction.amount >= 0
+    ? "text-emerald-600 dark:text-emerald-300"
+    : "text-rose-600 dark:text-rose-300";
+}
+
+function transactionAmountSign(transaction: WalletTransaction) {
+  return transaction.amount >= 0 ? "+" : "-";
+}
+
 export default function WalletPage() {
   const [summary, setSummary] = useState<WalletSummary | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -135,8 +145,56 @@ export default function WalletPage() {
         ) : error ? (
           <p className="text-sm text-rose-600">{error}</p>
         ) : transactions.length ? (
-          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
-            <table className="w-full min-w-[680px] text-right text-sm">
+          <>
+            <div className="space-y-3 md:hidden">
+              {transactions.map((transaction) => (
+                <article
+                  className="rounded-md border border-border bg-background/60 p-4 text-sm"
+                  key={transaction.id}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">نوع تراکنش</p>
+                      <h3 className="mt-1 font-bold">
+                        {transactionTypeLabel(transaction.type)}
+                      </h3>
+                    </div>
+                    <StatusBadge type="transaction" value={transaction.status} />
+                  </div>
+
+                  <p className="mt-3 leading-6 text-muted-foreground">
+                    {transactionDescription(transaction)}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-md bg-muted/50 p-3">
+                      <p className="text-xs text-muted-foreground">مبلغ</p>
+                      <p
+                        className={`mt-1 font-bold ${transactionAmountClass(
+                          transaction,
+                        )}`}
+                      >
+                        {transactionAmountSign(transaction)}
+                        {formatCurrency(Math.abs(transaction.amount))}
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-muted/50 p-3">
+                      <p className="text-xs text-muted-foreground">تاریخ</p>
+                      <p className="mt-1 font-medium">
+                        {formatDate(transaction.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 text-xs text-muted-foreground" dir="ltr">
+                    {transaction.id.slice(-8).toUpperCase()}
+                  </p>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden w-full max-w-full overflow-x-auto overscroll-x-contain md:block">
+              <table className="w-full min-w-[680px] text-right text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border">
                   <th className="py-3 font-medium">شناسه</th>
@@ -161,13 +219,7 @@ export default function WalletPage() {
                       {transactionDescription(transaction)}
                     </td>
                     <td className="py-3">
-                      <span
-                        className={
-                          transaction.amount >= 0
-                            ? "text-emerald-600 dark:text-emerald-300"
-                            : "text-rose-600 dark:text-rose-300"
-                        }
-                      >
+                      <span className={transactionAmountClass(transaction)}>
                         {formatCurrency(Math.abs(transaction.amount))}
                       </span>
                     </td>
@@ -180,7 +232,9 @@ export default function WalletPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
+
             <Pagination
               page={page}
               totalPages={totalPages}
@@ -189,7 +243,7 @@ export default function WalletPage() {
                 setPage(nextPage);
               }}
             />
-          </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">تراکنشی ثبت نشده است.</p>
         )}

@@ -94,7 +94,67 @@ export default function OrdersPage() {
           <p className="text-sm text-rose-600">{error}</p>
         ) : orders.length ? (
           <>
-            <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+            <div className="space-y-3 md:hidden">
+              {orders.map((order) => {
+                const deliveries = deliveredContent(order);
+
+                return (
+                  <article
+                    className="rounded-md border border-border bg-background/60 p-4 text-sm"
+                    key={order.id}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">شماره سفارش</p>
+                        <p className="mt-1 font-bold" dir="ltr">
+                          {orderCode(order)}
+                        </p>
+                      </div>
+                      <StatusBadge type="order" value={order.status} />
+                    </div>
+
+                    <h3 className="mt-4 line-clamp-2 font-bold leading-6">
+                      {orderTitle(order)}
+                    </h3>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-md bg-muted/50 p-3">
+                        <p className="text-xs text-muted-foreground">مبلغ</p>
+                        <p className="mt-1 font-bold">
+                          {formatCurrency(order.totalAmount)}
+                        </p>
+                      </div>
+                      <div className="rounded-md bg-muted/50 p-3">
+                        <p className="text-xs text-muted-foreground">ثبت</p>
+                        <p className="mt-1 font-medium">
+                          {formatDate(order.createdAt)}
+                        </p>
+                      </div>
+                      <div className="col-span-2 rounded-md bg-muted/50 p-3">
+                        <p className="text-xs text-muted-foreground">تحویل</p>
+                        <p className="mt-1 font-medium">
+                          {deliveries.length
+                            ? `${deliveries.length} مورد آماده`
+                            : "هنوز محتوایی ثبت نشده است"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      className="mt-4 w-full"
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSelectedOrder(order)}
+                    >
+                      <Eye className="size-4" />
+                      مشاهده جزئیات
+                    </Button>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="hidden w-full max-w-full overflow-x-auto overscroll-x-contain md:block">
               <table className="w-full min-w-[820px] text-right text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border">
