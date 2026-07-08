@@ -14,9 +14,12 @@ import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import type { AdminTicket, TicketPriority, TicketStatus } from "@/types/api";
 
+const PER_PAGE = 10;
 const ticketStatuses: TicketStatus[] = ["OPEN", "ANSWERED", "CLOSED"];
 const ticketPriorities: TicketPriority[] = ["LOW", "NORMAL", "HIGH"];
 
@@ -42,6 +45,7 @@ export default function AdminTicketsPage() {
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
   const [priorityFilter, setPriorityFilter] =
@@ -97,6 +101,12 @@ export default function AdminTicketsPage() {
     });
   }, [priorityFilter, search, statusFilter, tickets]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PER_PAGE));
+  const paginatedTickets = filteredTickets.slice(
+    (page - 1) * PER_PAGE,
+    page * PER_PAGE,
+  );
+
   const metrics = useMemo(
     () => [
       {
@@ -139,15 +149,19 @@ export default function AdminTicketsPage() {
               className="h-11 pr-9"
               placeholder="جست‌وجوی موضوع، کاربر، سفارش یا متن پیام"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
             />
           </label>
-          <select
+          <Select
             className="h-11 rounded-md border border-input bg-background px-3 text-sm"
             value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as "ALL" | TicketStatus)
-            }
+            onChange={(event) => {
+              setStatusFilter(event.target.value as "ALL" | TicketStatus);
+              setPage(1);
+            }}
           >
             <option value="ALL">همه وضعیت‌ها</option>
             {ticketStatuses.map((status) => (
@@ -155,13 +169,14 @@ export default function AdminTicketsPage() {
                 {ticketStatusLabels[status]}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             className="h-11 rounded-md border border-input bg-background px-3 text-sm"
             value={priorityFilter}
-            onChange={(event) =>
-              setPriorityFilter(event.target.value as "ALL" | TicketPriority)
-            }
+            onChange={(event) => {
+              setPriorityFilter(event.target.value as "ALL" | TicketPriority);
+              setPage(1);
+            }}
           >
             <option value="ALL">همه اولویت‌ها</option>
             {ticketPriorities.map((priority) => (
@@ -169,7 +184,7 @@ export default function AdminTicketsPage() {
                 {priorityLabels[priority]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {loading ? (
@@ -190,7 +205,7 @@ export default function AdminTicketsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTickets.map((ticket) => (
+                {paginatedTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     className="border-b border-border last:border-0 hover:bg-muted/40"
@@ -224,6 +239,12 @@ export default function AdminTicketsPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={page}
+              totalItems={filteredTickets.length}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
           </div>
         ) : (
           <AdminState>تیکتی با این فیلتر پیدا نشد.</AdminState>

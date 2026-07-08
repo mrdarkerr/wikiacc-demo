@@ -9,8 +9,13 @@ import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import type { AdminDeliveryItem, AdminDeliveryPool } from "@/types/api";
+
+const ITEMS_PER_PAGE = 10;
+const POOLS_PER_PAGE = 10;
 
 type PoolForm = {
   slug: string;
@@ -46,6 +51,8 @@ export default function AdminDeliveryPoolsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [itemsPage, setItemsPage] = useState(1);
+  const [poolsPage, setPoolsPage] = useState(1);
 
   async function loadPools(nextSelectedId?: string) {
     const result = await api.admin.deliveryPools.list();
@@ -79,6 +86,7 @@ export default function AdminDeliveryPoolsPage() {
 
   function selectPool(poolId: string) {
     setSelectedPoolId(poolId);
+    setItemsPage(1);
     void loadItems(poolId);
   }
 
@@ -148,6 +156,7 @@ export default function AdminDeliveryPoolsPage() {
       });
       setItemsText("");
       await Promise.all([loadPools(), loadItems(selectedPoolId)]);
+      setItemsPage(1);
       setMessage("آیتم ها اضافه شدند.");
       setError("");
     } catch (addError) {
@@ -157,6 +166,17 @@ export default function AdminDeliveryPoolsPage() {
       setSaving(false);
     }
   }
+
+  const poolsTotalPages = Math.max(1, Math.ceil(pools.length / POOLS_PER_PAGE));
+  const paginatedPools = pools.slice(
+    (poolsPage - 1) * POOLS_PER_PAGE,
+    poolsPage * POOLS_PER_PAGE,
+  );
+  const itemsTotalPages = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE));
+  const paginatedItems = items.slice(
+    (itemsPage - 1) * ITEMS_PER_PAGE,
+    itemsPage * ITEMS_PER_PAGE,
+  );
 
   return (
     <div className="space-y-6">
@@ -220,7 +240,7 @@ export default function AdminDeliveryPoolsPage() {
           <form className="space-y-4" onSubmit={addItems}>
             <label className="block text-sm font-medium">
               مخزن تحویل
-              <select
+              <Select
                 className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 required
                 value={selectedPoolId}
@@ -232,7 +252,7 @@ export default function AdminDeliveryPoolsPage() {
                     {pool.title}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label className="block text-sm font-medium">
               هر آیتم در یک خط
@@ -272,7 +292,7 @@ export default function AdminDeliveryPoolsPage() {
                 </tr>
               </thead>
               <tbody>
-                {pools.map((pool) => (
+                {paginatedPools.map((pool) => (
                   <tr key={pool.id} className="border-b border-border last:border-0">
                     <td className="py-3 font-medium" dir="ltr">
                       {shortId(pool.id)}
@@ -290,6 +310,12 @@ export default function AdminDeliveryPoolsPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={poolsPage}
+              totalItems={pools.length}
+              totalPages={poolsTotalPages}
+              onPageChange={setPoolsPage}
+            />
           </div>
         ) : (
           <AdminState>مخزنی ثبت نشده است.</AdminState>
@@ -315,7 +341,7 @@ export default function AdminDeliveryPoolsPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {paginatedItems.map((item) => (
                   <tr key={item.id} className="border-b border-border last:border-0">
                     <td className="py-3 font-medium" dir="ltr">
                       {shortId(item.id)}
@@ -338,6 +364,12 @@ export default function AdminDeliveryPoolsPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={itemsPage}
+              totalItems={items.length}
+              totalPages={itemsTotalPages}
+              onPageChange={setItemsPage}
+            />
           </div>
         ) : (
           <AdminState>برای این مخزن آیتمی ثبت نشده است.</AdminState>

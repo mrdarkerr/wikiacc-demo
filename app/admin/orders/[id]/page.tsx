@@ -16,6 +16,7 @@ import {
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import type { AdminOrder, OrderStatus } from "@/types/api";
 
@@ -280,7 +281,7 @@ export default function AdminOrderDetailPage() {
           <form className="space-y-4" onSubmit={updateStatus}>
             <label className="block text-sm font-medium">
               وضعیت سفارش
-              <select
+              <Select
                 className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 disabled={saving}
                 value={status}
@@ -291,7 +292,7 @@ export default function AdminOrderDetailPage() {
                     {statusLabels[nextStatus]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
 
             <label className="block text-sm font-medium">

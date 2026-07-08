@@ -10,6 +10,7 @@ import { PanelSection } from "@/components/panel/panel-section";
 import { StatusBadge } from "@/components/panel/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import type { ApiMeta, Ticket, TicketPriority } from "@/types/api";
 
@@ -107,7 +108,7 @@ export default function TicketsPage() {
 
           <label className="block space-y-2 text-sm font-medium">
             <span>اولویت</span>
-            <select
+            <Select
               className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={priority}
               onChange={(event) => setPriority(event.target.value as TicketPriority)}
@@ -115,7 +116,7 @@ export default function TicketsPage() {
               <option value="LOW">کم</option>
               <option value="NORMAL">معمولی</option>
               <option value="HIGH">فوری</option>
-            </select>
+            </Select>
           </label>
 
           <label className="block space-y-2 text-sm font-medium">
@@ -154,7 +155,7 @@ export default function TicketsPage() {
               }}
             />
           </label>
-          <select
+          <Select
             className="h-11 rounded-md border border-input bg-background px-3 text-sm"
             value={statusFilter}
             onChange={(event) => {
@@ -166,7 +167,7 @@ export default function TicketsPage() {
             <option value="OPEN">باز</option>
             <option value="ANSWERED">پاسخ داده شده</option>
             <option value="CLOSED">بسته</option>
-          </select>
+          </Select>
         </div>
 
         {loading ? (

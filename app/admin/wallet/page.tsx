@@ -15,6 +15,8 @@ import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import type {
   AdminUser,
@@ -28,6 +30,9 @@ type WalletForm = {
   note: string;
   userId: string;
 };
+
+const TRANSACTIONS_PER_PAGE = 10;
+const USERS_PER_PAGE = 10;
 
 const initialForm: WalletForm = {
   amount: "",
@@ -57,6 +62,8 @@ export default function AdminWalletPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
   const [sort, setSort] = useState<"balance-desc" | "balance-asc" | "name">(
     "balance-desc",
   );
@@ -142,6 +149,20 @@ export default function AdminWalletPage() {
       });
   }, [search, sort, users]);
 
+  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const paginatedUsers = filteredUsers.slice(
+    (usersPage - 1) * USERS_PER_PAGE,
+    usersPage * USERS_PER_PAGE,
+  );
+  const transactionsTotalPages = Math.max(
+    1,
+    Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE),
+  );
+  const paginatedTransactions = transactions.slice(
+    (transactionsPage - 1) * TRANSACTIONS_PER_PAGE,
+    transactionsPage * TRANSACTIONS_PER_PAGE,
+  );
+
   const metrics = useMemo(
     () => [
       {
@@ -226,20 +247,24 @@ export default function AdminWalletPage() {
               className="h-11 pr-9"
               placeholder="جست‌وجوی نام، ایمیل یا موبایل"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setUsersPage(1);
+              }}
             />
           </label>
-          <select
+          <Select
             className="h-11 rounded-md border border-input bg-background px-3 text-sm"
             value={sort}
-            onChange={(event) =>
-              setSort(event.target.value as "balance-desc" | "balance-asc" | "name")
-            }
+            onChange={(event) => {
+              setSort(event.target.value as "balance-desc" | "balance-asc" | "name");
+              setUsersPage(1);
+            }}
           >
             <option value="balance-desc">بیشترین موجودی</option>
             <option value="balance-asc">کمترین موجودی</option>
             <option value="name">نام کاربر</option>
-          </select>
+          </Select>
         </div>
 
         {loading ? (
@@ -259,7 +284,7 @@ export default function AdminWalletPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
+                {paginatedUsers.map((user) => (
                   <tr
                     key={user.id}
                     className={`border-b border-border last:border-0 ${
@@ -296,6 +321,12 @@ export default function AdminWalletPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={usersPage}
+              totalItems={filteredUsers.length}
+              totalPages={usersTotalPages}
+              onPageChange={setUsersPage}
+            />
           </div>
         ) : (
           <AdminState>کاربری با این جست‌وجو پیدا نشد.</AdminState>
@@ -316,7 +347,7 @@ export default function AdminWalletPage() {
               <form className="space-y-4" onSubmit={adjustWallet}>
                 <label className="block text-sm font-medium">
                   کاربر
-                  <select
+                  <Select
                     className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     required
                     value={form.userId}
@@ -333,11 +364,11 @@ export default function AdminWalletPage() {
                         {user.name} - {user.email}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <label className="block text-sm font-medium">
                   نوع عملیات
-                  <select
+                  <Select
                     className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={form.mode}
                     onChange={(event) =>
@@ -349,7 +380,7 @@ export default function AdminWalletPage() {
                   >
                     <option value="credit">افزایش موجودی</option>
                     <option value="debit">کاهش موجودی</option>
-                  </select>
+                  </Select>
                 </label>
                 <label className="block text-sm font-medium">
                   مبلغ
@@ -408,7 +439,7 @@ export default function AdminWalletPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((transaction) => (
+                  {paginatedTransactions.map((transaction) => (
                     <tr
                       key={transaction.id}
                       className="border-b border-border last:border-0"
@@ -455,6 +486,12 @@ export default function AdminWalletPage() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                page={transactionsPage}
+                totalItems={transactions.length}
+                totalPages={transactionsTotalPages}
+                onPageChange={setTransactionsPage}
+              />
             </div>
           ) : (
             <AdminState>تراکنشی ثبت نشده است.</AdminState>

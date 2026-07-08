@@ -13,6 +13,8 @@ import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import type {
   AdminDeliveryPool,
@@ -24,6 +26,7 @@ import type {
 } from "@/types/api";
 
 const fieldTypes: FieldType[] = ["TEXT", "EMAIL", "PHONE", "TEXTAREA", "SELECT"];
+const PRODUCTS_PER_PAGE = 10;
 
 const fieldTypeLabels: Record<FieldType, string> = {
   EMAIL: "ایمیل",
@@ -116,6 +119,7 @@ export default function AdminProductsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [productsPage, setProductsPage] = useState(1);
 
   async function loadData() {
     const [productsResult, categoriesResult, poolsResult] = await Promise.all([
@@ -294,6 +298,15 @@ export default function AdminProductsPage() {
     }
   }
 
+  const productsTotalPages = Math.max(
+    1,
+    Math.ceil(products.length / PRODUCTS_PER_PAGE),
+  );
+  const paginatedProducts = products.slice(
+    (productsPage - 1) * PRODUCTS_PER_PAGE,
+    productsPage * PRODUCTS_PER_PAGE,
+  );
+
   return (
     <div className="space-y-6">
       {message ? <AdminState tone="success">{message}</AdminState> : null}
@@ -386,7 +399,7 @@ export default function AdminProductsPage() {
             </label>
             <label className="block text-sm font-medium">
               نوع
-              <select
+              <Select
                 className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={productForm.type}
                 onChange={(event) =>
@@ -399,7 +412,7 @@ export default function AdminProductsPage() {
               >
                 <option value="CUSTOM_FORM">فرم اختصاصی</option>
                 <option value="INSTANT_DELIVERY">تحویل فوری</option>
-              </select>
+              </Select>
             </label>
             <label className="block text-sm font-medium">
               قیمت
@@ -419,7 +432,7 @@ export default function AdminProductsPage() {
             </label>
             <label className="block text-sm font-medium">
               دسته بندی
-              <select
+              <Select
                 className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={productForm.categoryId}
                 onChange={(event) =>
@@ -435,11 +448,11 @@ export default function AdminProductsPage() {
                     {category.title}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label className="block text-sm font-medium">
               مخزن تحویل فوری
-              <select
+              <Select
                 className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 disabled={productForm.type !== "INSTANT_DELIVERY"}
                 required={productForm.type === "INSTANT_DELIVERY"}
@@ -457,7 +470,7 @@ export default function AdminProductsPage() {
                     {pool.title}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label className="block text-sm font-medium">
               ترتیب
@@ -557,7 +570,7 @@ export default function AdminProductsPage() {
                     </label>
                     <label className="block text-sm font-medium">
                       نوع فیلد
-                      <select
+                      <Select
                         className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                         value={fieldDraft.type}
                         onChange={(event) =>
@@ -571,7 +584,7 @@ export default function AdminProductsPage() {
                             {fieldTypeLabels[type]}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </label>
                     <label className="flex items-center gap-2 pt-8 text-sm font-medium">
                       <input
@@ -658,7 +671,7 @@ export default function AdminProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((product) => (
+                {paginatedProducts.map((product) => (
                   <tr
                     key={product.id}
                     className="border-b border-border last:border-0"
@@ -703,6 +716,12 @@ export default function AdminProductsPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={productsPage}
+              totalItems={products.length}
+              totalPages={productsTotalPages}
+              onPageChange={setProductsPage}
+            />
           </div>
         ) : (
           <AdminState>محصولی ثبت نشده است.</AdminState>

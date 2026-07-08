@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Order, Product, ProductField } from "@/types/api";
@@ -499,7 +500,7 @@ function ProductFieldInput({
           onChange={(event) => onChange(event.target.value)}
         />
       ) : field.type === "SELECT" ? (
-        <select
+        <Select
           className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           id={field.key}
           required={field.required}
@@ -512,7 +513,7 @@ function ProductFieldInput({
               {option}
             </option>
           ))}
-        </select>
+        </Select>
       ) : (
         <Input
           id={field.key}

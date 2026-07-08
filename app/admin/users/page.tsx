@@ -12,8 +12,11 @@ import {
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
 import { api, ApiError } from "@/lib/api";
 import type { AdminUser } from "@/types/api";
+
+const PER_PAGE = 10;
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError
@@ -25,6 +28,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -48,6 +52,9 @@ export default function AdminUsersPage() {
       active = false;
     };
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(users.length / PER_PAGE));
+  const paginatedUsers = users.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   return (
     <AdminSection
@@ -74,7 +81,7 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {paginatedUsers.map((user) => (
                 <tr key={user.id} className="border-b border-border last:border-0">
                   <td className="py-3 font-medium" dir="ltr">
                     {shortId(user.id)}
@@ -105,6 +112,12 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
+          <Pagination
+            page={page}
+            totalItems={users.length}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
         </div>
       ) : (
         <AdminState>کاربری ثبت نشده است.</AdminState>

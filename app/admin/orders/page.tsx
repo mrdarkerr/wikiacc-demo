@@ -15,8 +15,12 @@ import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import type { AdminOrder, OrderStatus } from "@/types/api";
+
+const PER_PAGE = 10;
 
 const statusLabels: Record<OrderStatus, string> = {
   AWAITING_ADMIN: "در انتظار ادمین",
@@ -54,6 +58,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("ALL");
 
@@ -106,6 +111,12 @@ export default function AdminOrdersPage() {
     });
   }, [orders, search, statusFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PER_PAGE));
+  const paginatedOrders = filteredOrders.slice(
+    (page - 1) * PER_PAGE,
+    page * PER_PAGE,
+  );
+
   const metrics = useMemo(
     () => [
       {
@@ -154,15 +165,19 @@ export default function AdminOrdersPage() {
               className="h-11 pr-9"
               placeholder="جست‌وجو در سفارش، کاربر، محصول یا فیلدهای فرم"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
             />
           </label>
-          <select
+          <Select
             className="h-11 rounded-md border border-input bg-background px-3 text-sm"
             value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as "ALL" | OrderStatus)
-            }
+            onChange={(event) => {
+              setStatusFilter(event.target.value as "ALL" | OrderStatus);
+              setPage(1);
+            }}
           >
             <option value="ALL">همه وضعیت‌ها</option>
             {Object.entries(statusLabels).map(([status, label]) => (
@@ -170,7 +185,7 @@ export default function AdminOrdersPage() {
                 {label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {loading ? (
@@ -193,7 +208,7 @@ export default function AdminOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order) => (
+                {paginatedOrders.map((order) => (
                   <tr
                     key={order.id}
                     className={`border-b border-border last:border-0 ${
@@ -248,6 +263,12 @@ export default function AdminOrdersPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={page}
+              totalItems={filteredOrders.length}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
           </div>
         ) : (
           <AdminState>سفارشی با این فیلتر پیدا نشد.</AdminState>

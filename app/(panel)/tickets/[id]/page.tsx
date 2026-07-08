@@ -3,14 +3,21 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Lock, SendHorizontal } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Clock3,
+  Lock,
+  MessageSquare,
+  SendHorizontal,
+} from "lucide-react";
 
 import { formatDate } from "@/components/panel/formatters";
 import { PanelSection } from "@/components/panel/panel-section";
 import { StatusBadge } from "@/components/panel/status-badge";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { ApiMeta, Ticket, TicketMessage } from "@/types/api";
 
 const MESSAGE_PAGE_SIZE = 20;
@@ -19,6 +26,15 @@ function errorMessage(error: unknown) {
   return error instanceof ApiError
     ? error.message
     : "عملیات تیکت انجام نشد.";
+}
+
+function formatMessageTime(value: string) {
+  return new Intl.DateTimeFormat("fa-IR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+  }).format(new Date(value));
 }
 
 export default function TicketDetailPage() {
@@ -33,32 +49,42 @@ export default function TicketDetailPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const previousScrollStateRef = useRef<{
+    height: number;
+    top: number;
+  } | null>(null);
+  const shouldScrollToBottomRef = useRef(true);
+  const loadingOlderMessagesRef = useRef(false);
 
   async function loadTicket() {
     const result = await api.tickets.get(ticketId);
     setTicket(result.ticket);
   }
 
-  const loadMessages = useCallback(async function loadMessages(
-    nextPage = 1,
-    mode: "replace" | "prepend" = "replace",
-  ) {
-    setMessagesLoading(true);
-    try {
-      const result = await api.tickets.messages(ticketId, {
-        page: nextPage,
-        perPage: MESSAGE_PAGE_SIZE,
-      });
-      setMessages((current) =>
-        mode === "prepend"
-          ? [...result.data.messages, ...current]
-          : result.data.messages,
-      );
-      setMessagesMeta(result.meta ?? null);
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, [ticketId]);
+  const loadMessages = useCallback(
+    async function loadMessages(
+      nextPage = 1,
+      mode: "replace" | "prepend" = "replace",
+    ) {
+      setMessagesLoading(true);
+      try {
+        const result = await api.tickets.messages(ticketId, {
+          page: nextPage,
+          perPage: MESSAGE_PAGE_SIZE,
+        });
+        setMessages((current) =>
+          mode === "prepend"
+            ? [...result.data.messages, ...current]
+            : result.data.messages,
+        );
+        setMessagesMeta(result.meta ?? null);
+      } finally {
+        setMessagesLoading(false);
+      }
+    },
+    [ticketId],
+  );
 
   useEffect(() => {
     let active = true;
@@ -68,6 +94,7 @@ export default function TicketDetailPage() {
       .then(async (result) => {
         if (!active) return;
         setTicket(result.ticket);
+        shouldScrollToBottomRef.current = true;
         await loadMessages(1);
         setError("");
       })
@@ -92,6 +119,7 @@ export default function TicketDetailPage() {
       await api.tickets.addMessage(ticket.id, { body: replyBody.trim() });
       setReplyBody("");
       await loadTicket();
+      shouldScrollToBottomRef.current = true;
       await loadMessages(1);
       setMessage("پاسخ شما ارسال شد.");
       setError("");
@@ -120,8 +148,60 @@ export default function TicketDetailPage() {
     }
   }
 
+  useEffect(() => {
+    const scrollElement = messagesScrollRef.current;
+    if (!scrollElement) return;
+
+    window.requestAnimationFrame(() => {
+      const previousScrollState = previousScrollStateRef.current;
+
+      if (previousScrollState) {
+        scrollElement.scrollTop =
+          scrollElement.scrollHeight -
+          previousScrollState.height +
+          previousScrollState.top;
+        previousScrollStateRef.current = null;
+        return;
+      }
+
+      if (shouldScrollToBottomRef.current) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+        shouldScrollToBottomRef.current = false;
+      }
+    });
+  }, [messages.length]);
+
+  async function handleMessagesScroll() {
+    const scrollElement = messagesScrollRef.current;
+    const messagePage = messagesMeta?.page ?? 1;
+    const messageTotalPages = messagesMeta?.totalPages ?? 1;
+
+    if (
+      !scrollElement ||
+      scrollElement.scrollTop > 32 ||
+      messagePage >= messageTotalPages ||
+      loadingOlderMessagesRef.current
+    ) {
+      return;
+    }
+
+    previousScrollStateRef.current = {
+      height: scrollElement.scrollHeight,
+      top: scrollElement.scrollTop,
+    };
+    loadingOlderMessagesRef.current = true;
+
+    try {
+      await loadMessages(messagePage + 1, "prepend");
+    } finally {
+      loadingOlderMessagesRef.current = false;
+    }
+  }
+
   if (loading) {
-    return <p className="text-sm text-muted-foreground">در حال دریافت تیکت...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">در حال دریافت تیکت...</p>
+    );
   }
 
   if (!ticket) {
@@ -139,10 +219,11 @@ export default function TicketDetailPage() {
 
   const messagePage = messagesMeta?.page ?? 1;
   const messageTotalPages = messagesMeta?.totalPages ?? 1;
+  const ticketClosed = ticket.status === "CLOSED";
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Button asChild size="sm" variant="ghost">
             <Link href="/tickets">
@@ -150,9 +231,12 @@ export default function TicketDetailPage() {
               تیکت‌ها
             </Link>
           </Button>
-          <h2 className="mt-2 text-2xl font-bold">{ticket.subject}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {ticket.orderId ? `سفارش مرتبط: ${ticket.orderId}` : "درخواست عمومی"}
+          <h2 className="mt-2 text-2xl font-bold leading-9">
+            {ticket.subject}
+          </h2>
+          <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock3 className="size-4" />
+            آخرین بروزرسانی: {formatDate(ticket.updatedAt)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -168,83 +252,165 @@ export default function TicketDetailPage() {
       ) : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <PanelSection title="مکالمه">
-          <div className="space-y-4">
-            {messagePage < messageTotalPages ? (
-              <Button
-                className="w-full"
-                disabled={messagesLoading}
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  loadMessages(messagePage + 1, "prepend")
-                }
-              >
-                {messagesLoading ? "در حال دریافت..." : "پیام‌های قدیمی‌تر"}
-              </Button>
-            ) : null}
-
-            {messages.map((ticketMessage) => (
-              <article
-                className={`rounded-md p-4 text-sm ${
-                  ticketMessage.isAdmin
-                    ? "mr-auto max-w-[92%] bg-primary text-primary-foreground"
-                    : "ml-auto max-w-[92%] bg-muted"
-                }`}
-                key={ticketMessage.id}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3 text-xs opacity-80">
-                  <span>{ticketMessage.isAdmin ? "پشتیبانی" : "شما"}</span>
-                  <span>{formatDate(ticketMessage.createdAt)}</span>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <PanelSection
+          description="پیام‌های جدید پایین مکالمه نمایش داده می‌شوند."
+          title="گفت‌وگو با پشتیبانی"
+        >
+          <div className="flex h-[calc(100svh-190px)] min-h-[460px] max-h-[780px] flex-col overflow-hidden rounded-lg border border-border bg-muted/20 sm:h-[calc(100svh-220px)] sm:min-h-[560px]">
+            <div className="flex flex-col gap-3 border-b border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+                  <MessageSquare className="size-5" />
+                </span>
+                <div>
+                  <p className="font-semibold">پشتیبانی ویکی اکانت</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {ticket.orderId
+                      ? `سفارش مرتبط: ${ticket.orderId}`
+                      : "درخواست عمومی"}
+                  </p>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap leading-7">
-                  {ticketMessage.body}
-                </p>
-              </article>
-            ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {messages.length} پیام نمایش داده شده
+              </p>
+            </div>
+
+            <div
+              className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3 sm:p-4"
+              ref={messagesScrollRef}
+              onScroll={handleMessagesScroll}
+            >
+              {messagePage < messageTotalPages ? (
+                <div className="flex justify-center">
+                  <Button
+                    disabled={messagesLoading}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => loadMessages(messagePage + 1, "prepend")}
+                  >
+                    {messagesLoading
+                      ? "در حال دریافت..."
+                      : "نمایش پیام‌های قبلی"}
+                  </Button>
+                </div>
+              ) : null}
+
+              {messages.map((ticketMessage) => {
+                const isUserMessage = !ticketMessage.isAdmin;
+
+                return (
+                  <div
+                    className={cn(
+                      "flex",
+                      isUserMessage ? "justify-end" : "justify-start",
+                    )}
+                    key={ticketMessage.id}
+                  >
+                    <article
+                      className={cn(
+                        "max-w-[86%] rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[72%]",
+                        isUserMessage
+                          ? "rounded-br-md bg-primary text-primary-foreground"
+                          : "rounded-bl-md border border-border bg-background",
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3 text-xs opacity-80">
+                        <span>{ticketMessage.isAdmin ? "پشتیبانی" : "شما"}</span>
+                        <span>{formatMessageTime(ticketMessage.createdAt)}</span>
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap leading-7">
+                        {ticketMessage.body}
+                      </p>
+                    </article>
+                  </div>
+                );
+              })}
+            </div>
+
+            <form
+              className="sticky bottom-0 z-10 shrink-0 border-t border-border bg-card p-2 shadow-[0_-10px_24px_rgba(15,23,42,0.08)] sm:p-3"
+              onSubmit={sendReply}
+            >
+              {ticketClosed ? (
+                <div className="rounded-md border border-border bg-muted/50 px-3 py-4 text-sm text-muted-foreground">
+                  این تیکت بسته شده است و امکان ارسال پیام جدید ندارد.
+                </div>
+              ) : (
+                <>
+                  <label className="sr-only" htmlFor="ticket-reply">
+                    پیام
+                  </label>
+                  <div className="flex items-end gap-2 sm:gap-3">
+                    <textarea
+                      className="max-h-32 min-h-12 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-7 ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      id="ticket-reply"
+                      placeholder="پیام خود را بنویسید..."
+                      required
+                      value={replyBody}
+                      onChange={(event) => setReplyBody(event.target.value)}
+                    />
+                    <Button
+                      className="h-12 shrink-0 px-4"
+                      disabled={saving || !replyBody.trim()}
+                      type="submit"
+                    >
+                      <SendHorizontal className="size-4" />
+                      ارسال
+                    </Button>
+                  </div>
+                </>
+              )}
+            </form>
           </div>
         </PanelSection>
 
         <div className="space-y-6">
-          <PanelSection title="پاسخ جدید">
-            {ticket.status === "CLOSED" ? (
+          <PanelSection title="وضعیت تیکت">
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge type="ticket" value={ticket.status} />
+                <StatusBadge type="priority" value={ticket.priority} />
+              </div>
               <p className="text-sm text-muted-foreground">
-                این تیکت بسته شده است.
+                آخرین بروزرسانی: {formatDate(ticket.updatedAt)}
               </p>
-            ) : (
-              <form className="space-y-3" onSubmit={sendReply}>
-                <label className="block text-sm font-medium">
-                  پیام
-                  <textarea
-                    className="mt-2 min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    required
-                    value={replyBody}
-                    onChange={(event) => setReplyBody(event.target.value)}
-                  />
-                </label>
-                <Button className="w-full" disabled={saving} type="submit">
-                  <SendHorizontal className="size-4" />
-                  ارسال پاسخ
-                </Button>
-              </form>
-            )}
+              <Button
+                className="w-full"
+                disabled={saving || ticketClosed}
+                type="button"
+                variant="outline"
+                onClick={closeTicket}
+              >
+                <Lock className="size-4" />
+                بستن تیکت
+              </Button>
+            </div>
           </PanelSection>
 
-          <PanelSection title="وضعیت">
-            <p className="text-sm text-muted-foreground">
-              آخرین به‌روزرسانی: {formatDate(ticket.updatedAt)}
-            </p>
-            <Button
-              className="mt-4 w-full"
-              disabled={saving || ticket.status === "CLOSED"}
-              type="button"
-              variant="outline"
-              onClick={closeTicket}
-            >
-              <Lock className="size-4" />
-              بستن تیکت
-            </Button>
+          <PanelSection title="اطلاعات مرتبط">
+            <dl className="space-y-4 text-sm">
+              <div>
+                <dt className="text-muted-foreground">نوع درخواست</dt>
+                <dd className="mt-1 font-medium">
+                  {ticket.orderId ? "مرتبط با سفارش" : "عمومی"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">سفارش</dt>
+                <dd className="mt-1" dir={ticket.orderId ? "ltr" : "rtl"}>
+                  {ticket.orderId ?? "-"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">
+                  تعداد پیام‌های نمایش داده‌شده
+                </dt>
+                <dd className="mt-1">{messages.length}</dd>
+              </div>
+            </dl>
           </PanelSection>
         </div>
       </div>
