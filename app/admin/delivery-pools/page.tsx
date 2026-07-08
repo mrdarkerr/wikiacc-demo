@@ -279,7 +279,7 @@ export default function AdminDeliveryPoolsPage() {
         {loading ? (
           <AdminState>در حال دریافت مخزن‌ها...</AdminState>
         ) : pools.length ? (
-          <div className="overflow-x-auto">
+          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[760px] text-right text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border">
@@ -329,7 +329,7 @@ export default function AdminDeliveryPoolsPage() {
         {itemsLoading ? (
           <AdminState>در حال دریافت آیتم ها...</AdminState>
         ) : items.length ? (
-          <div className="overflow-x-auto">
+          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[860px] text-right text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border">

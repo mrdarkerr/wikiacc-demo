@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -52,7 +53,11 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     ref,
   ) => {
     const [open, setOpen] = React.useState(false);
+    const [dropdownStyle, setDropdownStyle] =
+      React.useState<React.CSSProperties>({});
     const rootRef = React.useRef<HTMLDivElement>(null);
+    const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+    const contentRef = React.useRef<HTMLDivElement>(null);
     const childOptions = React.useMemo(() => {
       return React.Children.toArray(children).flatMap((child) => {
         if (!React.isValidElement(child) || child.type !== "option") {
@@ -77,9 +82,54 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       resolvedOptions.find((option) => option.value === value) ?? EMPTY_OPTION;
     const selectedLabel = selectedOption.label || placeholder;
 
+    const updateDropdownPosition = React.useCallback(() => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+
+      const gap = 8;
+      const viewportPadding = 8;
+      const rect = trigger.getBoundingClientRect();
+      const availableBelow =
+        window.innerHeight - rect.bottom - gap - viewportPadding;
+      const availableAbove = rect.top - gap - viewportPadding;
+      const openAbove = availableBelow < 160 && availableAbove > availableBelow;
+      const maxHeight = Math.max(
+        120,
+        Math.min(256, openAbove ? availableAbove : availableBelow),
+      );
+
+      setDropdownStyle({
+        bottom: openAbove ? window.innerHeight - rect.top + gap : undefined,
+        left: Math.max(viewportPadding, rect.left),
+        maxHeight,
+        position: "fixed",
+        top: openAbove ? undefined : rect.bottom + gap,
+        width: rect.width,
+        zIndex: 120,
+      });
+    }, []);
+
+    const setTriggerRef = React.useCallback(
+      (node: HTMLButtonElement | null) => {
+        triggerRef.current = node;
+
+        if (typeof ref === "function") {
+          ref(node);
+        } else if (ref) {
+          ref.current = node;
+        }
+      },
+      [ref],
+    );
+
     React.useEffect(() => {
       function closeOnOutside(event: MouseEvent) {
-        if (!rootRef.current?.contains(event.target as Node)) {
+        const target = event.target as Node;
+
+        if (
+          !rootRef.current?.contains(target) &&
+          !contentRef.current?.contains(target)
+        ) {
           setOpen(false);
         }
       }
@@ -99,6 +149,60 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       };
     }, []);
 
+    React.useEffect(() => {
+      if (!open) return;
+
+      updateDropdownPosition();
+      window.addEventListener("resize", updateDropdownPosition);
+      window.addEventListener("scroll", updateDropdownPosition, true);
+
+      return () => {
+        window.removeEventListener("resize", updateDropdownPosition);
+        window.removeEventListener("scroll", updateDropdownPosition, true);
+      };
+    }, [open, updateDropdownPosition]);
+
+    const dropdown =
+      open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className={cn(
+                "overflow-auto rounded-md border border-border bg-card p-1 text-card-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10",
+                contentClassName,
+              )}
+              ref={contentRef}
+              role="listbox"
+              style={dropdownStyle}
+            >
+              {resolvedOptions.map((option) => {
+                const selected = option.value === value;
+                return (
+                  <button
+                    aria-selected={selected}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-right text-sm transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50",
+                      selected && "bg-accent text-accent-foreground",
+                    )}
+                    disabled={option.disabled}
+                    key={`${option.value}-${option.label}`}
+                    role="option"
+                    type="button"
+                    onClick={() => {
+                      onValueChange?.(option.value);
+                      onChange?.({ target: { value: option.value } });
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="min-w-0 truncate">{option.label}</span>
+                    {selected ? <Check className="size-4 shrink-0" /> : null}
+                  </button>
+                );
+              })}
+            </div>,
+            document.body,
+          )
+        : null;
+
     return (
       <div className={cn("relative", containerClassName)} ref={rootRef}>
         {name ? <input name={name} type="hidden" value={value} /> : null}
@@ -114,9 +218,14 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           )}
           disabled={disabled}
           id={id}
-          ref={ref}
+          ref={setTriggerRef}
           type="button"
-          onClick={() => setOpen((current) => !current)}
+          onClick={() => {
+            if (!open) {
+              updateDropdownPosition();
+            }
+            setOpen((current) => !current);
+          }}
         >
           <span className="min-w-0 truncate">{selectedLabel}</span>
           <ChevronDown
@@ -126,41 +235,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             )}
           />
         </button>
-
-        {open ? (
-          <div
-            className={cn(
-              "absolute left-0 right-0 z-50 mt-2 max-h-64 overflow-auto rounded-md border border-border bg-card p-1 text-card-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10",
-              contentClassName,
-            )}
-            role="listbox"
-          >
-            {resolvedOptions.map((option) => {
-              const selected = option.value === value;
-              return (
-                <button
-                  aria-selected={selected}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-sm px-3 py-2 text-right text-sm transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50",
-                    selected && "bg-accent text-accent-foreground",
-                  )}
-                  disabled={option.disabled}
-                  key={`${option.value}-${option.label}`}
-                  role="option"
-                  type="button"
-                  onClick={() => {
-                    onValueChange?.(option.value);
-                    onChange?.({ target: { value: option.value } });
-                    setOpen(false);
-                  }}
-                >
-                  <span className="min-w-0 truncate">{option.label}</span>
-                  {selected ? <Check className="size-4 shrink-0" /> : null}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
+        {dropdown}
       </div>
     );
   },

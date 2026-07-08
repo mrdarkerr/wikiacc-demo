@@ -655,7 +655,7 @@ export default function AdminProductsPage() {
         {loading ? (
           <AdminState>در حال دریافت محصولات...</AdminState>
         ) : products.length ? (
-          <div className="overflow-x-auto">
+          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[980px] text-right text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border">

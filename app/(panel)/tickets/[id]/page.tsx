@@ -19,6 +19,7 @@ import { formatDate } from "@/components/panel/formatters";
 import { PanelSection } from "@/components/panel/panel-section";
 import { StatusBadge } from "@/components/panel/status-badge";
 import { Button } from "@/components/ui/button";
+import { DialogOverlay } from "@/components/ui/dialog";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ApiMeta, Ticket, TicketMessage } from "@/types/api";
@@ -54,16 +55,11 @@ function MobileDialog({
   if (!open) return null;
 
   return (
-    <div
-      aria-modal="true"
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm xl:hidden"
-      role="dialog"
-      onClick={onClose}
+    <DialogOverlay
+      className="xl:hidden"
+      contentClassName="max-h-[calc(100svh-2rem)] max-w-md overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xl"
+      onClose={onClose}
     >
-      <div
-        className="absolute inset-x-3 bottom-20 max-h-[calc(100svh-7rem)] overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="font-bold">{title}</h3>
           <Button
@@ -77,8 +73,7 @@ function MobileDialog({
           </Button>
         </div>
         {children}
-      </div>
-    </div>
+    </DialogOverlay>
   );
 }
 

@@ -270,7 +270,7 @@ export default function AdminWalletPage() {
         {loading ? (
           <AdminState>در حال دریافت کاربران...</AdminState>
         ) : filteredUsers.length ? (
-          <div className="overflow-x-auto">
+          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[820px] text-right text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border">
@@ -424,7 +424,7 @@ export default function AdminWalletPage() {
 
         <AdminSection title="گردش کیف پول">
           {transactions.length ? (
-            <div className="overflow-x-auto">
+            <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
               <table className="w-full min-w-[900px] text-right text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border">

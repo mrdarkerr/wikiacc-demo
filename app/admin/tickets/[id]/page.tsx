@@ -19,11 +19,11 @@ import {
   formatCurrency,
   formatDate,
   orderCode,
-  userLabel,
 } from "@/components/admin/admin-formatters";
 import { AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
+import { DialogOverlay } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,11 @@ function formatMessageTime(value: string) {
   }).format(new Date(value));
 }
 
+function ticketUserName(user?: AdminTicket["user"]) {
+  if (!user) return "-";
+  return user.name || user.email;
+}
+
 function MobileDialog({
   children,
   onClose,
@@ -67,16 +72,11 @@ function MobileDialog({
   if (!open) return null;
 
   return (
-    <div
-      aria-modal="true"
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm xl:hidden"
-      role="dialog"
-      onClick={onClose}
+    <DialogOverlay
+      className="xl:hidden"
+      contentClassName="max-h-[calc(100svh-2rem)] max-w-md overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xl"
+      onClose={onClose}
     >
-      <div
-        className="absolute inset-x-3 bottom-20 max-h-[calc(100svh-7rem)] overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="font-bold">{title}</h3>
           <Button
@@ -90,8 +90,7 @@ function MobileDialog({
           </Button>
         </div>
         {children}
-      </div>
-    </div>
+    </DialogOverlay>
   );
 }
 
@@ -307,7 +306,9 @@ export default function AdminTicketDetailPage() {
       <dl className="space-y-4 text-sm">
         <div>
           <dt className="text-muted-foreground">کاربر</dt>
-          <dd className="mt-1 font-medium">{userLabel(currentTicket.user)}</dd>
+          <dd className="mt-1 font-medium">
+            {ticketUserName(currentTicket.user)}
+          </dd>
         </div>
         <div>
           <dt className="text-muted-foreground">سفارش مرتبط</dt>
@@ -402,7 +403,7 @@ export default function AdminTicketDetailPage() {
               </span>
               <div className="min-w-0">
                 <p className="truncate font-semibold">
-                  {userLabel(currentTicket.user)}
+                  {ticketUserName(currentTicket.user)}
                 </p>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
                   {currentTicket.order

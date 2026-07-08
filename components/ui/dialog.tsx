@@ -21,17 +21,19 @@ export function DialogOverlay({
     <div
       aria-modal="true"
       className={cn(
-        "fixed bottom-0 left-0 right-0 top-0 z-[100] grid place-items-center bg-background/80 p-4 backdrop-blur-sm",
+        "fixed inset-0 z-[100] m-0 h-[100dvh] w-[100vw] overflow-hidden bg-background/80 backdrop-blur-sm",
         className,
       )}
       role="dialog"
       onClick={onClose}
     >
-      <div
-        className={cn("w-full", contentClassName)}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {children}
+      <div className="flex h-full w-full items-center justify-center p-4">
+        <div
+          className={cn("w-full", contentClassName)}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

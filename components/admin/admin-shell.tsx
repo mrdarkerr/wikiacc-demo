@@ -79,7 +79,7 @@ export function AdminShell({ children }: AdminShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground" dir="rtl">
+    <div className="min-h-screen overflow-x-hidden bg-muted/30 text-foreground" dir="rtl">
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 border-l border-border bg-card lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-3 border-b border-border px-5">
           <Image

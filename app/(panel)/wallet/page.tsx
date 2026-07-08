@@ -135,7 +135,7 @@ export default function WalletPage() {
         ) : error ? (
           <p className="text-sm text-rose-600">{error}</p>
         ) : transactions.length ? (
-          <div className="overflow-x-auto">
+          <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[680px] text-right text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b border-border">
