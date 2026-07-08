@@ -8,9 +8,11 @@ import {
   ChevronLeft,
   CreditCard,
   Headphones,
+  LogIn,
   Menu,
   Search,
   ShieldCheck,
+  ShoppingCart,
   Star,
   X,
   Zap,
@@ -261,6 +263,27 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button
+                asChild
+                className="w-full rounded-2xl bg-gray-900 px-5 py-2.5 text-sm text-white shadow-md transition hover:opacity-90 dark:bg-white dark:text-gray-900 sm:w-auto"
+              >
+                <Link href="/store">
+                  <ShoppingCart className="size-4" />
+                  شروع خرید
+                </Link>
+              </Button>
+              <Button
+                asChild
+                className="w-full rounded-2xl border-white/60 bg-white/75 px-5 py-2.5 text-sm text-gray-900 shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 sm:w-auto"
+                variant="outline"
+              >
+                <Link href="/login">
+                  <LogIn className="size-4" />
+                  ورود / ثبت‌نام
+                </Link>
+              </Button>
+            </div>
           </div>
 
           <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
@@ -303,7 +326,7 @@ export default function Home() {
               asChild
               className="rounded-2xl bg-gray-900 px-5 py-2.5 text-sm text-white shadow-md transition hover:opacity-90 dark:bg-white dark:text-gray-900"
             >
-              <Link href="#contact">ثبت سفارش</Link>
+              <Link href="/store">ثبت سفارش</Link>
             </Button>
           </div>
         </div>
@@ -374,6 +397,9 @@ function Header() {
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
+          <Link className="text-sm opacity-80 transition hover:opacity-100" href="/store">
+            خرید
+          </Link>
           <Link className="text-sm opacity-80 transition hover:opacity-100" href="#services">
             خدمات
           </Link>
@@ -402,13 +428,20 @@ function Header() {
             asChild
             className="hidden rounded-2xl bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition hover:opacity-90 md:inline-flex dark:bg-white dark:text-gray-900"
           >
-            <Link href="#contact">ورود / ثبت‌نام</Link>
+            <Link href="/login">ورود / ثبت‌نام</Link>
           </Button>
         </div>
 
         {mobileMenuOpen ? (
           <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 rounded-3xl border border-white/60 bg-white/[0.94] p-2 shadow-2xl shadow-gray-950/10 backdrop-blur-xl md:hidden dark:border-white/10 dark:bg-gray-950/[0.94] dark:shadow-black/30">
             <nav className="grid gap-1 text-sm font-medium">
+              <Link
+                className="rounded-2xl px-4 py-3 transition hover:bg-gray-900/5 dark:hover:bg-white/10"
+                href="/store"
+                onClick={closeMobileMenu}
+              >
+                خرید
+              </Link>
               <Link
                 className="rounded-2xl px-4 py-3 transition hover:bg-gray-900/5 dark:hover:bg-white/10"
                 href="#services"
@@ -432,7 +465,7 @@ function Header() {
               </Link>
               <Link
                 className="rounded-2xl bg-gray-900 px-4 py-3 text-center text-white shadow-sm transition hover:opacity-90 dark:bg-white dark:text-gray-900"
-                href="#contact"
+                href="/login"
                 onClick={closeMobileMenu}
               >
                 ورود / ثبت‌نام
@@ -493,7 +526,7 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
           asChild
           className="rounded-2xl bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition hover:opacity-90 dark:bg-white dark:text-gray-900"
         >
-          <Link href="#contact">
+          <Link href="/store">
             ثبت سفارش
             <ChevronLeft className="size-4" />
           </Link>
@@ -584,6 +617,11 @@ function Footer() {
         <div>
           <div className="mb-3 font-bold">صفحات</div>
           <ul className="space-y-2 opacity-80">
+            <li>
+              <Link className="hover:opacity-100" href="/store">
+                فروشگاه
+              </Link>
+            </li>
             <li>
               <Link className="hover:opacity-100" href="#services">
                 خدمات
