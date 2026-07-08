@@ -194,9 +194,10 @@ export default function DashboardPage() {
           <div className="space-y-3">
             {summary.recentTickets.length ? (
               summary.recentTickets.map((ticket) => (
-                <article
+                <Link
                   key={ticket.id}
-                  className="rounded-md border border-border p-3 text-sm"
+                  className="block rounded-md border border-border p-3 text-sm transition hover:border-primary/40"
+                  href={`/tickets/${ticket.id}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="font-medium leading-6">{ticket.subject}</h3>
@@ -205,7 +206,7 @@ export default function DashboardPage() {
                   <p className="mt-2 text-xs text-muted-foreground">
                     آخرین بروزرسانی: {formatDate(ticket.updatedAt)}
                   </p>
-                </article>
+                </Link>
               ))
             ) : (
               <p className="text-sm text-muted-foreground">تیکت بازی ندارید.</p>

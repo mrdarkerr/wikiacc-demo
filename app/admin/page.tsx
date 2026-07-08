@@ -221,9 +221,10 @@ export default function AdminDashboardPage() {
         >
           <div className="space-y-3">
             {data.tickets.slice(0, 5).map((ticket) => (
-              <article
+              <Link
                 key={ticket.id}
-                className="rounded-md border border-border p-3 text-sm"
+                className="block rounded-md border border-border p-3 text-sm transition hover:border-primary/40"
+                href={`/admin/tickets/${ticket.id}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="font-medium leading-6">{ticket.subject}</h3>
@@ -232,7 +233,7 @@ export default function AdminDashboardPage() {
                 <p className="mt-2 text-xs text-muted-foreground">
                   {userLabel(ticket.user)} - {formatDate(ticket.updatedAt)}
                 </p>
-              </article>
+              </Link>
             ))}
             {!data.tickets.length ? <AdminState>تیکتی ثبت نشده است.</AdminState> : null}
           </div>

@@ -39,6 +39,26 @@ async function findProductOrThrow(prisma, id) {
   return product;
 }
 
+const adminOrderInclude = {
+  user: { select: { id: true, email: true, name: true, phone: true } },
+  items: {
+    include: {
+      product: true,
+      deliveries: true,
+      fieldValues: { orderBy: { createdAt: "asc" } },
+    },
+  },
+};
+
+const adminTicketInclude = {
+  user: { select: { id: true, email: true, name: true } },
+  order: { select: { id: true, status: true, totalAmount: true } },
+  messages: {
+    include: { sender: { select: { id: true, name: true, role: true } } },
+    orderBy: { createdAt: "asc" },
+  },
+};
+
 export async function adminRoutes(app) {
   app.addHook("preHandler", app.requireAdmin);
 
@@ -60,20 +80,23 @@ export async function adminRoutes(app) {
 
   app.get("/orders", async (request, reply) => {
     const orders = await app.prisma.order.findMany({
-      include: {
-        user: { select: { id: true, email: true, name: true, phone: true } },
-        items: {
-          include: {
-            product: true,
-            deliveries: true,
-            fieldValues: true,
-          },
-        },
-      },
+      include: adminOrderInclude,
       orderBy: { createdAt: "desc" },
       take: 200,
     });
     return ok(reply, { orders });
+  });
+
+  app.get("/orders/:id", async (request, reply) => {
+    const params = parse(idParamsSchema, request.params);
+    const order = await app.prisma.order.findUnique({
+      where: { id: params.id },
+      include: adminOrderInclude,
+    });
+    if (!order) {
+      throw notFound("ORDER_NOT_FOUND", "Order was not found");
+    }
+    return ok(reply, { order });
   });
 
   app.patch("/orders/:id/status", async (request, reply) => {
@@ -291,20 +314,76 @@ export async function adminRoutes(app) {
     return created(reply, result);
   });
 
-  app.get("/tickets", async (request, reply) => {
-    const tickets = await app.prisma.ticket.findMany({
+  app.get("/wallet/summary", async (request, reply) => {
+    const [users, recentTransactionCount, transactionCount] = await Promise.all([
+      app.prisma.user.findMany({
+        select: {
+          id: true,
+          wallet: { select: { balance: true } },
+        },
+      }),
+      app.prisma.walletTransaction.count({
+        where: {
+          createdAt: {
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+      app.prisma.walletTransaction.count(),
+    ]);
+
+    const balances = users.map((user) => user.wallet?.balance ?? 0);
+    const totalBalance = balances.reduce((sum, balance) => sum + balance, 0);
+    const totalUsers = users.length;
+
+    return ok(reply, {
+      summary: {
+        averageBalance: totalUsers ? Math.round(totalBalance / totalUsers) : 0,
+        maxBalance: balances.length ? Math.max(...balances) : 0,
+        recentTransactionCount,
+        totalBalance,
+        totalUsers,
+        transactionCount,
+        usersWithBalance: balances.filter((balance) => balance > 0).length,
+      },
+    });
+  });
+
+  app.get("/wallet/transactions", async (request, reply) => {
+    const transactions = await app.prisma.walletTransaction.findMany({
       include: {
-        user: { select: { id: true, email: true, name: true } },
-        order: { select: { id: true, status: true, totalAmount: true } },
-        messages: {
-          include: { sender: { select: { id: true, name: true, role: true } } },
-          orderBy: { createdAt: "asc" },
+        createdByAdmin: {
+          select: { id: true, email: true, name: true, role: true },
+        },
+        user: {
+          select: { id: true, email: true, name: true, phone: true },
         },
       },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+    return ok(reply, { transactions });
+  });
+
+  app.get("/tickets", async (request, reply) => {
+    const tickets = await app.prisma.ticket.findMany({
+      include: adminTicketInclude,
       orderBy: { updatedAt: "desc" },
       take: 200,
     });
     return ok(reply, { tickets });
+  });
+
+  app.get("/tickets/:id", async (request, reply) => {
+    const params = parse(idParamsSchema, request.params);
+    const ticket = await app.prisma.ticket.findUnique({
+      where: { id: params.id },
+      include: adminTicketInclude,
+    });
+    if (!ticket) {
+      throw notFound("TICKET_NOT_FOUND", "Ticket was not found");
+    }
+    return ok(reply, { ticket });
   });
 
   app.post("/tickets/:id/messages", async (request, reply) => {

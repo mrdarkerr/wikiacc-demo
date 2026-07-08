@@ -51,7 +51,7 @@ export default function AdminUsersPage() {
 
   return (
     <AdminSection
-      description="لیست از GET /api/v1/admin/users خوانده می شود."
+      description="مشاهده کاربران، نقش‌ها و دسترسی سریع به کیف پول"
       title="کاربران"
     >
       {loading ? (

@@ -121,9 +121,6 @@ export function PanelShell({ children }: PanelShellProps) {
             <h1 className="text-lg font-bold">{pageTitle}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="hidden h-8 items-center rounded-md border border-border px-3 text-xs text-muted-foreground sm:inline-flex">
-              API: Fastify
-            </span>
             <Button aria-label="اعلان ها" size="icon" variant="outline">
               <Bell className="size-4" />
             </Button>

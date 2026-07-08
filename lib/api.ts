@@ -6,6 +6,8 @@ import type {
   AdminTicket,
   AdminUser,
   AdminWalletAdjustmentRequest,
+  AdminWalletSummary,
+  AdminWalletTransaction,
   ApiErrorResponse,
   ApiResponse,
   CreateAdminCategoryRequest,
@@ -150,8 +152,18 @@ export const api = {
   },
   tickets: {
     list: () => apiFetch<{ tickets: Ticket[] }>("/tickets/my"),
+    get: (id: string) => apiFetch<{ ticket: Ticket }>(`/tickets/${id}`),
     create: (body: CreateTicketRequest) =>
       apiFetch<{ ticket: Ticket }>("/tickets", { body, method: "POST" }),
+    addMessage: (id: string, body: CreateAdminTicketMessageRequest) =>
+      apiFetch<{ ticket: Ticket }>(`/tickets/${id}/messages`, {
+        body,
+        method: "POST",
+      }),
+    close: (id: string) =>
+      apiFetch<{ ticket: Ticket }>(`/tickets/${id}/close`, {
+        method: "PATCH",
+      }),
   },
   wallet: {
     summary: () => apiFetch<WalletSummary>("/wallet/me"),
@@ -162,6 +174,7 @@ export const api = {
     },
     orders: {
       list: () => apiFetch<{ orders: AdminOrder[] }>("/admin/orders"),
+      get: (id: string) => apiFetch<{ order: AdminOrder }>(`/admin/orders/${id}`),
       updateStatus: (id: string, body: UpdateAdminOrderStatusRequest) =>
         apiFetch<{ order: AdminOrder }>(`/admin/orders/${id}/status`, {
           body,
@@ -222,6 +235,12 @@ export const api = {
         ),
     },
     wallet: {
+      summary: () =>
+        apiFetch<{ summary: AdminWalletSummary }>("/admin/wallet/summary"),
+      transactions: () =>
+        apiFetch<{ transactions: AdminWalletTransaction[] }>(
+          "/admin/wallet/transactions",
+        ),
       credit: (userId: string, body: AdminWalletAdjustmentRequest) =>
         apiFetch<{ wallet: Wallet; transaction: WalletTransaction }>(
           `/admin/wallet/users/${userId}/credit`,
@@ -235,6 +254,7 @@ export const api = {
     },
     tickets: {
       list: () => apiFetch<{ tickets: AdminTicket[] }>("/admin/tickets"),
+      get: (id: string) => apiFetch<{ ticket: AdminTicket }>(`/admin/tickets/${id}`),
       addMessage: (id: string, body: CreateAdminTicketMessageRequest) =>
         apiFetch<{ ticket: AdminTicket }>(`/admin/tickets/${id}/messages`, {
           body,

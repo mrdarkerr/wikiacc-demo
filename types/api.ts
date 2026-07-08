@@ -190,6 +190,7 @@ export type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED" | "REVERSED";
 
 export type WalletTransaction = {
   id: string;
+  userId?: string;
   amount: number;
   type: TransactionType;
   status: TransactionStatus;
@@ -202,6 +203,22 @@ export type WalletTransaction = {
 export type WalletSummary = {
   wallet: Wallet;
   transactions: WalletTransaction[];
+};
+
+export type AdminWalletSummary = {
+  averageBalance: number;
+  maxBalance: number;
+  recentTransactionCount: number;
+  totalBalance: number;
+  totalUsers: number;
+  transactionCount: number;
+  usersWithBalance: number;
+};
+
+export type AdminWalletTransaction = WalletTransaction & {
+  user: Pick<User, "id" | "email" | "name" | "phone">;
+  createdByAdmin?: Pick<User, "id" | "email" | "name" | "role"> | null;
+  createdByAdminId?: string | null;
 };
 
 export type DashboardSummary = {

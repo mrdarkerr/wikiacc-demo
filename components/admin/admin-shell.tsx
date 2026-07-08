@@ -121,7 +121,7 @@ export function AdminShell({ children }: AdminShellProps) {
           <div className="rounded-md bg-muted p-3 text-sm">
             <p className="font-medium">دسترسی مدیریتی</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              API با session cookie احراز می شود.
+              مدیریت سفارش ها، تیکت ها و کیف پول کاربران
             </p>
           </div>
           <Button

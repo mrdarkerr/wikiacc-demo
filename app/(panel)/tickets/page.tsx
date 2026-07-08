@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { SendHorizontal } from "lucide-react";
+import Link from "next/link";
+import type { FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, Search, SendHorizontal } from "lucide-react";
 
 import { formatDate } from "@/components/panel/formatters";
 import { PanelSection } from "@/components/panel/panel-section";
@@ -19,6 +21,10 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | Ticket["status"]>(
+    "ALL",
+  );
 
   useEffect(() => {
     let active = true;
@@ -67,6 +73,23 @@ export default function TicketsPage() {
       setSubmitting(false);
     }
   }
+
+  const filteredTickets = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return tickets.filter((ticket) => {
+      const matchesStatus =
+        statusFilter === "ALL" ? true : ticket.status === statusFilter;
+      const searchableText = [
+        ticket.subject,
+        ticket.orderId ?? "",
+        ...ticket.messages.map((ticketMessage) => ticketMessage.body),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return matchesStatus && searchableText.includes(normalizedSearch);
+    });
+  }, [search, statusFilter, tickets]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -121,11 +144,35 @@ export default function TicketsPage() {
         description="آخرین مکالمات و پاسخ های پشتیبانی"
         title="تیکت ها"
       >
+        <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_180px]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-11 pr-9"
+              placeholder="جست‌وجوی موضوع یا متن پیام"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          <select
+            className="h-11 rounded-md border border-input bg-background px-3 text-sm"
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as "ALL" | Ticket["status"])
+            }
+          >
+            <option value="ALL">همه وضعیت‌ها</option>
+            <option value="OPEN">باز</option>
+            <option value="ANSWERED">پاسخ داده شده</option>
+            <option value="CLOSED">بسته</option>
+          </select>
+        </div>
+
         {loading ? (
           <p className="text-sm text-muted-foreground">در حال دریافت تیکت ها...</p>
-        ) : tickets.length ? (
+        ) : filteredTickets.length ? (
           <div className="space-y-3">
-            {tickets.map((ticket) => (
+            {filteredTickets.map((ticket) => (
               <article
                 key={ticket.id}
                 className="rounded-md border border-border p-4 text-sm"
@@ -142,14 +189,22 @@ export default function TicketsPage() {
                     <StatusBadge type="ticket" value={ticket.status} />
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  آخرین بروزرسانی: {formatDate(ticket.updatedAt)}
-                </p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    آخرین بروزرسانی: {formatDate(ticket.updatedAt)}
+                  </p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/tickets/${ticket.id}`}>
+                      <Eye className="size-4" />
+                      مشاهده مکالمه
+                    </Link>
+                  </Button>
+                </div>
               </article>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">تیکتی ثبت نشده است.</p>
+          <p className="text-sm text-muted-foreground">تیکتی با این فیلتر پیدا نشد.</p>
         )}
       </PanelSection>
     </div>

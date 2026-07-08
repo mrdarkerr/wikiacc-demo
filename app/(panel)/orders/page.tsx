@@ -78,7 +78,7 @@ export default function OrdersPage() {
       </div>
 
       <PanelSection
-        description="اطلاعات این جدول از GET /api/v1/orders/my خوانده می شود"
+        description="تاریخچه خرید، وضعیت سفارش و محتوای آماده تحویل"
         title="همه سفارش ها"
       >
         {loading ? (

@@ -2,19 +2,25 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { WalletCards } from "lucide-react";
+import { Search, WalletCards } from "lucide-react";
 
 import {
   formatCurrency,
   formatDate,
+  formatNumber,
   shortId,
+  userLabel,
 } from "@/components/admin/admin-formatters";
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiError } from "@/lib/api";
-import type { AdminUser } from "@/types/api";
+import type {
+  AdminUser,
+  AdminWalletSummary,
+  AdminWalletTransaction,
+} from "@/types/api";
 
 type WalletForm = {
   amount: string;
@@ -43,22 +49,34 @@ function errorMessage(error: unknown) {
 
 export default function AdminWalletPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [summary, setSummary] = useState<AdminWalletSummary | null>(null);
+  const [transactions, setTransactions] = useState<AdminWalletTransaction[]>([]);
   const [form, setForm] = useState<WalletForm>(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"balance-desc" | "balance-asc" | "name">(
+    "balance-desc",
+  );
 
-  async function loadUsers(nextUserId?: string) {
-    const result = await api.admin.users.list();
-    setUsers(result.users);
+  async function loadWallet(nextUserId?: string) {
+    const [usersResult, summaryResult, transactionsResult] = await Promise.all([
+      api.admin.users.list(),
+      api.admin.wallet.summary(),
+      api.admin.wallet.transactions(),
+    ]);
+    setUsers(usersResult.users);
+    setSummary(summaryResult.summary);
+    setTransactions(transactionsResult.transactions);
     setForm((current) => ({
       ...current,
       userId:
         nextUserId ||
         current.userId ||
         new URLSearchParams(window.location.search).get("userId") ||
-        result.users[0]?.id ||
+        usersResult.users[0]?.id ||
         "",
     }));
   }
@@ -66,17 +84,22 @@ export default function AdminWalletPage() {
   useEffect(() => {
     let active = true;
 
-    api.admin.users
-      .list()
-      .then((result) => {
+    Promise.all([
+      api.admin.users.list(),
+      api.admin.wallet.summary(),
+      api.admin.wallet.transactions(),
+    ])
+      .then(([usersResult, summaryResult, transactionsResult]) => {
         if (!active) return;
         const queryUserId = new URLSearchParams(window.location.search).get(
           "userId",
         );
-        setUsers(result.users);
+        setUsers(usersResult.users);
+        setSummary(summaryResult.summary);
+        setTransactions(transactionsResult.transactions);
         setForm((current) => ({
           ...current,
-          userId: queryUserId || result.users[0]?.id || "",
+          userId: queryUserId || usersResult.users[0]?.id || "",
         }));
         setError("");
       })
@@ -95,6 +118,54 @@ export default function AdminWalletPage() {
   const selectedUser = useMemo(
     () => users.find((user) => user.id === form.userId),
     [form.userId, users],
+  );
+
+  const filteredUsers = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return users
+      .filter((user) =>
+        [user.name, user.email, user.phone ?? ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedSearch),
+      )
+      .sort((first, second) => {
+        if (sort === "name") {
+          return first.name.localeCompare(second.name, "fa");
+        }
+
+        const firstBalance = first.wallet?.balance ?? 0;
+        const secondBalance = second.wallet?.balance ?? 0;
+        return sort === "balance-desc"
+          ? secondBalance - firstBalance
+          : firstBalance - secondBalance;
+      });
+  }, [search, sort, users]);
+
+  const metrics = useMemo(
+    () => [
+      {
+        label: "مجموع موجودی",
+        value: formatCurrency(summary?.totalBalance ?? 0),
+      },
+      {
+        label: "میانگین موجودی",
+        value: formatCurrency(summary?.averageBalance ?? 0),
+      },
+      {
+        label: "کاربران دارای موجودی",
+        value: formatNumber(summary?.usersWithBalance ?? 0),
+      },
+      {
+        label: "بیشترین موجودی",
+        value: formatCurrency(summary?.maxBalance ?? 0),
+      },
+      {
+        label: "تراکنش ۳۰ روز اخیر",
+        value: formatNumber(summary?.recentTransactionCount ?? 0),
+      },
+    ],
+    [summary],
   );
 
   async function adjustWallet(event: FormEvent<HTMLFormElement>) {
@@ -118,7 +189,7 @@ export default function AdminWalletPage() {
         await api.admin.wallet.debit(form.userId, body);
       }
 
-      await loadUsers(form.userId);
+      await loadWallet(form.userId);
       setForm((current) => ({ ...current, amount: "", note: "" }));
       setMessage("کیف پول به روز شد.");
       setError("");
@@ -135,121 +206,45 @@ export default function AdminWalletPage() {
       {message ? <AdminState tone="success">{message}</AdminState> : null}
       {error ? <AdminState tone="danger">{error}</AdminState> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
-        <AdminSection title="شارژ کیف پول">
-          <form className="space-y-4" onSubmit={adjustWallet}>
-            <label className="block text-sm font-medium">
-              کاربر
-              <select
-                className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                required
-                value={form.userId}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    userId: event.target.value,
-                  }))
-                }
-              >
-                <option value="">انتخاب کنید</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} - {user.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm font-medium">
-              نوع عملیات
-              <select
-                className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={form.mode}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    mode: event.target.value as WalletForm["mode"],
-                  }))
-                }
-              >
-                <option value="credit">افزایش موجودی</option>
-                <option value="debit">کاهش موجودی</option>
-              </select>
-            </label>
-            <label className="block text-sm font-medium">
-              مبلغ
-              <Input
-                className="mt-2"
-                min={1}
-                required
-                type="number"
-                value={form.amount}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    amount: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              توضیح
-              <textarea
-                className="mt-2 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.note}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    note: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <Button disabled={saving || loading} type="submit">
-              <WalletCards className="size-4" />
-              ثبت عملیات
-            </Button>
-          </form>
-        </AdminSection>
-
-        <AdminSection title="کاربر انتخاب شده">
-          {selectedUser ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-md border border-border p-4">
-                <p className="text-sm text-muted-foreground">نام</p>
-                <p className="mt-2 font-medium">{selectedUser.name}</p>
-              </div>
-              <div className="rounded-md border border-border p-4">
-                <p className="text-sm text-muted-foreground">ایمیل</p>
-                <p className="mt-2 font-medium" dir="ltr">
-                  {selectedUser.email}
-                </p>
-              </div>
-              <div className="rounded-md border border-border p-4">
-                <p className="text-sm text-muted-foreground">موجودی</p>
-                <p className="mt-2 text-lg font-bold">
-                  {formatCurrency(selectedUser.wallet?.balance ?? 0)}
-                </p>
-              </div>
-              <div className="rounded-md border border-border p-4">
-                <p className="text-sm text-muted-foreground">نقش</p>
-                <div className="mt-2">
-                  <AdminStatusBadge type="role" value={selectedUser.role} />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <AdminState>کاربری انتخاب نشده است.</AdminState>
-          )}
-        </AdminSection>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {metrics.map((metric) => (
+          <div
+            className="rounded-lg border border-border bg-card p-4 shadow-sm"
+            key={metric.label}
+          >
+            <p className="text-sm text-muted-foreground">{metric.label}</p>
+            <p className="mt-2 text-xl font-bold">{metric.value}</p>
+          </div>
+        ))}
       </div>
 
-      <AdminSection
-        description="شارژ و برداشت از POST /api/v1/admin/wallet/users/:userId/credit|debit انجام می شود."
-        title="موجودی کاربران"
-      >
+      <AdminSection title="موجودی کاربران" description="انتخاب کاربر برای شارژ یا برداشت">
+        <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_220px]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-11 pr-9"
+              placeholder="جست‌وجوی نام، ایمیل یا موبایل"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          <select
+            className="h-11 rounded-md border border-input bg-background px-3 text-sm"
+            value={sort}
+            onChange={(event) =>
+              setSort(event.target.value as "balance-desc" | "balance-asc" | "name")
+            }
+          >
+            <option value="balance-desc">بیشترین موجودی</option>
+            <option value="balance-asc">کمترین موجودی</option>
+            <option value="name">نام کاربر</option>
+          </select>
+        </div>
+
         {loading ? (
           <AdminState>در حال دریافت کاربران...</AdminState>
-        ) : users.length ? (
+        ) : filteredUsers.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-right text-sm">
               <thead className="text-xs text-muted-foreground">
@@ -260,13 +255,16 @@ export default function AdminWalletPage() {
                   <th className="py-3 font-medium">موجودی</th>
                   <th className="py-3 font-medium">نقش</th>
                   <th className="py-3 font-medium">ثبت نام</th>
+                  <th className="py-3 font-medium">عملیات</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <tr
                     key={user.id}
-                    className="border-b border-border last:border-0"
+                    className={`border-b border-border last:border-0 ${
+                      user.id === form.userId ? "bg-primary/5" : ""
+                    }`}
                   >
                     <td className="py-3 font-medium" dir="ltr">
                       {shortId(user.id)}
@@ -282,15 +280,187 @@ export default function AdminWalletPage() {
                     <td className="py-3 text-muted-foreground">
                       {formatDate(user.createdAt)}
                     </td>
+                    <td className="py-3">
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant={user.id === form.userId ? "default" : "outline"}
+                        onClick={() =>
+                          setForm((current) => ({ ...current, userId: user.id }))
+                        }
+                      >
+                        انتخاب
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <AdminState>کاربری ثبت نشده است.</AdminState>
+          <AdminState>کاربری با این جست‌وجو پیدا نشد.</AdminState>
         )}
       </AdminSection>
+
+      <div className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
+        <AdminSection title="عملیات کیف پول">
+          {selectedUser ? (
+            <div className="space-y-5">
+              <div className="rounded-md border border-border p-4">
+                <p className="font-medium">{userLabel(selectedUser)}</p>
+                <p className="mt-2 text-2xl font-bold">
+                  {formatCurrency(selectedUser.wallet?.balance ?? 0)}
+                </p>
+              </div>
+
+              <form className="space-y-4" onSubmit={adjustWallet}>
+                <label className="block text-sm font-medium">
+                  کاربر
+                  <select
+                    className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    required
+                    value={form.userId}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        userId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">انتخاب کنید</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} - {user.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium">
+                  نوع عملیات
+                  <select
+                    className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.mode}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        mode: event.target.value as WalletForm["mode"],
+                      }))
+                    }
+                  >
+                    <option value="credit">افزایش موجودی</option>
+                    <option value="debit">کاهش موجودی</option>
+                  </select>
+                </label>
+                <label className="block text-sm font-medium">
+                  مبلغ
+                  <Input
+                    className="mt-2"
+                    min={1}
+                    required
+                    type="number"
+                    value={form.amount}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        amount: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  توضیح
+                  <textarea
+                    className="mt-2 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={form.note}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        note: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <Button disabled={saving || loading} type="submit">
+                  <WalletCards className="size-4" />
+                  ثبت عملیات
+                </Button>
+              </form>
+            </div>
+          ) : (
+            <AdminState>برای عملیات کیف پول یک کاربر را انتخاب کنید.</AdminState>
+          )}
+        </AdminSection>
+
+        <AdminSection title="گردش کیف پول">
+          {transactions.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-right text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="py-3 font-medium">شناسه</th>
+                    <th className="py-3 font-medium">کاربر</th>
+                    <th className="py-3 font-medium">نوع</th>
+                    <th className="py-3 font-medium">مبلغ</th>
+                    <th className="py-3 font-medium">توضیح</th>
+                    <th className="py-3 font-medium">ثبت‌کننده</th>
+                    <th className="py-3 font-medium">تاریخ</th>
+                    <th className="py-3 font-medium">وضعیت</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((transaction) => (
+                    <tr
+                      key={transaction.id}
+                      className="border-b border-border last:border-0"
+                    >
+                      <td className="py-3 font-medium" dir="ltr">
+                        {shortId(transaction.id)}
+                      </td>
+                      <td className="py-3">{userLabel(transaction.user)}</td>
+                      <td className="py-3">
+                        <AdminStatusBadge
+                          type="transaction"
+                          value={transaction.type}
+                        />
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={
+                            transaction.amount >= 0
+                              ? "text-emerald-600 dark:text-emerald-300"
+                              : "text-rose-600 dark:text-rose-300"
+                          }
+                        >
+                          {formatCurrency(Math.abs(transaction.amount))}
+                        </span>
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {transaction.note ?? transaction.referenceType ?? "-"}
+                      </td>
+                      <td className="py-3">
+                        {transaction.createdByAdmin
+                          ? userLabel(transaction.createdByAdmin)
+                          : "-"}
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {formatDate(transaction.createdAt)}
+                      </td>
+                      <td className="py-3">
+                        <AdminStatusBadge
+                          type="transaction"
+                          value={transaction.status}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <AdminState>تراکنشی ثبت نشده است.</AdminState>
+          )}
+        </AdminSection>
+      </div>
     </div>
   );
 }

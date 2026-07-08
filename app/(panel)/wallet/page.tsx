@@ -55,18 +55,18 @@ export default function WalletPage() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <MetricCard
-          helper="در این مرحله موجودی فقط توسط ادمین شارژ می شود"
+          helper="موجودی قابل استفاده برای خریدهای بعدی"
           icon={WalletCards}
           label="موجودی فعلی"
           tone="emerald"
           value={formatCurrency(wallet?.balance ?? 0)}
         />
         <MetricCard
-          helper="درگاه پرداخت در فاز بعدی به همین ledger وصل می شود"
+          helper="شارژ کیف پول و پرداخت مستقیم سفارش‌ها"
           icon={CreditCard}
           label="پرداخت آنلاین"
           tone="amber"
-          value="مرحله بعد"
+          value="کیف پول"
         />
       </div>
 

@@ -32,7 +32,7 @@ function optionalText(value: string) {
 function errorMessage(error: unknown) {
   return error instanceof ApiError
     ? error.message
-    : "عملیات delivery pool انجام نشد.";
+    : "عملیات موجودی تحویل انجام نشد.";
 }
 
 export default function AdminDeliveryPoolsPage() {
@@ -118,7 +118,7 @@ export default function AdminDeliveryPoolsPage() {
       });
       setPoolForm(initialPoolForm);
       await loadPools(result.pool.id);
-      setMessage("delivery pool ایجاد شد.");
+      setMessage("مخزن تحویل ایجاد شد.");
       setError("");
     } catch (createError) {
       setError(errorMessage(createError));
@@ -137,7 +137,7 @@ export default function AdminDeliveryPoolsPage() {
       .filter(Boolean);
 
     if (!selectedPoolId || !nextItems.length) {
-      setError("حداقل یک آیتم برای pool انتخاب شده وارد کنید.");
+      setError("حداقل یک آیتم برای مخزن انتخاب‌شده وارد کنید.");
       return;
     }
 
@@ -164,7 +164,7 @@ export default function AdminDeliveryPoolsPage() {
       {error ? <AdminState tone="danger">{error}</AdminState> : null}
 
       <div className="grid gap-6 xl:grid-cols-[0.7fr_1.3fr]">
-        <AdminSection title="delivery pool جدید">
+        <AdminSection title="مخزن تحویل جدید">
           <form className="space-y-4" onSubmit={createPool}>
             <label className="block text-sm font-medium">
               عنوان
@@ -211,7 +211,7 @@ export default function AdminDeliveryPoolsPage() {
             </label>
             <Button disabled={saving} type="submit">
               <Plus className="size-4" />
-              ایجاد pool
+              ایجاد مخزن
             </Button>
           </form>
         </AdminSection>
@@ -219,7 +219,7 @@ export default function AdminDeliveryPoolsPage() {
         <AdminSection title="افزودن آیتم تحویل">
           <form className="space-y-4" onSubmit={addItems}>
             <label className="block text-sm font-medium">
-              pool
+              مخزن تحویل
               <select
                 className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 required
@@ -253,11 +253,11 @@ export default function AdminDeliveryPoolsPage() {
       </div>
 
       <AdminSection
-        description="لیست poolها از GET /api/v1/admin/delivery-pools خوانده می شود."
-        title="delivery pools"
+        description="مخزن‌هایی که برای تحویل فوری محصولات استفاده می‌شوند."
+        title="مخزن‌های تحویل"
       >
         {loading ? (
-          <AdminState>در حال دریافت poolها...</AdminState>
+          <AdminState>در حال دریافت مخزن‌ها...</AdminState>
         ) : pools.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-right text-sm">
@@ -292,13 +292,13 @@ export default function AdminDeliveryPoolsPage() {
             </table>
           </div>
         ) : (
-          <AdminState>pool ثبت نشده است.</AdminState>
+          <AdminState>مخزنی ثبت نشده است.</AdminState>
         )}
       </AdminSection>
 
       <AdminSection
-        description="آیتم های pool انتخاب شده از GET /api/v1/admin/delivery-pools/:id/items خوانده می شود."
-        title="آیتم های pool انتخاب شده"
+        description="محتواهای آماده‌ای که بعد از خرید به کاربر تحویل داده می‌شوند."
+        title="آیتم‌های مخزن انتخاب‌شده"
       >
         {itemsLoading ? (
           <AdminState>در حال دریافت آیتم ها...</AdminState>
@@ -340,7 +340,7 @@ export default function AdminDeliveryPoolsPage() {
             </table>
           </div>
         ) : (
-          <AdminState>برای این pool آیتمی ثبت نشده است.</AdminState>
+          <AdminState>برای این مخزن آیتمی ثبت نشده است.</AdminState>
         )}
       </AdminSection>
     </div>
