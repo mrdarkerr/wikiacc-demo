@@ -6,10 +6,15 @@ export function getWalletByUserId(prisma, userId) {
   });
 }
 
-export function listWalletTransactions(prisma, userId) {
+export function listWalletTransactions(prisma, userId, { page = 1, perPage = 20 } = {}) {
   return prisma.walletTransaction.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    skip: (page - 1) * perPage,
+    take: perPage,
   });
+}
+
+export function countWalletTransactions(prisma, userId) {
+  return prisma.walletTransaction.count({ where: { userId } });
 }

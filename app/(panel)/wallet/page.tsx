@@ -11,10 +11,37 @@ import {
   transactionTypeLabel,
 } from "@/components/panel/status-badge";
 import { api, ApiError } from "@/lib/api";
-import type { WalletSummary } from "@/types/api";
+import type { ApiMeta, WalletSummary, WalletTransaction } from "@/types/api";
+
+const PER_PAGE = 10;
+
+function transactionDescription(transaction: WalletTransaction) {
+  const note = transaction.note?.trim();
+
+  if (transaction.type === "ORDER_PAYMENT") {
+    return "خرید محصول";
+  }
+
+  if (transaction.type === "ORDER_REFUND") {
+    return "بازگشت وجه سفارش";
+  }
+
+  if (transaction.type === "ADMIN_CREDIT") {
+    return note ? `شارژ کیف پول - ${note}` : "شارژ کیف پول توسط پشتیبانی";
+  }
+
+  if (transaction.type === "ADMIN_DEBIT") {
+    return note ? `برداشت از کیف پول - ${note}` : "برداشت از کیف پول توسط پشتیبانی";
+  }
+
+  return note || "شارژ آنلاین کیف پول";
+}
 
 export default function WalletPage() {
   const [summary, setSummary] = useState<WalletSummary | null>(null);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [transactionsMeta, setTransactionsMeta] = useState<ApiMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -48,8 +75,37 @@ export default function WalletPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    api.wallet
+      .transactionsPage({ page, perPage: PER_PAGE })
+      .then((result) => {
+        if (!active) return;
+        setTransactions(result.data.transactions);
+        setTransactionsMeta(result.meta ?? null);
+        setError("");
+      })
+      .catch((loadError) => {
+        if (active) {
+          setError(
+            loadError instanceof ApiError
+              ? loadError.message
+              : "دریافت تراکنش ها انجام نشد.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [page]);
+
   const wallet = summary?.wallet;
-  const transactions = summary?.transactions ?? [];
+  const totalPages = transactionsMeta?.totalPages ?? 1;
 
   return (
     <div className="space-y-6">
@@ -102,7 +158,7 @@ export default function WalletPage() {
                     </td>
                     <td className="py-3">{transactionTypeLabel(transaction.type)}</td>
                     <td className="py-3 text-muted-foreground">
-                      {transaction.note ?? transaction.referenceType ?? "-"}
+                      {transactionDescription(transaction)}
                     </td>
                     <td className="py-3">
                       <span
@@ -125,11 +181,57 @@ export default function WalletPage() {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={(nextPage) => {
+                setLoading(true);
+                setPage(nextPage);
+              }}
+            />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">تراکنشی ثبت نشده است.</p>
         )}
       </PanelSection>
+    </div>
+  );
+}
+
+function Pagination({
+  onPageChange,
+  page,
+  totalPages,
+}: {
+  onPageChange: (page: number) => void;
+  page: number;
+  totalPages: number;
+}) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">
+        صفحه {page} از {totalPages}
+      </p>
+      <div className="flex gap-2">
+        <button
+          className="h-9 rounded-md border border-input px-3 text-sm disabled:opacity-50"
+          disabled={page <= 1}
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+        >
+          قبلی
+        </button>
+        <button
+          className="h-9 rounded-md border border-input px-3 text-sm disabled:opacity-50"
+          disabled={page >= totalPages}
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+        >
+          بعدی
+        </button>
+      </div>
     </div>
   );
 }

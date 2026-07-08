@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Lock, SendHorizontal } from "lucide-react";
 
 import { formatDate } from "@/components/panel/formatters";
@@ -11,7 +11,9 @@ import { PanelSection } from "@/components/panel/panel-section";
 import { StatusBadge } from "@/components/panel/status-badge";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
-import type { Ticket } from "@/types/api";
+import type { ApiMeta, Ticket, TicketMessage } from "@/types/api";
+
+const MESSAGE_PAGE_SIZE = 20;
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError
@@ -23,8 +25,11 @@ export default function TicketDetailPage() {
   const params = useParams<{ id: string }>();
   const ticketId = params.id;
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [messages, setMessages] = useState<TicketMessage[]>([]);
+  const [messagesMeta, setMessagesMeta] = useState<ApiMeta | null>(null);
   const [replyBody, setReplyBody] = useState("");
   const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -34,14 +39,36 @@ export default function TicketDetailPage() {
     setTicket(result.ticket);
   }
 
+  const loadMessages = useCallback(async function loadMessages(
+    nextPage = 1,
+    mode: "replace" | "prepend" = "replace",
+  ) {
+    setMessagesLoading(true);
+    try {
+      const result = await api.tickets.messages(ticketId, {
+        page: nextPage,
+        perPage: MESSAGE_PAGE_SIZE,
+      });
+      setMessages((current) =>
+        mode === "prepend"
+          ? [...result.data.messages, ...current]
+          : result.data.messages,
+      );
+      setMessagesMeta(result.meta ?? null);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [ticketId]);
+
   useEffect(() => {
     let active = true;
 
     api.tickets
       .get(ticketId)
-      .then((result) => {
+      .then(async (result) => {
         if (!active) return;
         setTicket(result.ticket);
+        await loadMessages(1);
         setError("");
       })
       .catch((loadError) => {
@@ -54,7 +81,7 @@ export default function TicketDetailPage() {
     return () => {
       active = false;
     };
-  }, [ticketId]);
+  }, [loadMessages, ticketId]);
 
   async function sendReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,6 +92,7 @@ export default function TicketDetailPage() {
       await api.tickets.addMessage(ticket.id, { body: replyBody.trim() });
       setReplyBody("");
       await loadTicket();
+      await loadMessages(1);
       setMessage("پاسخ شما ارسال شد.");
       setError("");
     } catch (replyError) {
@@ -80,8 +108,8 @@ export default function TicketDetailPage() {
 
     setSaving(true);
     try {
-      await api.tickets.close(ticket.id);
-      await loadTicket();
+      const result = await api.tickets.close(ticket.id);
+      setTicket(result.ticket);
       setMessage("تیکت بسته شد.");
       setError("");
     } catch (closeError) {
@@ -108,6 +136,9 @@ export default function TicketDetailPage() {
       </PanelSection>
     );
   }
+
+  const messagePage = messagesMeta?.page ?? 1;
+  const messageTotalPages = messagesMeta?.totalPages ?? 1;
 
   return (
     <div className="space-y-6">
@@ -140,7 +171,21 @@ export default function TicketDetailPage() {
       <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
         <PanelSection title="مکالمه">
           <div className="space-y-4">
-            {ticket.messages.map((ticketMessage) => (
+            {messagePage < messageTotalPages ? (
+              <Button
+                className="w-full"
+                disabled={messagesLoading}
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  loadMessages(messagePage + 1, "prepend")
+                }
+              >
+                {messagesLoading ? "در حال دریافت..." : "پیام‌های قدیمی‌تر"}
+              </Button>
+            ) : null}
+
+            {messages.map((ticketMessage) => (
               <article
                 className={`rounded-md p-4 text-sm ${
                   ticketMessage.isAdmin

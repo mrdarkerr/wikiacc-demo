@@ -25,6 +25,7 @@ import type {
   RefundAdminOrderRequest,
   SetAdminProductActiveRequest,
   Ticket,
+  TicketMessage,
   UpdateAdminOrderStatusRequest,
   UpdateAdminProductRequest,
   UpdateAdminTicketStatusRequest,
@@ -89,6 +90,43 @@ async function readJson<T>(response: Response): Promise<T | undefined> {
   return text ? (JSON.parse(text) as T) : undefined;
 }
 
+export async function apiFetchWithMeta<T>(
+  path: string,
+  { body, headers, query, ...init }: ApiFetchOptions = {},
+): Promise<ApiResponse<T>> {
+  const requestHeaders = new Headers(headers);
+
+  if (!requestHeaders.has("Accept")) {
+    requestHeaders.set("Accept", "application/json");
+  }
+
+  const jsonBody = isJsonBody(body);
+  if (jsonBody && !requestHeaders.has("Content-Type")) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(normalizeUrl(path, query), {
+    cache: "no-store",
+    credentials: "include",
+    ...init,
+    body: jsonBody ? JSON.stringify(body) : body,
+    headers: requestHeaders,
+  });
+
+  const payload = await readJson<ApiResponse<T> | ApiErrorResponse>(response);
+
+  if (!response.ok) {
+    const errorPayload = payload as ApiErrorResponse | undefined;
+    throw new ApiError(
+      response.status,
+      errorPayload?.error?.message ?? "خطا در ارتباط با سرور",
+      errorPayload,
+    );
+  }
+
+  return payload as ApiResponse<T>;
+}
+
 export async function apiFetch<T>(
   path: string,
   { body, headers, query, ...init }: ApiFetchOptions = {},
@@ -147,12 +185,31 @@ export const api = {
   orders: {
     create: (body: CreateOrderRequest) =>
       apiFetch<{ order: Order }>("/orders", { body, method: "POST" }),
-    list: () => apiFetch<{ orders: Order[] }>("/orders/my"),
+    list: () =>
+      apiFetch<{ orders: Order[] }>("/orders/my", {
+        query: { page: 1, perPage: 50 },
+      }),
+    listPage: (query?: { page?: number; perPage?: number }) =>
+      apiFetchWithMeta<{ orders: Order[] }>("/orders/my", { query }),
     get: (id: string) => apiFetch<{ order: Order }>(`/orders/${id}`),
   },
   tickets: {
-    list: () => apiFetch<{ tickets: Ticket[] }>("/tickets/my"),
+    list: () =>
+      apiFetch<{ tickets: Ticket[] }>("/tickets/my", {
+        query: { page: 1, perPage: 50 },
+      }),
+    listPage: (query?: {
+      page?: number;
+      perPage?: number;
+      search?: string;
+      status?: Ticket["status"];
+    }) => apiFetchWithMeta<{ tickets: Ticket[] }>("/tickets/my", { query }),
     get: (id: string) => apiFetch<{ ticket: Ticket }>(`/tickets/${id}`),
+    messages: (id: string, query?: { page?: number; perPage?: number }) =>
+      apiFetchWithMeta<{ messages: TicketMessage[] }>(
+        `/tickets/${id}/messages`,
+        { query },
+      ),
     create: (body: CreateTicketRequest) =>
       apiFetch<{ ticket: Ticket }>("/tickets", { body, method: "POST" }),
     addMessage: (id: string, body: CreateAdminTicketMessageRequest) =>
@@ -167,6 +224,11 @@ export const api = {
   },
   wallet: {
     summary: () => apiFetch<WalletSummary>("/wallet/me"),
+    transactionsPage: (query?: { page?: number; perPage?: number }) =>
+      apiFetchWithMeta<{ transactions: WalletTransaction[] }>(
+        "/wallet/transactions",
+        { query },
+      ),
   },
   admin: {
     users: {

@@ -1,10 +1,17 @@
 import { paymentRequired } from "../../shared/errors.js";
-import { getWalletByUserId, listWalletTransactions } from "./repository.js";
+import {
+  countWalletTransactions,
+  getWalletByUserId,
+  listWalletTransactions,
+} from "./repository.js";
 
-export async function getWalletSummary(prisma, userId) {
+export async function getWalletSummary(prisma, userId, pagination) {
   const wallet = await getWalletByUserId(prisma, userId);
-  const transactions = await listWalletTransactions(prisma, userId);
-  return { wallet, transactions };
+  const [transactions, total] = await Promise.all([
+    listWalletTransactions(prisma, userId, pagination),
+    countWalletTransactions(prisma, userId),
+  ]);
+  return { total, transactions, wallet };
 }
 
 export async function adjustWalletByAdmin(prisma, adminId, userId, type, input) {

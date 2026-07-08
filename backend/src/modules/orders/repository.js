@@ -1,4 +1,4 @@
-export function listUserOrders(prisma, userId) {
+export function listUserOrders(prisma, userId, { page = 1, perPage = 20 } = {}) {
   return prisma.order.findMany({
     where: { userId },
     include: {
@@ -11,7 +11,13 @@ export function listUserOrders(prisma, userId) {
       },
     },
     orderBy: { createdAt: "desc" },
+    skip: (page - 1) * perPage,
+    take: perPage,
   });
+}
+
+export function countUserOrders(prisma, userId) {
+  return prisma.order.count({ where: { userId } });
 }
 
 export function getUserOrder(prisma, userId, orderId) {

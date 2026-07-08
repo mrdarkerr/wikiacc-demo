@@ -14,6 +14,19 @@ import {
 } from "./service.js";
 
 const orderParamsSchema = z.object({ id: z.string().min(1) });
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  perPage: z.coerce.number().int().positive().max(50).default(10),
+});
+
+function paginationMeta(page, perPage, total) {
+  return {
+    page,
+    perPage,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / perPage)),
+  };
+}
 
 export async function orderRoutes(app) {
   app.post("/", { preHandler: app.authenticate }, async (request, reply) => {
@@ -23,8 +36,9 @@ export async function orderRoutes(app) {
   });
 
   app.get("/my", { preHandler: app.authenticate }, async (request, reply) => {
-    const orders = await listMyOrders(app.prisma, request.user.id);
-    return ok(reply, { orders });
+    const query = parse(paginationQuerySchema, request.query);
+    const { orders, total } = await listMyOrders(app.prisma, request.user.id, query);
+    return ok(reply, { orders }, paginationMeta(query.page, query.perPage, total));
   });
 
   app.get("/:id", { preHandler: app.authenticate }, async (request, reply) => {

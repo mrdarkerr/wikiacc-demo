@@ -52,11 +52,11 @@ const transactionStatusLabels: Record<
 };
 
 const transactionTypeLabels: Record<TransactionType, string> = {
-  ADMIN_CREDIT: "شارژ ادمین",
-  ADMIN_DEBIT: "برداشت ادمین",
-  GATEWAY_TOPUP: "شارژ درگاه",
-  ORDER_PAYMENT: "خرید",
-  ORDER_REFUND: "بازگشت وجه",
+  ADMIN_CREDIT: "شارژ کیف پول",
+  ADMIN_DEBIT: "برداشت از کیف پول",
+  GATEWAY_TOPUP: "شارژ آنلاین",
+  ORDER_PAYMENT: "خرید محصول",
+  ORDER_REFUND: "بازگشت وجه سفارش",
 };
 
 type StatusBadgeProps =

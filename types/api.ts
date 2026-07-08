@@ -144,6 +144,7 @@ export type TicketMessage = {
   body: string;
   isAdmin: boolean;
   createdAt: string;
+  sender?: Pick<User, "id" | "name" | "role"> | null;
 };
 
 export type Ticket = {

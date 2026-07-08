@@ -1,5 +1,5 @@
 import { badRequest, notFound } from "../../shared/errors.js";
-import { getUserTicket, listUserTickets } from "./repository.js";
+import { countUserTickets, getUserTicket, listUserTickets } from "./repository.js";
 
 export async function createTicket(prisma, userId, input) {
   if (input.orderId) {
@@ -32,8 +32,13 @@ export async function createTicket(prisma, userId, input) {
   });
 }
 
-export function listMyTickets(prisma, userId) {
-  return listUserTickets(prisma, userId);
+export async function listMyTickets(prisma, userId, options) {
+  const [tickets, total] = await Promise.all([
+    listUserTickets(prisma, userId, options),
+    countUserTickets(prisma, userId, options),
+  ]);
+
+  return { tickets, total };
 }
 
 export async function getMyTicket(prisma, userId, ticketId) {
@@ -62,7 +67,7 @@ export async function addTicketMessage(prisma, userId, ticketId, input, isAdmin 
     },
   });
 
-  return prisma.ticket.update({
+  await prisma.ticket.update({
     where: { id: ticketId },
     data: { status: isAdmin ? "ANSWERED" : "OPEN" },
     include: {
@@ -72,6 +77,20 @@ export async function addTicketMessage(prisma, userId, ticketId, input, isAdmin 
       },
     },
   });
+
+  return isAdmin
+    ? prisma.ticket.findUnique({
+        where: { id: ticketId },
+        include: {
+          user: { select: { id: true, email: true, name: true } },
+          order: { select: { id: true, status: true, totalAmount: true } },
+          messages: {
+            include: { sender: { select: { id: true, name: true, role: true } } },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      })
+    : getUserTicket(prisma, userId, ticketId);
 }
 
 export async function closeTicket(prisma, userId, ticketId) {
@@ -80,8 +99,10 @@ export async function closeTicket(prisma, userId, ticketId) {
     throw notFound("TICKET_NOT_FOUND", "Ticket was not found");
   }
 
-  return prisma.ticket.update({
+  await prisma.ticket.update({
     where: { id: ticketId },
     data: { status: "CLOSED" },
   });
+
+  return getUserTicket(prisma, userId, ticketId);
 }

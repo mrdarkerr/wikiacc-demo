@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Search, SendHorizontal } from "lucide-react";
 
 import { formatDate } from "@/components/panel/formatters";
@@ -11,10 +11,14 @@ import { StatusBadge } from "@/components/panel/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiError } from "@/lib/api";
-import type { Ticket, TicketPriority } from "@/types/api";
+import type { ApiMeta, Ticket, TicketPriority } from "@/types/api";
+
+const PER_PAGE = 8;
 
 export default function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<ApiMeta | null>(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("NORMAL");
@@ -30,10 +34,17 @@ export default function TicketsPage() {
     let active = true;
 
     async function loadTickets() {
+      setLoading(true);
       try {
-        const result = await api.tickets.list();
+        const result = await api.tickets.listPage({
+          page,
+          perPage: PER_PAGE,
+          search: search.trim() || undefined,
+          status: statusFilter === "ALL" ? undefined : statusFilter,
+        });
         if (active) {
-          setTickets(result.tickets);
+          setTickets(result.data.tickets);
+          setMeta(result.meta ?? null);
         }
       } catch (error) {
         if (active) {
@@ -53,7 +64,7 @@ export default function TicketsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [page, search, statusFilter]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,6 +74,7 @@ export default function TicketsPage() {
     try {
       const result = await api.tickets.create({ body, priority, subject });
       setTickets((current) => [result.ticket, ...current]);
+      setPage(1);
       setSubject("");
       setBody("");
       setPriority("NORMAL");
@@ -74,22 +86,7 @@ export default function TicketsPage() {
     }
   }
 
-  const filteredTickets = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    return tickets.filter((ticket) => {
-      const matchesStatus =
-        statusFilter === "ALL" ? true : ticket.status === statusFilter;
-      const searchableText = [
-        ticket.subject,
-        ticket.orderId ?? "",
-        ...ticket.messages.map((ticketMessage) => ticketMessage.body),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return matchesStatus && searchableText.includes(normalizedSearch);
-    });
-  }, [search, statusFilter, tickets]);
+  const totalPages = meta?.totalPages ?? 1;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -151,15 +148,19 @@ export default function TicketsPage() {
               className="h-11 pr-9"
               placeholder="جست‌وجوی موضوع یا متن پیام"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
             />
           </label>
           <select
             className="h-11 rounded-md border border-input bg-background px-3 text-sm"
             value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as "ALL" | Ticket["status"])
-            }
+            onChange={(event) => {
+              setStatusFilter(event.target.value as "ALL" | Ticket["status"]);
+              setPage(1);
+            }}
           >
             <option value="ALL">همه وضعیت‌ها</option>
             <option value="OPEN">باز</option>
@@ -170,9 +171,10 @@ export default function TicketsPage() {
 
         {loading ? (
           <p className="text-sm text-muted-foreground">در حال دریافت تیکت ها...</p>
-        ) : filteredTickets.length ? (
-          <div className="space-y-3">
-            {filteredTickets.map((ticket) => (
+        ) : tickets.length ? (
+          <>
+            <div className="space-y-3">
+              {tickets.map((ticket) => (
               <article
                 key={ticket.id}
                 className="rounded-md border border-border p-4 text-sm"
@@ -201,12 +203,58 @@ export default function TicketsPage() {
                   </Button>
                 </div>
               </article>
-            ))}
-          </div>
+              ))}
+            </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">تیکتی با این فیلتر پیدا نشد.</p>
         )}
       </PanelSection>
+    </div>
+  );
+}
+
+function Pagination({
+  onPageChange,
+  page,
+  totalPages,
+}: {
+  onPageChange: (page: number) => void;
+  page: number;
+  totalPages: number;
+}) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">
+        صفحه {page} از {totalPages}
+      </p>
+      <div className="flex gap-2">
+        <Button
+          disabled={page <= 1}
+          size="sm"
+          type="button"
+          variant="outline"
+          onClick={() => onPageChange(page - 1)}
+        >
+          قبلی
+        </Button>
+        <Button
+          disabled={page >= totalPages}
+          size="sm"
+          type="button"
+          variant="outline"
+          onClick={() => onPageChange(page + 1)}
+        >
+          بعدی
+        </Button>
+      </div>
     </div>
   );
 }

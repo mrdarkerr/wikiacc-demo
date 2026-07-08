@@ -1,7 +1,7 @@
 import { findProductForOrder } from "../catalog/repository.js";
 import { allocateDeliveryItems } from "../delivery/repository.js";
 import { badRequest, notFound, paymentRequired } from "../../shared/errors.js";
-import { getUserOrder, listUserOrders } from "./repository.js";
+import { countUserOrders, getUserOrder, listUserOrders } from "./repository.js";
 
 function normalizeFieldValues(fields, values = {}) {
   const normalized = [];
@@ -128,8 +128,13 @@ export async function createOrder(prisma, userId, input) {
   return getUserOrder(prisma, userId, orderId);
 }
 
-export function listMyOrders(prisma, userId) {
-  return listUserOrders(prisma, userId);
+export async function listMyOrders(prisma, userId, pagination) {
+  const [orders, total] = await Promise.all([
+    listUserOrders(prisma, userId, pagination),
+    countUserOrders(prisma, userId),
+  ]);
+
+  return { orders, total };
 }
 
 export async function getMyOrder(prisma, userId, orderId) {
