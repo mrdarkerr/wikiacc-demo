@@ -1,0 +1,38 @@
+{
+  "name": "wikiacc-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "db:apply": "node scripts/apply-schema.js",
+    "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "latest",
+    "@fastify/cors": "latest",
+    "@fastify/jwt": "latest",
+    "@fastify/rate-limit": "latest",
+    "@fastify/swagger": "latest",
+    "@fastify/swagger-ui": "latest",
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "latest",
+    "dotenv": "latest",
+    "fastify": "latest",
+    "fastify-plugin": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "prisma": "6.19.3",
+    "supertest": "latest",
+    "sql.js": "latest",
+    "vitest": "latest"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}
