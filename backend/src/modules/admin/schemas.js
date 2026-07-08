@@ -18,6 +18,7 @@ export const updateOrderStatusSchema = z.object({
     "CANCELLED",
     "REFUNDED",
   ]),
+  adminNote: z.string().trim().max(1000).nullable().optional(),
   note: z.string().trim().max(1000).optional(),
 });
 

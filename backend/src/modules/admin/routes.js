@@ -106,8 +106,10 @@ export async function adminRoutes(app) {
       where: { id: params.id },
       data: {
         status: input.status,
-        note: input.note,
+        ...(input.adminNote === undefined ? {} : { adminNote: input.adminNote }),
+        ...(input.note === undefined ? {} : { note: input.note }),
       },
+      include: adminOrderInclude,
     });
     return ok(reply, { order });
   });
@@ -405,6 +407,7 @@ export async function adminRoutes(app) {
     const ticket = await app.prisma.ticket.update({
       where: { id: params.id },
       data: { status: input.status },
+      include: adminTicketInclude,
     });
     return ok(reply, { ticket });
   });

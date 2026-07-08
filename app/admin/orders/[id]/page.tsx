@@ -51,7 +51,7 @@ export default function AdminOrderDetailPage() {
   const orderId = params.id;
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [status, setStatus] = useState<OrderStatus>("AWAITING_ADMIN");
-  const [note, setNote] = useState("");
+  const [adminNote, setAdminNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -61,7 +61,7 @@ export default function AdminOrderDetailPage() {
     const result = await api.admin.orders.get(orderId);
     setOrder(result.order);
     setStatus(result.order.status);
-    setNote(result.order.note ?? "");
+    setAdminNote(result.order.adminNote ?? "");
   }
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function AdminOrderDetailPage() {
         if (!active) return;
         setOrder(result.order);
         setStatus(result.order.status);
-        setNote(result.order.note ?? "");
+        setAdminNote(result.order.adminNote ?? "");
         setError("");
       })
       .catch((loadError) => {
@@ -105,7 +105,7 @@ export default function AdminOrderDetailPage() {
     setSaving(true);
     try {
       await api.admin.orders.updateStatus(order.id, {
-        note: note.trim() ? note.trim() : undefined,
+        adminNote: adminNote.trim() ? adminNote.trim() : null,
         status,
       });
       await loadOrder();
@@ -125,7 +125,7 @@ export default function AdminOrderDetailPage() {
     setSaving(true);
     try {
       await api.admin.orders.refund(order.id, {
-        note: note.trim() ? note.trim() : "بازگشت وجه از پنل مدیریت",
+        note: adminNote.trim() ? adminNote.trim() : "بازگشت وجه از پنل مدیریت",
       });
       await loadOrder();
       setMessage("بازگشت وجه سفارش ثبت شد.");
@@ -299,8 +299,8 @@ export default function AdminOrderDetailPage() {
               یادداشت داخلی
               <textarea
                 className="mt-2 min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
+                value={adminNote}
+                onChange={(event) => setAdminNote(event.target.value)}
               />
             </label>
 

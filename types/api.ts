@@ -236,6 +236,7 @@ export type AdminUser = User & {
 };
 
 export type AdminOrder = Order & {
+  adminNote?: string | null;
   user?: Pick<User, "id" | "email" | "name" | "phone"> | null;
   items: Array<
     OrderItem & {
@@ -292,6 +293,8 @@ export type CreateAdminCategoryRequest = {
   sortOrder?: number;
 };
 
+export type UpdateAdminCategoryRequest = Partial<CreateAdminCategoryRequest>;
+
 export type CreateAdminProductFieldRequest = {
   key: string;
   label: string;
@@ -337,6 +340,7 @@ export type AdminWalletAdjustmentRequest = {
 };
 
 export type UpdateAdminOrderStatusRequest = {
+  adminNote?: string | null;
   status: OrderStatus;
   note?: string;
 };

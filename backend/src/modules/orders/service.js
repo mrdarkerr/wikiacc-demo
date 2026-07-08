@@ -3,6 +3,14 @@ import { allocateDeliveryItems } from "../delivery/repository.js";
 import { badRequest, notFound, paymentRequired } from "../../shared/errors.js";
 import { countUserOrders, getUserOrder, listUserOrders } from "./repository.js";
 
+function withoutAdminFields(order) {
+  if (!order) return order;
+
+  const publicOrder = { ...order };
+  delete publicOrder.adminNote;
+  return publicOrder;
+}
+
 function normalizeFieldValues(fields, values = {}) {
   const normalized = [];
   const missingRequired = [];
@@ -125,7 +133,7 @@ export async function createOrder(prisma, userId, input) {
     return order.id;
   });
 
-  return getUserOrder(prisma, userId, orderId);
+  return withoutAdminFields(await getUserOrder(prisma, userId, orderId));
 }
 
 export async function listMyOrders(prisma, userId, pagination) {
@@ -134,11 +142,11 @@ export async function listMyOrders(prisma, userId, pagination) {
     countUserOrders(prisma, userId),
   ]);
 
-  return { orders, total };
+  return { orders: orders.map(withoutAdminFields), total };
 }
 
 export async function getMyOrder(prisma, userId, orderId) {
-  const order = await getUserOrder(prisma, userId, orderId);
+  const order = withoutAdminFields(await getUserOrder(prisma, userId, orderId));
   if (!order) {
     throw notFound("ORDER_NOT_FOUND", "Order was not found");
   }
@@ -179,6 +187,6 @@ export async function submitOrderFieldValues(prisma, userId, orderId, input) {
       },
     });
 
-    return getUserOrder(tx, userId, orderId);
+    return withoutAdminFields(await getUserOrder(tx, userId, orderId));
   });
 }

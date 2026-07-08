@@ -97,6 +97,7 @@ export default function AdminOrdersPage() {
         userLabel(order.user),
         firstItemTitle(order),
         order.note ?? "",
+        order.adminNote ?? "",
         ...order.items.flatMap((item) =>
           item.fieldValues.flatMap((field) => [
             field.labelSnapshot,

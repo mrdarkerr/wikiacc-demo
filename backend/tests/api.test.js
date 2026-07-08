@@ -36,6 +36,9 @@ function getCookie(response) {
 
 describe("wikiacc backend api", () => {
   let app;
+  let adminCookie;
+  let customOrderId;
+  let ticketId;
   let userCookie;
   let userId;
   let instantProduct;
@@ -101,6 +104,24 @@ describe("wikiacc backend api", () => {
     await app.close();
   });
 
+  it("allows CORS preflight for PATCH admin actions", async () => {
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/api/v1/admin/orders/test-order/status",
+      headers: {
+        "access-control-request-method": "PATCH",
+        origin: "http://localhost:3000",
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe(
+      "http://localhost:3000",
+    );
+    expect(response.headers["access-control-allow-methods"]).toContain("PATCH");
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
   it("registers a user and creates a wallet", async () => {
     const response = await app.inject({
       method: "POST",
@@ -130,7 +151,7 @@ describe("wikiacc backend api", () => {
         password: "password123",
       },
     });
-    const adminCookie = getCookie(login);
+    adminCookie = getCookie(login);
 
     const response = await app.inject({
       method: "POST",
@@ -178,8 +199,35 @@ describe("wikiacc backend api", () => {
 
     expect(response.statusCode).toBe(201);
     const order = response.json().data.order;
+    customOrderId = order.id;
     expect(order.status).toBe("AWAITING_ADMIN");
     expect(order.items[0].fieldValues[0].value).toBe("customer@example.com");
+  });
+
+  it("allows admin to update order status and keep admin note internal", async () => {
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/admin/orders/${customOrderId}/status`,
+      headers: { cookie: adminCookie },
+      payload: {
+        adminNote: "Prepared manually",
+        status: "READY",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const order = response.json().data.order;
+    expect(order.status).toBe("READY");
+    expect(order.adminNote).toBe("Prepared manually");
+    expect(order.items[0].fieldValues[0].value).toBe("customer@example.com");
+
+    const userResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/orders/${customOrderId}`,
+      headers: { cookie: userCookie },
+    });
+    expect(userResponse.statusCode).toBe(200);
+    expect(userResponse.json().data.order.adminNote).toBeUndefined();
   });
 
   it("creates a ticket for the user", async () => {
@@ -194,6 +242,23 @@ describe("wikiacc backend api", () => {
     });
 
     expect(response.statusCode).toBe(201);
-    expect(response.json().data.ticket.messages[0].body).toBe("Please check my order.");
+    const ticket = response.json().data.ticket;
+    ticketId = ticket.id;
+    expect(ticket.messages[0].body).toBe("Please check my order.");
+  });
+
+  it("allows admin to update ticket status and returns ticket details", async () => {
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/admin/tickets/${ticketId}/status`,
+      headers: { cookie: adminCookie },
+      payload: { status: "CLOSED" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const ticket = response.json().data.ticket;
+    expect(ticket.status).toBe("CLOSED");
+    expect(ticket.user.email).toBe("user@test.local");
+    expect(ticket.messages[0].body).toBe("Please check my order.");
   });
 });

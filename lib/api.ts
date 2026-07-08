@@ -27,6 +27,7 @@ import type {
   Ticket,
   TicketMessage,
   UpdateAdminOrderStatusRequest,
+  UpdateAdminCategoryRequest,
   UpdateAdminProductRequest,
   UpdateAdminTicketStatusRequest,
   User,
@@ -255,6 +256,11 @@ export const api = {
         apiFetch<{ category: ProductCategory }>("/admin/categories", {
           body,
           method: "POST",
+        }),
+      update: (id: string, body: UpdateAdminCategoryRequest) =>
+        apiFetch<{ category: ProductCategory }>(`/admin/categories/${id}`, {
+          body,
+          method: "PATCH",
         }),
     },
     products: {

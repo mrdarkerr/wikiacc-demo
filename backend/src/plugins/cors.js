@@ -12,6 +12,7 @@ export const corsPlugin = fp(async (app) => {
 
   await app.register(cors, {
     credentials: true,
+    methods: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);

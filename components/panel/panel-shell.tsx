@@ -97,9 +97,9 @@ export function PanelShell({ children }: PanelShellProps) {
 
         <div className="mt-auto border-t border-border p-4">
           <div className="rounded-md bg-muted p-3 text-sm">
-            <p className="font-medium">حساب کاربری</p>
+            <p className="font-medium">اطلاعات امنیتی</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              session cookie فعال
+              ورود با session cookie انجام می شود؛ توکن در localStorage ذخیره نمی شود.
             </p>
           </div>
           <Button
