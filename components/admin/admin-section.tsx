@@ -14,7 +14,7 @@ export function AdminSection({
   title,
 }: AdminSectionProps) {
   return (
-    <section className="rounded-lg border border-border bg-card text-card-foreground shadow-sm">
+    <section className="min-w-0 rounded-lg border border-border bg-card text-card-foreground shadow-sm">
       <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-bold">{title}</h2>
@@ -24,7 +24,7 @@ export function AdminSection({
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="min-w-0 p-4">{children}</div>
     </section>
   );
 }

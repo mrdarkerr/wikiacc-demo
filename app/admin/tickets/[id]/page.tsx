@@ -269,12 +269,14 @@ export default function AdminTicketDetailPage() {
     );
   }
 
+  const currentTicket = ticket;
+
   function renderStatusContent(selectId: string) {
     return (
       <form className="space-y-4" onSubmit={updateStatus}>
         <div className="flex flex-wrap gap-2">
-          <AdminStatusBadge type="priority" value={ticket.priority} />
-          <AdminStatusBadge type="ticket" value={ticket.status} />
+          <AdminStatusBadge type="priority" value={currentTicket.priority} />
+          <AdminStatusBadge type="ticket" value={currentTicket.status} />
         </div>
         <label className="block text-sm font-medium">
           وضعیت
@@ -305,35 +307,35 @@ export default function AdminTicketDetailPage() {
       <dl className="space-y-4 text-sm">
         <div>
           <dt className="text-muted-foreground">کاربر</dt>
-          <dd className="mt-1 font-medium">{userLabel(ticket.user)}</dd>
+          <dd className="mt-1 font-medium">{userLabel(currentTicket.user)}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">سفارش مرتبط</dt>
           <dd className="mt-1">
-            {ticket.order ? (
+            {currentTicket.order ? (
               <Link
                 className="font-medium text-primary"
                 dir="ltr"
-                href={`/admin/orders/${ticket.order.id}`}
+                href={`/admin/orders/${currentTicket.order.id}`}
               >
-                {orderCode(ticket.order.id)}
+                {orderCode(currentTicket.order.id)}
               </Link>
             ) : (
               "-"
             )}
           </dd>
         </div>
-        {ticket.order ? (
+        {currentTicket.order ? (
           <div>
             <dt className="text-muted-foreground">مبلغ سفارش</dt>
             <dd className="mt-1">
-              {formatCurrency(ticket.order.totalAmount)}
+              {formatCurrency(currentTicket.order.totalAmount)}
             </dd>
           </div>
         ) : null}
         <div>
           <dt className="text-muted-foreground">آخرین بروزرسانی</dt>
-          <dd className="mt-1">{formatDate(ticket.updatedAt)}</dd>
+          <dd className="mt-1">{formatDate(currentTicket.updatedAt)}</dd>
         </div>
       </dl>
     );
@@ -351,16 +353,16 @@ export default function AdminTicketDetailPage() {
               </Link>
             </Button>
             <h2 className="mt-1 line-clamp-2 text-xl font-bold leading-8 sm:text-2xl">
-              {ticket.subject}
+              {currentTicket.subject}
             </h2>
             <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
               <Clock3 className="size-4 shrink-0" />
-              آخرین بروزرسانی: {formatDate(ticket.updatedAt)}
+              آخرین بروزرسانی: {formatDate(currentTicket.updatedAt)}
             </p>
           </div>
           <div className="hidden flex-wrap gap-2 sm:flex">
-            <AdminStatusBadge type="priority" value={ticket.priority} />
-            <AdminStatusBadge type="ticket" value={ticket.status} />
+            <AdminStatusBadge type="priority" value={currentTicket.priority} />
+            <AdminStatusBadge type="ticket" value={currentTicket.status} />
           </div>
         </div>
 
@@ -399,16 +401,18 @@ export default function AdminTicketDetailPage() {
                 <MessageSquare className="size-5" />
               </span>
               <div className="min-w-0">
-                <p className="truncate font-semibold">{userLabel(ticket.user)}</p>
+                <p className="truncate font-semibold">
+                  {userLabel(currentTicket.user)}
+                </p>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {ticket.order
-                    ? `سفارش مرتبط: ${orderCode(ticket.order.id)}`
+                  {currentTicket.order
+                    ? `سفارش مرتبط: ${orderCode(currentTicket.order.id)}`
                     : "درخواست عمومی"}
                 </p>
               </div>
             </div>
             <p className="shrink-0 text-xs text-muted-foreground">
-              {ticket.messages.length} پیام
+              {currentTicket.messages.length} پیام
             </p>
           </div>
 

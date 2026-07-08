@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from "@/components/panel/formatters";
 import { PanelSection } from "@/components/panel/panel-section";
 import { StatusBadge } from "@/components/panel/status-badge";
 import { Button } from "@/components/ui/button";
+import { DialogOverlay } from "@/components/ui/dialog";
 import { api, ApiError } from "@/lib/api";
 import type { ApiMeta, Order } from "@/types/api";
 
@@ -226,12 +227,10 @@ function OrderDialog({
   const deliveries = deliveredContent(order);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end bg-background/80 p-0 backdrop-blur-sm sm:items-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
+    <DialogOverlay
+      contentClassName="max-h-[calc(100svh-2rem)] max-w-3xl overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-lg sm:p-6"
+      onClose={onClose}
     >
-      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg border border-border bg-card p-4 shadow-lg sm:mx-auto sm:max-w-3xl sm:rounded-lg sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">جزئیات سفارش</p>
@@ -331,7 +330,6 @@ function OrderDialog({
             {deliveries.length} محتوای آماده برای این سفارش ثبت شده است.
           </p>
         )}
-      </div>
-    </div>
+    </DialogOverlay>
   );
 }
