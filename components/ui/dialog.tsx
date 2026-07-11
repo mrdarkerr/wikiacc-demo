@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type DialogOverlayProps = {
+  ariaLabel?: string;
   children: ReactNode;
   className?: string;
   contentClassName?: string;
@@ -13,6 +14,7 @@ type DialogOverlayProps = {
 };
 
 export function DialogOverlay({
+  ariaLabel,
   children,
   className,
   contentClassName,
@@ -45,6 +47,7 @@ export function DialogOverlay({
 
   return createPortal(
     <div
+      aria-label={ariaLabel}
       aria-modal="true"
       className={cn(
         "fixed inset-0 z-[100] m-0 h-[100dvh] w-[100vw] overflow-hidden bg-background/80 backdrop-blur-sm",

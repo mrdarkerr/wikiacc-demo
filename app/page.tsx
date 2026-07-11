@@ -2,17 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle,
   ChevronLeft,
   CreditCard,
   Headphones,
+  Info,
   LogIn,
   Menu,
   Search,
   ShieldCheck,
   ShoppingCart,
+  ScrollText,
   Star,
   X,
   Zap,
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DialogOverlay } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 type Service = {
@@ -45,6 +48,8 @@ type Testimonial = {
   text: string;
   service: string;
 };
+
+type InfoModal = "about" | "terms" | null;
 
 const services: Service[] = [
   {
@@ -184,6 +189,7 @@ const formatPrice = (price: number) =>
 
 export default function Home() {
   const [query, setQuery] = useState("");
+  const [infoModal, setInfoModal] = useState<InfoModal>(null);
 
   const filteredServices = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -371,8 +377,12 @@ export default function Home() {
         </div>
       </section>
 
-        <Footer />
+        <Footer onOpenInfo={setInfoModal} />
       </div>
+
+      {infoModal ? (
+        <InfoDialog type={infoModal} onClose={() => setInfoModal(null)} />
+      ) : null}
     </main>
   );
 }
@@ -559,6 +569,122 @@ function TestimonialCard({ item }: { item: Testimonial }) {
   );
 }
 
+function InfoDialog({ type, onClose }: { type: Exclude<InfoModal, null>; onClose: () => void }) {
+  const isAbout = type === "about";
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <DialogOverlay
+      ariaLabel={isAbout ? "درباره ویکی اکانت" : "قوانین و مقررات ویکی اکانت"}
+      className="bg-gray-950/65"
+      contentClassName="max-w-2xl"
+      onClose={onClose}
+    >
+      <section
+        dir="rtl"
+        className="relative max-h-[calc(100dvh-2rem)] overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-gray-950/25 dark:border-white/10 dark:bg-gray-950"
+      >
+        <header className="flex items-start gap-4 border-b border-gray-200/80 bg-gradient-to-l from-indigo-500/10 via-fuchsia-500/5 to-transparent p-5 dark:border-gray-800/80 sm:p-6">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/20">
+            {isAbout ? <Info className="size-5" /> : <ScrollText className="size-5" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-extrabold sm:text-2xl">
+              {isAbout ? "درباره ویکی اکانت" : "قوانین و مقررات"}
+            </h2>
+            <p className="mt-1 text-xs opacity-60">
+              {isAbout ? "آشنایی با خدمات و تعهدهای ما" : "آخرین به‌روزرسانی: تیر ۱۴۰۵"}
+            </p>
+          </div>
+          <Button
+            autoFocus
+            aria-label="بستن پنجره"
+            className="size-10 shrink-0 rounded-xl"
+            size="icon"
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+          >
+            <X className="size-5" />
+          </Button>
+        </header>
+
+        <div className="max-h-[calc(100dvh-9rem)] overflow-y-auto p-5 text-sm leading-8 sm:p-6">
+          {isAbout ? <AboutContent /> : <TermsContent />}
+        </div>
+      </section>
+    </DialogOverlay>
+  );
+}
+
+function AboutContent() {
+  return (
+    <div className="space-y-5">
+      <p className="text-base leading-8">
+        ویکی اکانت یک فروشگاه آنلاین برای خرید و تمدید اشتراک سرویس‌های دیجیتال است. هدف ما این است که دسترسی به ابزارهایی مانند ChatGPT، Gemini، Claude، Grok و Spotify را با فرایندی ساده، شفاف و قابل پیگیری فراهم کنیم.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          ["تحویل سریع", "بررسی و فعال‌سازی سفارش‌ها در کوتاه‌ترین زمان ممکن"],
+          ["خرید شفاف", "نمایش مشخصات، مبلغ و شرایط هر سرویس پیش از پرداخت"],
+          ["پشتیبانی واقعی", "پیگیری سفارش و مشکلات دسترسی از طریق تیکت پنل"],
+        ].map(([title, description]) => (
+          <div key={title} className="rounded-2xl border border-gray-200/80 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+            <h3 className="font-bold">{title}</h3>
+            <p className="mt-1 text-xs leading-6 opacity-70">{description}</p>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/5">
+        <h3 className="font-bold">تعهد ما به شما</h3>
+        <p className="mt-1 opacity-80">
+          اطلاعات هر محصول، نوع دسترسی و شرایط تمدید را تا حد ممکن روشن اعلام می‌کنیم و پس از خرید نیز تا پایان فرایند تحویل همراه شما هستیم. اگر مشکلی در سفارش ایجاد شود، تیم پشتیبانی موضوع را بررسی و راهکار مناسب را ارائه می‌کند.
+        </p>
+      </div>
+      <p className="opacity-75">
+        برای ارتباط با ما می‌توانید از بخش تیکت در پنل کاربری استفاده کنید یا با شماره ۰۹۳۶۸۰۳۱۱۴۸ تماس بگیرید.
+      </p>
+    </div>
+  );
+}
+
+function TermsContent() {
+  const terms = [
+    ["۱. ثبت سفارش", "کاربر موظف است پیش از پرداخت، مشخصات محصول، نوع اشتراک، مدت اعتبار و اطلاعات موردنیاز برای فعال‌سازی را بررسی کند. مسئولیت صحت اطلاعات ثبت‌شده بر عهده کاربر است."],
+    ["۲. پرداخت و قیمت", "مبلغ نهایی هر سفارش پیش از پرداخت نمایش داده می‌شود. ثبت سفارش تنها پس از پرداخت موفق و دریافت کد پیگیری قطعی است. تغییر قیمت‌ها روی سفارش‌های پرداخت‌شده اثر ندارد."],
+    ["۳. تحویل سرویس", "زمان تحویل بسته به نوع سرویس و نیاز به تأیید اطلاعات متفاوت است. در صورت نیاز به اطلاعات تکمیلی، موضوع از طریق تیکت یا راه ارتباطی ثبت‌شده به کاربر اطلاع داده می‌شود."],
+    ["۴. لغو و بازگشت وجه", "تا پیش از شروع فرایند فعال‌سازی، امکان درخواست لغو سفارش وجود دارد. پس از تحویل یا فعال‌شدن اشتراک، به دلیل ماهیت دیجیتال محصول، بازگشت وجه تنها در صورت نقص تأییدشده و حل‌نشدن مشکل توسط پشتیبانی انجام می‌شود."],
+    ["۵. پشتیبانی و ضمانت", "در صورت بروز مشکل در بازه ضمانت اعلام‌شده برای محصول، کاربر باید از طریق تیکت اطلاع دهد. ضمانت شامل ایرادهای ناشی از استفاده نادرست، تغییر اطلاعات دسترسی بدون هماهنگی یا نقض قوانین سرویس‌دهنده اصلی نیست."],
+    ["۶. نحوه استفاده", "کاربر متعهد است از سرویس خریداری‌شده مطابق قوانین سرویس‌دهنده اصلی استفاده کند و از واگذاری غیرمجاز، فعالیت خلاف قانون، ارسال هرزنامه یا اقداماتی که باعث مسدودشدن حساب می‌شود خودداری کند."],
+    ["۷. حریم خصوصی", "اطلاعات کاربران فقط برای پردازش سفارش، ارائه پشتیبانی و انجام تعهدات فروشگاه استفاده می‌شود و جز در موارد الزام قانونی یا ضرورت ارائه خدمت، در اختیار اشخاص دیگر قرار نمی‌گیرد."],
+    ["۸. تغییر شرایط", "ممکن است این مقررات برای هماهنگی با تغییر خدمات یا الزامات قانونی به‌روزرسانی شود. نسخه منتشرشده در همین صفحه، مبنای استفاده از خدمات ویکی اکانت خواهد بود."],
+  ];
+
+  return (
+    <div className="space-y-5">
+      <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm leading-7">
+        ثبت سفارش در ویکی اکانت به معنی مطالعه و پذیرش این شرایط است. لطفاً پیش از خرید، موارد زیر را با دقت بخوانید.
+      </p>
+      <div className="space-y-4">
+        {terms.map(([title, description]) => (
+          <article key={title}>
+            <h3 className="font-bold">{title}</h3>
+            <p className="mt-1 opacity-75">{description}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EnamadSeal() {
   const [loaded, setLoaded] = useState(false);
 
@@ -594,7 +720,7 @@ function EnamadSeal() {
   );
 }
 
-function Footer() {
+function Footer({ onOpenInfo }: { onOpenInfo: (type: Exclude<InfoModal, null>) => void }) {
   return (
     <footer id="contact" className="border-t border-gray-200/70 bg-white py-10 text-sm dark:border-gray-800/70 dark:bg-gray-950">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1.2fr_0.8fr_1fr_0.8fr] lg:px-8">
@@ -633,9 +759,22 @@ function Footer() {
               </Link>
             </li>
             <li>
-              <Link className="hover:opacity-100" href="#">
+              <button
+                className="transition hover:opacity-100"
+                type="button"
+                onClick={() => onOpenInfo("about")}
+              >
+                درباره ما
+              </button>
+            </li>
+            <li>
+              <button
+                className="transition hover:opacity-100"
+                type="button"
+                onClick={() => onOpenInfo("terms")}
+              >
                 قوانین و مقررات
-              </Link>
+              </button>
             </li>
           </ul>
         </div>
