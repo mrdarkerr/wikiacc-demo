@@ -32,6 +32,7 @@ import { Card } from "@/components/ui/card";
 import { DialogOverlay } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
 import type { Product } from "@/types/api";
 
 type Testimonial = {
@@ -366,7 +367,10 @@ export default function Home() {
 
 function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { loading: authLoading, user } = useCurrentUser();
   const closeMobileMenu = () => setMobileMenuOpen(false);
+  const accountHref = user ? dashboardPath(user) : "/login";
+  const accountLabel = user ? "داشبورد" : "ورود / ثبت‌نام";
 
   return (
     <header className="fixed inset-x-0 top-3 z-50 px-3 sm:px-6">
@@ -411,12 +415,19 @@ function Header() {
           >
             {mobileMenuOpen ? <X /> : <Menu />}
           </Button>
-          <Button
-            asChild
-            className="hidden rounded-2xl bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition hover:opacity-90 md:inline-flex dark:bg-white dark:text-gray-900"
-          >
-            <Link href="/login">ورود / ثبت‌نام</Link>
-          </Button>
+          {authLoading ? (
+            <div
+              aria-hidden="true"
+              className="hidden h-10 w-28 animate-pulse rounded-2xl bg-gray-900/15 md:block dark:bg-white/15"
+            />
+          ) : (
+            <Button
+              asChild
+              className="hidden rounded-2xl bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition hover:opacity-90 md:inline-flex dark:bg-white dark:text-gray-900"
+            >
+              <Link href={accountHref}>{accountLabel}</Link>
+            </Button>
+          )}
         </div>
 
         {mobileMenuOpen ? (
@@ -450,13 +461,19 @@ function Header() {
               >
                 تماس
               </Link>
-              <Link
-                className="rounded-2xl bg-gray-900 px-4 py-3 text-center text-white shadow-sm transition hover:opacity-90 dark:bg-white dark:text-gray-900"
-                href="/login"
-                onClick={closeMobileMenu}
-              >
-                ورود / ثبت‌نام
-              </Link>
+              {authLoading ? (
+                <div className="animate-pulse rounded-2xl bg-gray-900/10 px-4 py-3 text-center text-transparent dark:bg-white/10">
+                  در حال بررسی
+                </div>
+              ) : (
+                <Link
+                  className="rounded-2xl bg-gray-900 px-4 py-3 text-center text-white shadow-sm transition hover:opacity-90 dark:bg-white dark:text-gray-900"
+                  href={accountHref}
+                  onClick={closeMobileMenu}
+                >
+                  {accountLabel}
+                </Link>
+              )}
             </nav>
           </div>
         ) : null}

@@ -21,6 +21,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
+import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
 import type { Order, Product, ProductField } from "@/types/api";
 
 type FieldValues = Record<string, string>;
@@ -118,6 +119,7 @@ function apiErrorMessage(error: unknown) {
 
 export function StorefrontClient() {
   const searchParams = useSearchParams();
+  const { loading: authLoading, user } = useCurrentUser();
   const requestedProduct = searchParams.get("product") ?? "";
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -246,9 +248,18 @@ export function StorefrontClient() {
                 سفارش‌ها
               </Link>
             </Button>
-            <Button asChild size="sm">
-              <Link href="/login">ورود</Link>
-            </Button>
+            {authLoading ? (
+              <div
+                aria-hidden="true"
+                className="h-9 w-16 animate-pulse rounded-md bg-muted"
+              />
+            ) : (
+              <Button asChild size="sm">
+                <Link href={user ? dashboardPath(user) : "/login"}>
+                  {user ? "داشبورد" : "ورود"}
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>
