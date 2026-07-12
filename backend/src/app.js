@@ -6,6 +6,10 @@ import { adminRoutes } from "./modules/admin/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { catalogRoutes } from "./modules/catalog/routes.js";
 import { orderRoutes } from "./modules/orders/routes.js";
+import {
+  adminSiteContentRoutes,
+  siteContentRoutes,
+} from "./modules/site-content/routes.js";
 import { ticketRoutes } from "./modules/tickets/routes.js";
 import { walletRoutes } from "./modules/wallet/routes.js";
 import { authPlugin } from "./plugins/auth.js";
@@ -36,10 +40,14 @@ export async function buildApp(options = {}) {
 
   await app.register(authRoutes, { prefix: "/api/v1/auth" });
   await app.register(catalogRoutes, { prefix: "/api/v1" });
+  await app.register(siteContentRoutes, { prefix: "/api/v1/site-content" });
   await app.register(orderRoutes, { prefix: "/api/v1/orders" });
   await app.register(walletRoutes, { prefix: "/api/v1/wallet" });
   await app.register(ticketRoutes, { prefix: "/api/v1/tickets" });
   await app.register(adminRoutes, { prefix: "/api/v1/admin" });
+  await app.register(adminSiteContentRoutes, {
+    prefix: "/api/v1/admin/site-content",
+  });
 
   return app;
 }

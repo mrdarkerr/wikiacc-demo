@@ -10,6 +10,101 @@ export type ApiResponse<T> = {
   meta?: ApiMeta;
 };
 
+export type SiteContent = {
+  hero: {
+    title: string;
+    highlight: string;
+    description: string;
+    searchPlaceholder: string;
+    popularLabel: string;
+  };
+  trust: {
+    items: string[];
+  };
+  services: {
+    title: string;
+    emptyMessage: string;
+  };
+  cta: {
+    title: string;
+    description: string;
+    buttonLabel: string;
+  };
+  testimonials: {
+    title: string;
+    ratingLabel: string;
+    items: Array<{
+      name: string;
+      service: string;
+      text: string;
+    }>;
+  };
+  faq: {
+    title: string;
+    items: Array<{
+      question: string;
+      answer: string;
+    }>;
+  };
+  footer: {
+    brandName: string;
+    description: string;
+    pagesTitle: string;
+    supportTitle: string;
+    supportTicket: string;
+    address: string;
+    phone: string;
+    trustTitle: string;
+    copyright: string;
+  };
+  about: {
+    title: string;
+    subtitle: string;
+    intro: string;
+    highlights: Array<{
+      title: string;
+      description: string;
+    }>;
+    commitmentTitle: string;
+    commitmentText: string;
+    contactText: string;
+  };
+  terms: {
+    title: string;
+    subtitle: string;
+    intro: string;
+    items: Array<{
+      title: string;
+      description: string;
+    }>;
+  };
+};
+
+export type PublicSiteContent = {
+  content: SiteContent;
+  version: number;
+  publishedAt: string | null;
+};
+
+export type AdminSiteContentState = {
+  content: SiteContent;
+  published: SiteContent;
+  draftVersion: number;
+  publishedVersion: number;
+  hasUnpublishedChanges: boolean;
+  updatedAt: string | null;
+  publishedAt: string | null;
+};
+
+export type SaveAdminSiteContentRequest = {
+  content: SiteContent;
+  expectedVersion: number;
+};
+
+export type VersionedAdminSiteContentRequest = {
+  expectedVersion: number;
+};
+
 export type ApiErrorResponse = {
   error?: {
     code: string;

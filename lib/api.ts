@@ -24,6 +24,10 @@ import type {
   RegisterRequest,
   RefundAdminOrderRequest,
   SetAdminProductActiveRequest,
+  AdminSiteContentState,
+  PublicSiteContent,
+  SaveAdminSiteContentRequest,
+  VersionedAdminSiteContentRequest,
   Ticket,
   TicketMessage,
   UpdateAdminOrderStatusRequest,
@@ -194,6 +198,9 @@ export const api = {
       apiFetchWithMeta<{ orders: Order[] }>("/orders/my", { query }),
     get: (id: string) => apiFetch<{ order: Order }>(`/orders/${id}`),
   },
+  siteContent: {
+    get: () => apiFetch<PublicSiteContent>("/site-content"),
+  },
   tickets: {
     list: () =>
       apiFetch<{ tickets: Ticket[] }>("/tickets/my", {
@@ -232,6 +239,24 @@ export const api = {
       ),
   },
   admin: {
+    siteContent: {
+      get: () => apiFetch<AdminSiteContentState>("/admin/site-content"),
+      saveDraft: (body: SaveAdminSiteContentRequest) =>
+        apiFetch<AdminSiteContentState>("/admin/site-content/draft", {
+          body,
+          method: "PUT",
+        }),
+      publish: (body: VersionedAdminSiteContentRequest) =>
+        apiFetch<AdminSiteContentState>("/admin/site-content/publish", {
+          body,
+          method: "POST",
+        }),
+      resetDraft: (body: VersionedAdminSiteContentRequest) =>
+        apiFetch<AdminSiteContentState>("/admin/site-content/reset-draft", {
+          body,
+          method: "POST",
+        }),
+    },
     users: {
       list: () => apiFetch<{ users: AdminUser[] }>("/admin/users"),
     },

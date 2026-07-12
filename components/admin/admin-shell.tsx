@@ -12,6 +12,7 @@ import {
   ListPlus,
   LogOut,
   PackagePlus,
+  PanelsTopLeft,
   Tags,
   Users,
   WalletCards,
@@ -38,6 +39,11 @@ const navItems = [
     href: "/admin",
     icon: LayoutDashboard,
     label: "داشبورد",
+  },
+  {
+    href: "/admin/content",
+    icon: PanelsTopLeft,
+    label: "محتوای سایت",
   },
   {
     href: "/admin/orders",

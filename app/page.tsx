@@ -2,7 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   CheckCircle,
   ChevronLeft,
@@ -32,106 +38,40 @@ import { Card } from "@/components/ui/card";
 import { DialogOverlay } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { DEFAULT_SITE_CONTENT, formatCopyright } from "@/lib/site-content";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
-import type { Product } from "@/types/api";
+import type { Product, SiteContent } from "@/types/api";
 
-type Testimonial = {
-  name: string;
-  text: string;
-  service: string;
-};
+type Testimonial = SiteContent["testimonials"]["items"][number];
 
 type InfoModal = "about" | "terms" | null;
 
-const faqs = [
-  {
-    q: "چه سرویس‌هایی قابل خرید هستند؟",
-    a: "در حال حاضر فقط Gemini، ChatGPT، Claude، Grok و Spotify ارائه می‌شود تا موجودی، پشتیبانی و تمدید هر سفارش دقیق‌تر پیگیری شود.",
-  },
-  {
-    q: "زمان تحویل چقدر است؟",
-    a: "بعد از ثبت سفارش و تکمیل اطلاعات لازم، فعال‌سازی معمولا در همان بازه کاری انجام می‌شود. اگر سرویس نیاز به تایید یا اطلاعات تکمیلی داشته باشد، از طریق تیکت اطلاع داده می‌شود.",
-  },
-  {
-    q: "اشتراک‌ها اختصاصی هستند یا اشتراکی؟",
-    a: "نوع دسترسی بسته به سرویس و پلن سفارش متفاوت است. قبل از تحویل، جزئیات نحوه استفاده، محدودیت‌ها و شرایط تمدید در پنل یا تیکت سفارش اعلام می‌شود.",
-  },
-  {
-    q: "اگر اکانت یا اشتراک مشکل داشت چه می‌شود؟",
-    a: "در صورت بروز مشکل، پشتیبانی سفارش را بررسی می‌کند و تا رفع مشکل، اصلاح دسترسی یا ارائه راهکار جایگزین موضوع را پیگیری می‌کند.",
-  },
-  {
-    q: "برای تمدید باید سفارش جدید ثبت کنم؟",
-    a: "برای تمدید می‌توانید از طریق پنل کاربری یا تیکت درخواست بدهید. بهتر است تمدید را قبل از پایان اعتبار ثبت کنید تا دسترسی بدون وقفه ادامه پیدا کند.",
-  },
-  {
-    q: "پرداخت و پیگیری سفارش چگونه انجام می‌شود؟",
-    a: "بعد از ثبت پرداخت، وضعیت سفارش از پنل کاربری قابل پیگیری است. پیام‌های مهم، اطلاعات فعال‌سازی و پاسخ پشتیبانی از همان مسیر ارسال می‌شود.",
-  },
-  {
-    q: "امکان خرید چند اکانت برای تیم وجود دارد؟",
-    a: "بله، برای سفارش‌های چندتایی یا تیمی می‌توانید از طریق پشتیبانی هماهنگ کنید تا تحویل، تمدید و مدیریت سفارش‌ها یکپارچه انجام شود.",
-  },
-  {
-    q: "اطلاعات تماس پشتیبانی چیست؟",
-    a: "پشتیبانی از طریق تیکت پنل کاربری انجام می‌شود. آدرس: بلوار ابن سینا- ابن سینا 8 و تلفن تماس: 0936 803 1148.",
-  },
-];
+const CMS_SECTIONS = [
+  "hero",
+  "trust",
+  "services",
+  "cta",
+  "testimonials",
+  "faq",
+  "footer",
+  "about",
+  "terms",
+] as const;
 
-const testimonials: Testimonial[] = [
-  {
-    name: "آراد",
-    text: "تحویل ChatGPT خیلی سریع بود و راهنمای ورود کامل ارسال شد.",
-    service: "ChatGPT",
-  },
-  {
-    name: "نیلوفر",
-    text: "برای تمدید Claude پیام دادم و پشتیبانی خیلی منظم پیگیری کرد.",
-    service: "Claude",
-  },
-  {
-    name: "مانی",
-    text: "Spotify بدون تبلیغ فعال شد و مشکلی در ورود نداشتم.",
-    service: "Spotify",
-  },
-  {
-    name: "سارا",
-    text: "اکانت Gemini سریع فعال شد و همه چیز شفاف توضیح داده شد.",
-    service: "Gemini",
-  },
-  {
-    name: "امیر",
-    text: "برای خرید تیمی Grok هماهنگی خوبی انجام شد.",
-    service: "Grok",
-  },
-  {
-    name: "رها",
-    text: "قیمت‌ها مناسب بود و وضعیت سفارش را راحت پیگیری کردم.",
-    service: "ChatGPT",
-  },
-  {
-    name: "کیان",
-    text: "پشتیبانی بعد از خرید هم پاسخگو بود و مشکل ورود را حل کرد.",
-    service: "Claude",
-  },
-  {
-    name: "هستی",
-    text: "فرآیند خرید ساده بود و اطلاعات اشتراک کامل ارسال شد.",
-    service: "Spotify",
-  },
-  {
-    name: "پارسا",
-    text: "تمدید ماهانه بدون دردسر انجام شد و دسترسی قطع نشد.",
-    service: "Gemini",
-  },
-  {
-    name: "الناز",
-    text: "پاسخگویی سریع بود و سفارش دقیقا مطابق توضیحات تحویل شد.",
-    service: "Grok",
-  },
-];
+type CmsSection = (typeof CMS_SECTIONS)[number];
 
-const marqueeTestimonials = [...testimonials, ...testimonials, ...testimonials];
+const trustIcons = [Zap, ShieldCheck, CreditCard, Headphones] as const;
+
+function isCmsSection(value: unknown): value is CmsSection {
+  return typeof value === "string" && CMS_SECTIONS.some((section) => section === value);
+}
+
+function cmsSectionClass(isPreview: boolean, isSelected: boolean) {
+  if (!isPreview) return "";
+  return isSelected
+    ? "relative cursor-pointer ring-4 ring-fuchsia-500 ring-inset"
+    : "relative cursor-pointer outline outline-2 outline-dashed outline-indigo-400/60 outline-offset-[-2px]";
+}
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("fa-IR").format(price);
@@ -139,10 +79,67 @@ const formatPrice = (price: number) =>
 export default function Home() {
   const [query, setQuery] = useState("");
   const [infoModal, setInfoModal] = useState<InfoModal>(null);
+  const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
+  const [cmsPreview, setCmsPreview] = useState(false);
+  const [selectedSection, setSelectedSection] = useState<CmsSection | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
   const [loadVersion, setLoadVersion] = useState(0);
+  const previewContentReceived = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    const previewMode = new URLSearchParams(window.location.search).get("cmsPreview") === "1";
+    const previewFrame = window.requestAnimationFrame(() => {
+      if (active) setCmsPreview(previewMode);
+    });
+
+    function handlePreviewMessage(event: MessageEvent) {
+      if (
+        !previewMode ||
+        event.origin !== window.location.origin ||
+        event.source !== window.parent ||
+        typeof event.data !== "object" ||
+        event.data === null ||
+        event.data.type !== "wikiacc:cms-preview" ||
+        typeof event.data.content !== "object" ||
+        event.data.content === null
+      ) {
+        return;
+      }
+
+      previewContentReceived.current = true;
+      setSiteContent(event.data.content as SiteContent);
+
+      const section = isCmsSection(event.data.selectedSection)
+        ? event.data.selectedSection
+        : null;
+      setSelectedSection(section);
+      setInfoModal(section === "about" || section === "terms" ? section : null);
+    }
+
+    if (previewMode) {
+      window.addEventListener("message", handlePreviewMessage);
+    }
+
+    api.siteContent
+      .get()
+      .then((result) => {
+        if (active && !previewContentReceived.current) {
+          setSiteContent(result.content);
+        }
+      })
+      .catch(() => {
+        // The public page intentionally keeps the bundled defaults when content is unavailable.
+      });
+
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(previewFrame);
+      window.removeEventListener("message", handlePreviewMessage);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -170,6 +167,28 @@ export default function Home() {
     setLoadVersion((value) => value + 1);
   }
 
+  function handleCmsClickCapture(event: ReactMouseEvent<HTMLElement>) {
+    if (!cmsPreview) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const target = event.target;
+    const sectionElement =
+      target instanceof Element
+        ? target.closest<HTMLElement>("[data-cms-section]")
+        : null;
+    const section = sectionElement?.dataset.cmsSection;
+    if (!isCmsSection(section)) return;
+
+    setSelectedSection(section);
+    setInfoModal(section === "about" || section === "terms" ? section : null);
+    window.parent.postMessage(
+      { type: "wikiacc:cms-select", section },
+      window.location.origin,
+    );
+  }
+
   const filteredProducts = useMemo(() => {
     const value = query.trim().toLowerCase();
     if (!value) {
@@ -186,8 +205,25 @@ export default function Home() {
     );
   }, [products, query]);
 
+  const marqueeTestimonials = useMemo(
+    () => [
+      ...siteContent.testimonials.items,
+      ...siteContent.testimonials.items,
+      ...siteContent.testimonials.items,
+    ],
+    [siteContent.testimonials.items],
+  );
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-transparent text-gray-900 transition-colors duration-300 dark:text-gray-100">
+    <main
+      className="relative min-h-screen overflow-hidden bg-transparent text-gray-900 transition-colors duration-300 dark:text-gray-100"
+      onClickCapture={handleCmsClickCapture}
+    >
+      {cmsPreview ? (
+        <div className="pointer-events-none fixed left-3 top-3 z-[150] rounded-full border border-fuchsia-300/60 bg-gray-950/90 px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur">
+          حالت ویرایش
+        </div>
+      ) : null}
       <div className="pointer-events-none fixed inset-0 z-0 opacity-100">
         <Grainient
           className="relative h-full min-h-dvh w-full overflow-hidden"
@@ -207,24 +243,26 @@ export default function Home() {
       </div>
       <div className="pointer-events-none fixed inset-0 z-[1] bg-gray-50/20 dark:bg-gray-950/[0.18]" />
       <div className="relative z-10 pt-24">
-        <Header />
+        <Header brandName={siteContent.footer.brandName} />
 
-        <section className="relative">
+        <section
+          className={`relative ${cmsSectionClass(cmsPreview, selectedSection === "hero")}`}
+          data-cms-section="hero"
+        >
         <div className="pointer-events-none absolute inset-0 -z-10 opacity-70 [mask-image:radial-gradient(60%_60%_at_50%_0%,black,transparent)]">
           <div className="mx-auto h-72 max-w-6xl bg-gradient-to-b from-fuchsia-500/20 via-indigo-500/10 to-transparent blur-2xl" />
         </div>
 
         <div className="mx-auto max-w-7xl px-4 pb-10 pt-8 sm:px-6 lg:px-8 lg:pb-14 lg:pt-12">
           <h1 className="mx-auto max-w-3xl animate-in fade-in slide-in-from-bottom-2 text-center text-3xl font-extrabold leading-tight sm:text-4xl md:text-5xl">
-            فروشگاه اشتراک‌های دیجیتال
+            {siteContent.hero.title}
             <span className="block text-white dark:text-gray-950">
-              ایجاد قیمت ها متفاوته
+              {siteContent.hero.highlight}
             </span>
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl animate-in fade-in slide-in-from-bottom-2 text-center text-sm/7 opacity-80 delay-100 sm:text-base/8">
-            خرید و تمدید اشتراک Gemini، ChatGPT، Claude، Grok و Spotify با
-            تحویل سریع، پشتیبانی قابل پیگیری و رابطی ساده برای انتخاب سرویس.
+            {siteContent.hero.description}
           </p>
 
           <div className="mx-auto mt-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 delay-150">
@@ -233,13 +271,13 @@ export default function Home() {
               <Input
                 aria-label="جست‌وجوی سرویس"
                 className="h-auto w-full rounded-2xl border-gray-200/70 bg-white/90 px-12 py-4 text-sm text-gray-900 shadow-sm outline-none transition placeholder:opacity-60 focus:border-indigo-400 focus:bg-white focus-visible:ring-2 focus-visible:ring-indigo-400 dark:border-gray-800/70 dark:bg-gray-900/80 dark:text-gray-100 dark:focus:border-fuchsia-500 dark:focus:bg-gray-900 dark:focus-visible:ring-fuchsia-500"
-                placeholder="نام سرویس را جست‌وجو کنید..."
+                placeholder={siteContent.hero.searchPlaceholder}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs opacity-80">
-              <span>محبوب‌ها:</span>
+              <span>{siteContent.hero.popularLabel}</span>
               {products.slice(0, 5).map((product) => (
                 <button
                   key={product.id}
@@ -253,18 +291,25 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
-            <TrustItem icon={Zap} label="تحویل فوری" />
-            <TrustItem icon={ShieldCheck} label="گارانتی سلامت اکانت" />
-            <TrustItem icon={CreditCard} label="پرداخت امن" />
-            <TrustItem icon={Headphones} label="پشتیبانی ۲۴/۷" />
+          <div
+            className={`mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4 ${cmsSectionClass(cmsPreview, selectedSection === "trust")}`}
+            data-cms-section="trust"
+          >
+            {siteContent.trust.items.map((label, index) => {
+              const Icon = trustIcons[index] ?? CheckCircle;
+              return <TrustItem icon={Icon} key={`${label}-${index}`} label={label} />;
+            })}
           </div>
         </div>
       </section>
 
-        <section id="services" className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+        <section
+          id="services"
+          className={`mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8 ${cmsSectionClass(cmsPreview, selectedSection === "services")}`}
+          data-cms-section="services"
+        >
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white dark:text-gray-100 sm:text-xl">خدمات محبوب</h2>
+          <h2 className="text-lg font-bold text-white dark:text-gray-100 sm:text-xl">{siteContent.services.title}</h2>
           <span className="text-xs opacity-60">
             {productsLoading ? "در حال به‌روزرسانی" : `${new Intl.NumberFormat("fa-IR").format(products.length)} سرویس فعال`}
           </span>
@@ -291,35 +336,41 @@ export default function Home() {
         )}
         {!productsLoading && !productsError && filteredProducts.length === 0 ? (
           <Card className="mt-4 rounded-3xl border-gray-200/70 bg-white p-6 text-center text-sm shadow-sm dark:border-gray-800/70 dark:bg-gray-900">
-            سرویسی با این نام پیدا نشد.
+            {siteContent.services.emptyMessage}
           </Card>
         ) : null}
       </section>
 
-        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+        <section
+          className={`mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8 ${cmsSectionClass(cmsPreview, selectedSection === "cta")}`}
+          data-cms-section="cta"
+        >
         <div className="relative overflow-hidden rounded-3xl border border-indigo-500/20 bg-gradient-to-l from-indigo-500/10 via-fuchsia-500/10 to-transparent p-6 dark:border-fuchsia-500/20">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_100%_0%,rgba(99,102,241,0.15),transparent_60%)]" />
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
             <div>
-              <h3 className="text-lg font-extrabold text-white">شروع سریع با تحویل خودکار</h3>
+              <h3 className="text-lg font-extrabold text-white">{siteContent.cta.title}</h3>
               <p className="mt-1 text-sm text-white/85">
-                سرویس را انتخاب کنید و اطلاعات اشتراک را با پشتیبانی مرحله‌به‌مرحله دریافت کنید.
+                {siteContent.cta.description}
               </p>
             </div>
             <Button
               asChild
               className="rounded-2xl bg-gray-900 px-5 py-2.5 text-sm text-white shadow-md transition hover:opacity-90 dark:bg-white dark:text-gray-900"
             >
-              <Link href="#services">انتخاب محصول</Link>
+              <Link href="#services">{siteContent.cta.buttonLabel}</Link>
             </Button>
           </div>
         </div>
       </section>
 
-        <section className="pb-16">
+        <section
+          className={`pb-16 ${cmsSectionClass(cmsPreview, selectedSection === "testimonials")}`}
+          data-cms-section="testimonials"
+        >
         <div className="mx-auto mb-6 flex max-w-7xl items-end justify-between px-4 sm:px-6 lg:px-8">
-          <h2 className="text-lg font-bold text-white dark:text-gray-100 sm:text-xl">نظر کاربران</h2>
-          <div className="text-xs text-white/75 dark:text-gray-100/70">امتیاز میانگین ۴.۹ از ۵</div>
+          <h2 className="text-lg font-bold text-white dark:text-gray-100 sm:text-xl">{siteContent.testimonials.title}</h2>
+          <div className="text-xs text-white/75 dark:text-gray-100/70">{siteContent.testimonials.ratingLabel}</div>
         </div>
         <div dir="ltr" className="marquee-shell relative overflow-hidden">
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-950" />
@@ -335,19 +386,23 @@ export default function Home() {
         </div>
       </section>
 
-        <section id="faq" className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-        <h2 className="mb-6 text-lg font-bold text-white dark:text-gray-100 sm:text-xl">سوالات پرتکرار</h2>
+        <section
+          id="faq"
+          className={`mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8 ${cmsSectionClass(cmsPreview, selectedSection === "faq")}`}
+          data-cms-section="faq"
+        >
+        <h2 className="mb-6 text-lg font-bold text-white dark:text-gray-100 sm:text-xl">{siteContent.faq.title}</h2>
         <div className="overflow-hidden rounded-3xl border border-gray-200/70 bg-white dark:border-gray-800/70 dark:bg-gray-900">
           <Accordion type="single" collapsible>
-            {faqs.map((item, index) => (
+            {siteContent.faq.items.map((item, index) => (
               <AccordionItem
-                key={item.q}
+                key={`${item.question}-${index}`}
                 className="border-gray-200 px-5 dark:border-gray-800"
                 value={`item-${index}`}
               >
-                <AccordionTrigger>{item.q}</AccordionTrigger>
+                <AccordionTrigger>{item.question}</AccordionTrigger>
                 <AccordionContent className="text-sm opacity-80">
-                  {item.a}
+                  {item.answer}
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -355,17 +410,28 @@ export default function Home() {
         </div>
       </section>
 
-        <Footer onOpenInfo={setInfoModal} />
+        <Footer
+          cmsPreview={cmsPreview}
+          content={siteContent}
+          selectedSection={selectedSection}
+          onOpenInfo={setInfoModal}
+        />
       </div>
 
       {infoModal ? (
-        <InfoDialog type={infoModal} onClose={() => setInfoModal(null)} />
+        <InfoDialog
+          cmsPreview={cmsPreview}
+          content={siteContent}
+          selectedSection={selectedSection}
+          type={infoModal}
+          onClose={() => setInfoModal(null)}
+        />
       ) : null}
     </main>
   );
 }
 
-function Header() {
+function Header({ brandName }: { brandName: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { loading: authLoading, user } = useCurrentUser();
   const closeMobileMenu = () => setMobileMenuOpen(false);
@@ -377,14 +443,14 @@ function Header() {
       <div className="relative mx-auto flex max-w-7xl items-center justify-between rounded-3xl border border-white/50 bg-white/70 px-4 py-3 shadow-lg shadow-gray-900/5 backdrop-blur-xl dark:border-white/10 dark:bg-gray-950/60 dark:shadow-black/20 sm:px-6 lg:px-8">
         <Link className="group inline-flex items-center gap-3" href="#">
           <Image
-            alt="ویکی اکانت"
+            alt={brandName}
             className="h-9 w-9 rounded-2xl object-contain shadow-lg transition-transform group-hover:scale-105"
             height={36}
             priority
             src="/wiki-high-resolution-logo-transparent.png"
             width={36}
           />
-          <span className="text-lg font-bold tracking-tight">ویکی اکانت</span>
+          <span className="text-lg font-bold tracking-tight">{brandName}</span>
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
@@ -605,28 +671,42 @@ function TestimonialCard({ item }: { item: Testimonial }) {
   );
 }
 
-function InfoDialog({ type, onClose }: { type: Exclude<InfoModal, null>; onClose: () => void }) {
+function InfoDialog({
+  cmsPreview,
+  content,
+  selectedSection,
+  type,
+  onClose,
+}: {
+  cmsPreview: boolean;
+  content: SiteContent;
+  selectedSection: CmsSection | null;
+  type: Exclude<InfoModal, null>;
+  onClose: () => void;
+}) {
   const isAbout = type === "about";
+  const modalContent = isAbout ? content.about : content.terms;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (!cmsPreview && event.key === "Escape") onClose();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [cmsPreview, onClose]);
 
   return (
     <DialogOverlay
-      ariaLabel={isAbout ? "درباره ویکی اکانت" : "قوانین و مقررات ویکی اکانت"}
+      ariaLabel={modalContent.title}
       className="bg-gray-950/65"
       contentClassName="max-w-2xl"
       onClose={onClose}
     >
       <section
         dir="rtl"
-        className="relative max-h-[calc(100dvh-2rem)] overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-gray-950/25 dark:border-white/10 dark:bg-gray-950"
+        className={`relative max-h-[calc(100dvh-2rem)] overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-gray-950/25 dark:border-white/10 dark:bg-gray-950 ${cmsSectionClass(cmsPreview, selectedSection === type)}`}
+        data-cms-section={type}
       >
         <header className="flex items-start gap-4 border-b border-gray-200/80 bg-gradient-to-l from-indigo-500/10 via-fuchsia-500/5 to-transparent p-5 dark:border-gray-800/80 sm:p-6">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/20">
@@ -634,10 +714,10 @@ function InfoDialog({ type, onClose }: { type: Exclude<InfoModal, null>; onClose
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-extrabold sm:text-2xl">
-              {isAbout ? "درباره ویکی اکانت" : "قوانین و مقررات"}
+              {modalContent.title}
             </h2>
             <p className="mt-1 text-xs opacity-60">
-              {isAbout ? "آشنایی با خدمات و تعهدهای ما" : "آخرین به‌روزرسانی: تیر ۱۴۰۵"}
+              {modalContent.subtitle}
             </p>
           </div>
           <Button
@@ -654,66 +734,49 @@ function InfoDialog({ type, onClose }: { type: Exclude<InfoModal, null>; onClose
         </header>
 
         <div className="max-h-[calc(100dvh-9rem)] overflow-y-auto p-5 text-sm leading-8 sm:p-6">
-          {isAbout ? <AboutContent /> : <TermsContent />}
+          {isAbout ? (
+            <AboutContent content={content.about} />
+          ) : (
+            <TermsContent content={content.terms} />
+          )}
         </div>
       </section>
     </DialogOverlay>
   );
 }
 
-function AboutContent() {
+function AboutContent({ content }: { content: SiteContent["about"] }) {
   return (
     <div className="space-y-5">
-      <p className="text-base leading-8">
-        ویکی اکانت یک فروشگاه آنلاین برای خرید و تمدید اشتراک سرویس‌های دیجیتال است. هدف ما این است که دسترسی به ابزارهایی مانند ChatGPT، Gemini، Claude، Grok و Spotify را با فرایندی ساده، شفاف و قابل پیگیری فراهم کنیم.
-      </p>
+      <p className="text-base leading-8">{content.intro}</p>
       <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          ["تحویل سریع", "بررسی و فعال‌سازی سفارش‌ها در کوتاه‌ترین زمان ممکن"],
-          ["خرید شفاف", "نمایش مشخصات، مبلغ و شرایط هر سرویس پیش از پرداخت"],
-          ["پشتیبانی واقعی", "پیگیری سفارش و مشکلات دسترسی از طریق تیکت پنل"],
-        ].map(([title, description]) => (
-          <div key={title} className="rounded-2xl border border-gray-200/80 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-            <h3 className="font-bold">{title}</h3>
-            <p className="mt-1 text-xs leading-6 opacity-70">{description}</p>
+        {content.highlights.map((highlight, index) => (
+          <div key={`${highlight.title}-${index}`} className="rounded-2xl border border-gray-200/80 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+            <h3 className="font-bold">{highlight.title}</h3>
+            <p className="mt-1 text-xs leading-6 opacity-70">{highlight.description}</p>
           </div>
         ))}
       </div>
       <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/5">
-        <h3 className="font-bold">تعهد ما به شما</h3>
-        <p className="mt-1 opacity-80">
-          اطلاعات هر محصول، نوع دسترسی و شرایط تمدید را تا حد ممکن روشن اعلام می‌کنیم و پس از خرید نیز تا پایان فرایند تحویل همراه شما هستیم. اگر مشکلی در سفارش ایجاد شود، تیم پشتیبانی موضوع را بررسی و راهکار مناسب را ارائه می‌کند.
-        </p>
+        <h3 className="font-bold">{content.commitmentTitle}</h3>
+        <p className="mt-1 opacity-80">{content.commitmentText}</p>
       </div>
-      <p className="opacity-75">
-        برای ارتباط با ما می‌توانید از بخش تیکت در پنل کاربری استفاده کنید یا با شماره ۰۹۳۶۸۰۳۱۱۴۸ تماس بگیرید.
-      </p>
+      <p className="opacity-75">{content.contactText}</p>
     </div>
   );
 }
 
-function TermsContent() {
-  const terms = [
-    ["۱. ثبت سفارش", "کاربر موظف است پیش از پرداخت، مشخصات محصول، نوع اشتراک، مدت اعتبار و اطلاعات موردنیاز برای فعال‌سازی را بررسی کند. مسئولیت صحت اطلاعات ثبت‌شده بر عهده کاربر است."],
-    ["۲. پرداخت و قیمت", "مبلغ نهایی هر سفارش پیش از پرداخت نمایش داده می‌شود. ثبت سفارش تنها پس از پرداخت موفق و دریافت کد پیگیری قطعی است. تغییر قیمت‌ها روی سفارش‌های پرداخت‌شده اثر ندارد."],
-    ["۳. تحویل سرویس", "زمان تحویل بسته به نوع سرویس و نیاز به تأیید اطلاعات متفاوت است. در صورت نیاز به اطلاعات تکمیلی، موضوع از طریق تیکت یا راه ارتباطی ثبت‌شده به کاربر اطلاع داده می‌شود."],
-    ["۴. لغو و بازگشت وجه", "تا پیش از شروع فرایند فعال‌سازی، امکان درخواست لغو سفارش وجود دارد. پس از تحویل یا فعال‌شدن اشتراک، به دلیل ماهیت دیجیتال محصول، بازگشت وجه تنها در صورت نقص تأییدشده و حل‌نشدن مشکل توسط پشتیبانی انجام می‌شود."],
-    ["۵. پشتیبانی و ضمانت", "در صورت بروز مشکل در بازه ضمانت اعلام‌شده برای محصول، کاربر باید از طریق تیکت اطلاع دهد. ضمانت شامل ایرادهای ناشی از استفاده نادرست، تغییر اطلاعات دسترسی بدون هماهنگی یا نقض قوانین سرویس‌دهنده اصلی نیست."],
-    ["۶. نحوه استفاده", "کاربر متعهد است از سرویس خریداری‌شده مطابق قوانین سرویس‌دهنده اصلی استفاده کند و از واگذاری غیرمجاز، فعالیت خلاف قانون، ارسال هرزنامه یا اقداماتی که باعث مسدودشدن حساب می‌شود خودداری کند."],
-    ["۷. حریم خصوصی", "اطلاعات کاربران فقط برای پردازش سفارش، ارائه پشتیبانی و انجام تعهدات فروشگاه استفاده می‌شود و جز در موارد الزام قانونی یا ضرورت ارائه خدمت، در اختیار اشخاص دیگر قرار نمی‌گیرد."],
-    ["۸. تغییر شرایط", "ممکن است این مقررات برای هماهنگی با تغییر خدمات یا الزامات قانونی به‌روزرسانی شود. نسخه منتشرشده در همین صفحه، مبنای استفاده از خدمات ویکی اکانت خواهد بود."],
-  ];
-
+function TermsContent({ content }: { content: SiteContent["terms"] }) {
   return (
     <div className="space-y-5">
       <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm leading-7">
-        ثبت سفارش در ویکی اکانت به معنی مطالعه و پذیرش این شرایط است. لطفاً پیش از خرید، موارد زیر را با دقت بخوانید.
+        {content.intro}
       </p>
       <div className="space-y-4">
-        {terms.map(([title, description]) => (
-          <article key={title}>
-            <h3 className="font-bold">{title}</h3>
-            <p className="mt-1 opacity-75">{description}</p>
+        {content.items.map((item, index) => (
+          <article key={`${item.title}-${index}`}>
+            <h3 className="font-bold">{item.title}</h3>
+            <p className="mt-1 opacity-75">{item.description}</p>
           </article>
         ))}
       </div>
@@ -721,7 +784,7 @@ function TermsContent() {
   );
 }
 
-function EnamadSeal() {
+function EnamadSeal({ label }: { label: string }) {
   const [loaded, setLoaded] = useState(false);
 
   return (
@@ -731,21 +794,21 @@ function EnamadSeal() {
       rel="noopener"
       href="https://trustseal.enamad.ir/?id=644002&Code=frDMiNn3bP7yVs4bFGR06i7W9nu4zxhe"
       className="inline-flex rounded-2xl border border-gray-200/70 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-gray-800/70 dark:bg-gray-900"
-      aria-label="نماد اعتماد الکترونیکی"
+      aria-label={label}
     >
       <span
         className={`grid h-24 w-24 place-items-center rounded-xl bg-gray-100 text-center text-xs leading-5 text-gray-500 dark:bg-gray-800 dark:text-gray-400 ${
           loaded ? "hidden" : ""
         }`}
       >
-        نماد اعتماد
+        {label}
         <span className="mt-1 block h-2 w-14 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700" />
       </span>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         referrerPolicy="origin"
         src="https://trustseal.enamad.ir/logo.aspx?id=644002&Code=frDMiNn3bP7yVs4bFGR06i7W9nu4zxhe"
-        alt="نماد اعتماد الکترونیکی"
+        alt={label}
         className={`h-24 w-24 object-contain ${loaded ? "block" : "hidden"}`}
         width="96"
         height="96"
@@ -756,28 +819,42 @@ function EnamadSeal() {
   );
 }
 
-function Footer({ onOpenInfo }: { onOpenInfo: (type: Exclude<InfoModal, null>) => void }) {
+function Footer({
+  cmsPreview,
+  content,
+  selectedSection,
+  onOpenInfo,
+}: {
+  cmsPreview: boolean;
+  content: SiteContent;
+  selectedSection: CmsSection | null;
+  onOpenInfo: (type: Exclude<InfoModal, null>) => void;
+}) {
+  const footer = content.footer;
+
   return (
-    <footer id="contact" className="border-t border-gray-200/70 bg-white py-10 text-sm dark:border-gray-800/70 dark:bg-gray-950">
+    <footer
+      id="contact"
+      className={`border-t border-gray-200/70 bg-white py-10 text-sm dark:border-gray-800/70 dark:bg-gray-950 ${cmsSectionClass(cmsPreview, selectedSection === "footer")}`}
+      data-cms-section="footer"
+    >
       <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1.2fr_0.8fr_1fr_0.8fr] lg:px-8">
         <div className="space-y-3">
           <div className="inline-flex items-center gap-2">
             <Image
-              alt="ویکی اکانت"
+              alt={footer.brandName}
               className="h-9 w-9 rounded-2xl object-contain shadow-lg"
               height={36}
               src="/wiki-high-resolution-logo-transparent.png"
               width={36}
             />
-            <span className="text-base font-extrabold">ویکی اکانت</span>
+            <span className="text-base font-extrabold">{footer.brandName}</span>
           </div>
-          <p className="opacity-70">
-            فروشگاه آنلاین خرید اشتراک سرویس‌های دیجیتال با تحویل سریع و پشتیبانی حرفه‌ای.
-          </p>
+          <p className="opacity-70">{footer.description}</p>
         </div>
 
         <div>
-          <div className="mb-3 font-bold">صفحات</div>
+          <div className="mb-3 font-bold">{footer.pagesTitle}</div>
           <ul className="space-y-2 opacity-80">
             <li>
               <Link className="hover:opacity-100" href="/store">
@@ -786,54 +863,56 @@ function Footer({ onOpenInfo }: { onOpenInfo: (type: Exclude<InfoModal, null>) =
             </li>
             <li>
               <Link className="hover:opacity-100" href="#services">
-                خدمات
+                {content.services.title}
               </Link>
             </li>
             <li>
               <Link className="hover:opacity-100" href="#faq">
-                سوالات
+                {content.faq.title}
               </Link>
             </li>
             <li>
               <button
                 className="transition hover:opacity-100"
+                data-cms-section="about"
                 type="button"
                 onClick={() => onOpenInfo("about")}
               >
-                درباره ما
+                {content.about.title}
               </button>
             </li>
             <li>
               <button
                 className="transition hover:opacity-100"
+                data-cms-section="terms"
                 type="button"
                 onClick={() => onOpenInfo("terms")}
               >
-                قوانین و مقررات
+                {content.terms.title}
               </button>
             </li>
           </ul>
         </div>
 
         <div>
-          <div className="mb-3 font-bold">پشتیبانی</div>
+          <div className="mb-3 font-bold">{footer.supportTitle}</div>
           <ul className="space-y-2 opacity-80">
-            <li>تیکت در پنل کاربری</li>
-            <li>آدرس : بلوار ابن سینا- ابن سینا 8</li>
+            <li>{footer.supportTicket}</li>
+            <li>آدرس : {footer.address}</li>
             <li>
-              تلفن: <span dir="ltr" className="inline-block">0936 803 1148</span>
+              تلفن: <span dir="ltr" className="inline-block">{footer.phone}</span>
             </li>
           </ul>
         </div>
 
         <div>
-          <div className="mb-3 font-bold">نماد اعتماد</div>
-          <EnamadSeal />
+          <div className="mb-3 font-bold">{footer.trustTitle}</div>
+          <EnamadSeal label={footer.trustTitle} />
         </div>
       </div>
 
       <div className="mx-auto mt-10 max-w-7xl px-4 text-center opacity-60 sm:px-6 lg:px-8">
-        © {new Date().getFullYear()} ویکی اکانت - تمامی حقوق محفوظ است.
+        {formatCopyright(footer.copyright)}
       </div>
     </footer>
   );

@@ -88,6 +88,8 @@ model User {
   ticketMessages           TicketMessage[]
   walletTransactions       WalletTransaction[] @relation("WalletTransactionUser")
   adminWalletTransactions  WalletTransaction[] @relation("WalletTransactionAdmin")
+  siteContentDraftUpdates  SiteContent[]       @relation("SiteContentDraftUpdater")
+  siteContentPublications  SiteContent[]       @relation("SiteContentPublisher")
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
 }
@@ -295,4 +297,23 @@ model TicketMessage {
   body      String
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model SiteContent {
+  id               String   @id
+  draftJson        String
+  publishedJson    String
+  draftVersion     Int      @default(1)
+  publishedVersion Int      @default(1)
+  draftUpdatedById String?
+  draftUpdatedBy   User?    @relation("SiteContentDraftUpdater", fields: [draftUpdatedById], references: [id], onDelete: SetNull)
+  publishedById    String?
+  publishedBy      User?    @relation("SiteContentPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+  draftUpdatedAt   DateTime @default(now())
+  publishedAt      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([draftUpdatedById])
+  @@index([publishedById])
 }

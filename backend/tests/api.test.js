@@ -44,6 +44,9 @@ describe("wikiacc backend api", () => {
   let userId;
   let instantProduct;
   let customProduct;
+  let initialSiteContent;
+  let siteContentDraft;
+  let siteContentDraftVersion;
 
   beforeAll(async () => {
     app = await buildApp({ logger: false });
@@ -188,6 +191,190 @@ describe("wikiacc backend api", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json().data.wallet.balance).toBe(1000);
+  });
+
+  it("serves published site content and protects the admin document", async () => {
+    const publicResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/site-content",
+    });
+
+    expect(publicResponse.statusCode).toBe(200);
+    expect(publicResponse.json().data.version).toBe(1);
+    initialSiteContent = publicResponse.json().data.content;
+    expect(initialSiteContent.hero.title).toBeTruthy();
+
+    const anonymousResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/site-content",
+    });
+    expect(anonymousResponse.statusCode).toBe(401);
+
+    const userResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/site-content",
+      headers: { cookie: userCookie },
+    });
+    expect(userResponse.statusCode).toBe(403);
+
+    const adminResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/site-content",
+      headers: { cookie: adminCookie },
+    });
+    expect(adminResponse.statusCode).toBe(200);
+    const adminContent = adminResponse.json().data;
+    expect(adminContent.content).toEqual(initialSiteContent);
+    expect(adminContent.published).toEqual(initialSiteContent);
+    expect(adminContent.hasUnpublishedChanges).toBe(false);
+    siteContentDraft = adminContent.content;
+    siteContentDraftVersion = adminContent.draftVersion;
+  });
+
+  it("keeps draft site content private", async () => {
+    const draft = structuredClone(siteContentDraft);
+    draft.hero.title = "Private draft homepage title";
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/v1/admin/site-content/draft",
+      headers: { cookie: adminCookie },
+      payload: {
+        content: draft,
+        expectedVersion: siteContentDraftVersion,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const result = response.json().data;
+    expect(result.content.hero.title).toBe("Private draft homepage title");
+    expect(result.published.hero.title).toBe(initialSiteContent.hero.title);
+    expect(result.draftVersion).toBe(siteContentDraftVersion + 1);
+    expect(result.hasUnpublishedChanges).toBe(true);
+    siteContentDraft = result.content;
+    siteContentDraftVersion = result.draftVersion;
+
+    const publicResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/site-content",
+    });
+    expect(publicResponse.statusCode).toBe(200);
+    expect(publicResponse.json().data.content.hero.title).toBe(
+      initialSiteContent.hero.title,
+    );
+  });
+
+  it("rejects invalid or HTML site content", async () => {
+    const invalid = structuredClone(siteContentDraft);
+    invalid.hero.title = "<strong>Unsafe title</strong>";
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/v1/admin/site-content/draft",
+      headers: { cookie: adminCookie },
+      payload: {
+        content: invalid,
+        expectedVersion: siteContentDraftVersion,
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("VALIDATION_ERROR");
+
+    const currentResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/site-content",
+      headers: { cookie: adminCookie },
+    });
+    expect(currentResponse.json().data.draftVersion).toBe(
+      siteContentDraftVersion,
+    );
+  });
+
+  it("rejects stale site content versions", async () => {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/v1/admin/site-content/draft",
+      headers: { cookie: adminCookie },
+      payload: {
+        content: siteContentDraft,
+        expectedVersion: siteContentDraftVersion - 1,
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe(
+      "SITE_CONTENT_VERSION_CONFLICT",
+    );
+    expect(response.json().error.details.currentVersion).toBe(
+      siteContentDraftVersion,
+    );
+  });
+
+  it("publishes the current draft atomically", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/site-content/publish",
+      headers: { cookie: adminCookie },
+      payload: { expectedVersion: siteContentDraftVersion },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const result = response.json().data;
+    expect(result.published).toEqual(siteContentDraft);
+    expect(result.hasUnpublishedChanges).toBe(false);
+
+    const publicResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/site-content",
+    });
+    expect(publicResponse.statusCode).toBe(200);
+    expect(publicResponse.json().data.content.hero.title).toBe(
+      "Private draft homepage title",
+    );
+    expect(publicResponse.json().data.version).toBe(result.publishedVersion);
+
+    const repeatedPublish = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/site-content/publish",
+      headers: { cookie: adminCookie },
+      payload: { expectedVersion: siteContentDraftVersion },
+    });
+    expect(repeatedPublish.statusCode).toBe(200);
+    expect(repeatedPublish.json().data.publishedVersion).toBe(
+      result.publishedVersion,
+    );
+  });
+
+  it("resets an unpublished draft to the published content", async () => {
+    const discardedDraft = structuredClone(siteContentDraft);
+    discardedDraft.hero.title = "Discard this title";
+
+    const saveResponse = await app.inject({
+      method: "PUT",
+      url: "/api/v1/admin/site-content/draft",
+      headers: { cookie: adminCookie },
+      payload: {
+        content: discardedDraft,
+        expectedVersion: siteContentDraftVersion,
+      },
+    });
+    expect(saveResponse.statusCode).toBe(200);
+    const saved = saveResponse.json().data;
+    expect(saved.hasUnpublishedChanges).toBe(true);
+
+    const resetResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/site-content/reset-draft",
+      headers: { cookie: adminCookie },
+      payload: { expectedVersion: saved.draftVersion },
+    });
+    expect(resetResponse.statusCode).toBe(200);
+    const reset = resetResponse.json().data;
+    expect(reset.content).toEqual(reset.published);
+    expect(reset.content.hero.title).toBe("Private draft homepage title");
+    expect(reset.draftVersion).toBe(saved.draftVersion + 1);
+    expect(reset.hasUnpublishedChanges).toBe(false);
   });
 
   it("creates an instant delivery order and consumes one ready item", async () => {
