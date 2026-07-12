@@ -64,6 +64,11 @@ type FieldDraft = {
   optionDraft: string;
 };
 
+type FeatureDraft = {
+  id: string;
+  title: string;
+};
+
 const initialProductForm: ProductForm = {
   categoryId: "",
   deliveryPoolId: "",
@@ -78,6 +83,13 @@ const initialProductForm: ProductForm = {
 
 function createDraftId() {
   return `field-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createFeatureDraft(title = ""): FeatureDraft {
+  return {
+    id: `feature-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    title,
+  };
 }
 
 function optionalText(value: string) {
@@ -149,6 +161,9 @@ export function AdminProductFormClient() {
   const [fieldDrafts, setFieldDrafts] = useState<FieldDraft[]>([
     createFieldDraft(),
   ]);
+  const [featureDrafts, setFeatureDrafts] = useState<FeatureDraft[]>([
+    createFeatureDraft(),
+  ]);
   const [editingProductId, setEditingProductId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -159,6 +174,7 @@ export function AdminProductFormClient() {
   function resetForm() {
     setProductForm(initialProductForm);
     setFieldDrafts([createFieldDraft()]);
+    setFeatureDrafts([createFeatureDraft()]);
     setEditingProductId("");
   }
 
@@ -179,6 +195,11 @@ export function AdminProductFormClient() {
       product.fields.length
         ? product.fields.map(createFieldDraft)
         : [createFieldDraft()],
+    );
+    setFeatureDrafts(
+      product.features?.length
+        ? product.features.map((feature) => createFeatureDraft(feature.title))
+        : [createFeatureDraft()],
     );
   }
 
@@ -319,6 +340,10 @@ export function AdminProductFormClient() {
     }
 
     const usedKeys = new Set<string>();
+    const features = featureDrafts
+      .map((featureDraft) => featureDraft.title.trim())
+      .filter(Boolean)
+      .map((title, index) => ({ title, sortOrder: index }));
     const fields =
       productForm.type === "CUSTOM_FORM"
         ? visibleFieldDrafts.map((fieldDraft, index) => ({
@@ -339,6 +364,7 @@ export function AdminProductFormClient() {
         categoryId: optionalText(productForm.categoryId),
         deliveryPoolId,
         description: optionalText(productForm.description),
+        features,
         fields,
         isActive: productForm.isActive,
         price: Number(productForm.price),
@@ -588,6 +614,66 @@ export function AdminProductFormClient() {
               </div>
             )
           ) : null}
+        </AdminSection>
+
+        <AdminSection
+          action={
+            <Button
+              disabled={featureDrafts.length >= 12}
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setFeatureDrafts((current) => [...current, createFeatureDraft()])
+              }
+            >
+              <Plus className="size-4" />
+              افزودن ویژگی
+            </Button>
+          }
+          description="موارد کوتاهی که همراه آیکن تیک روی کارت محصول در صفحه اصلی نمایش داده می‌شوند"
+          title="ویژگی‌های نمایشی"
+        >
+          <div className="space-y-3">
+            {featureDrafts.map((featureDraft, index) => (
+              <div
+                className="flex items-center gap-3 rounded-lg border border-border bg-background p-3"
+                key={featureDraft.id}
+              >
+                <CheckCircle2 className="size-5 shrink-0 text-primary" />
+                <Input
+                  aria-label={`ویژگی ${index + 1}`}
+                  maxLength={160}
+                  placeholder={index === 0 ? "مثلاً فعال‌سازی سریع" : "عنوان ویژگی"}
+                  value={featureDraft.title}
+                  onChange={(event) =>
+                    setFeatureDrafts((current) =>
+                      current.map((item) =>
+                        item.id === featureDraft.id
+                          ? { ...item, title: event.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <Button
+                  aria-label={`حذف ویژگی ${index + 1}`}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                  onClick={() =>
+                    setFeatureDrafts((current) =>
+                      current.length > 1
+                        ? current.filter((item) => item.id !== featureDraft.id)
+                        : [createFeatureDraft()],
+                    )
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </AdminSection>
 
         {!isInstantDelivery ? (

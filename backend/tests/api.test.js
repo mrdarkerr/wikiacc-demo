@@ -7,7 +7,8 @@ import bcrypt from "bcryptjs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 process.env.NODE_ENV = "test";
-process.env.DATABASE_URL = "file:./test.db";
+const testDatabaseName = `test-${process.pid}.db`;
+process.env.DATABASE_URL = `file:./${testDatabaseName}`;
 process.env.JWT_SECRET = "test-secret-with-enough-length";
 process.env.WEB_APP_URL = "http://localhost:3000";
 process.env.COOKIE_SECURE = "false";
@@ -15,7 +16,7 @@ process.env.COOKIE_SECURE = "false";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const backendDir = resolve(__dirname, "..");
 const applySchemaScript = resolve(backendDir, "scripts", "apply-schema.js");
-const testDbPath = resolve(backendDir, "prisma", "test.db");
+const testDbPath = resolve(backendDir, "prisma", testDatabaseName);
 
 if (existsSync(testDbPath)) {
   unlinkSync(testDbPath);
@@ -76,6 +77,12 @@ describe("wikiacc backend api", () => {
         title: "Custom Product",
         type: "CUSTOM_FORM",
         price: 50,
+        features: {
+          create: [
+            { title: "Fast activation", sortOrder: 0 },
+            { title: "Supported", sortOrder: 1 },
+          ],
+        },
         fields: {
           create: [
             {
@@ -102,6 +109,25 @@ describe("wikiacc backend api", () => {
 
   afterAll(async () => {
     await app.close();
+    if (existsSync(testDbPath)) {
+      unlinkSync(testDbPath);
+    }
+  });
+
+  it("returns product display features in catalog order", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/products",
+    });
+
+    expect(response.statusCode).toBe(200);
+    const product = response.json().data.products.find(
+      (item) => item.id === customProduct.id,
+    );
+    expect(product.features.map((feature) => feature.title)).toEqual([
+      "Fast activation",
+      "Supported",
+    ]);
   });
 
   it("allows CORS preflight for PATCH admin actions", async () => {

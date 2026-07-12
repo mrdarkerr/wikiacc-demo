@@ -111,6 +111,7 @@ model Product {
   deliveryPoolId String?
   deliveryPool   DeliveryPool?    @relation(fields: [deliveryPoolId], references: [id], onDelete: SetNull)
   fields         ProductField[]
+  features       ProductFeature[]
   orderItems     OrderItem[]
   slug           String           @unique
   title          String
@@ -123,6 +124,18 @@ model Product {
   updatedAt      DateTime         @updatedAt
 
   @@index([type, isActive, sortOrder])
+}
+
+model ProductFeature {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, sortOrder])
 }
 
 model ProductField {

@@ -49,6 +49,31 @@ async function main() {
     },
   });
 
+  const geminiProduct = await prisma.product.upsert({
+    where: { slug: "gemini" },
+    update: {
+      description: "دستیار گوگل برای متن، تصویر و ایده‌پردازی",
+    },
+    create: {
+      slug: "gemini",
+      title: "Gemini",
+      description: "دستیار گوگل برای متن، تصویر و ایده‌پردازی",
+      type: "CUSTOM_FORM",
+      price: 390000,
+      categoryId: aiCategory.id,
+      sortOrder: 0,
+    },
+  });
+
+  await prisma.productFeature.deleteMany({ where: { productId: geminiProduct.id } });
+  await prisma.productFeature.createMany({
+    data: [
+      { productId: geminiProduct.id, title: "فعال‌سازی سریع", sortOrder: 0 },
+      { productId: geminiProduct.id, title: "مناسب تولید محتوا", sortOrder: 1 },
+      { productId: geminiProduct.id, title: "پشتیبانی تمدید", sortOrder: 2 },
+    ],
+  });
+
   const licensePool = await prisma.deliveryPool.upsert({
     where: { slug: "chatgpt-ready-licenses" },
     update: {},
@@ -75,6 +100,15 @@ async function main() {
       deliveryPoolId: licensePool.id,
       sortOrder: 1,
     },
+  });
+
+  await prisma.productFeature.deleteMany({ where: { productId: readyProduct.id } });
+  await prisma.productFeature.createMany({
+    data: [
+      { productId: readyProduct.id, title: "فعال‌سازی سریع", sortOrder: 0 },
+      { productId: readyProduct.id, title: "اکانت آماده تحویل", sortOrder: 1 },
+      { productId: readyProduct.id, title: "پشتیبانی پس از خرید", sortOrder: 2 },
+    ],
   });
 
   const existingReadyItems = await prisma.deliveryItem.count({
@@ -108,6 +142,15 @@ async function main() {
       categoryId: musicCategory.id,
       sortOrder: 2,
     },
+  });
+
+  await prisma.productFeature.deleteMany({ where: { productId: customProduct.id } });
+  await prisma.productFeature.createMany({
+    data: [
+      { productId: customProduct.id, title: "فعال‌سازی روی حساب شما", sortOrder: 0 },
+      { productId: customProduct.id, title: "بدون تبلیغ", sortOrder: 1 },
+      { productId: customProduct.id, title: "پشتیبانی تمدید", sortOrder: 2 },
+    ],
   });
 
   await prisma.productField.upsert({
@@ -149,7 +192,7 @@ async function main() {
   console.log({
     adminEmail,
     adminPassword,
-    seededProducts: [readyProduct.slug, customProduct.slug],
+    seededProducts: [geminiProduct.slug, readyProduct.slug, customProduct.slug],
   });
 }
 

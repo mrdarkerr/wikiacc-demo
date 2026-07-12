@@ -33,15 +33,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DialogOverlay } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-
-type Service = {
-  id: string;
-  name: string;
-  tagline: string;
-  price: number;
-  short: string;
-  features: string[];
-};
+import { api } from "@/lib/api";
+import type { Product } from "@/types/api";
 
 type Testimonial = {
   name: string;
@@ -50,49 +43,6 @@ type Testimonial = {
 };
 
 type InfoModal = "about" | "terms" | null;
-
-const services: Service[] = [
-  {
-    id: "gemini",
-    name: "Gemini",
-    tagline: "دستیار گوگل برای متن، تصویر و ایده‌پردازی",
-    price: 390000,
-    short: "Ge",
-    features: ["فعال‌سازی سریع", "مناسب تولید محتوا", "پشتیبانی تمدید"],
-  },
-  {
-    id: "chatgpt",
-    name: "ChatGPT",
-    tagline: "مکالمه، تحلیل، کدنویسی و تولید محتوا",
-    price: 690000,
-    short: "Ch",
-    features: ["اکانت پایدار", "راهنمای شروع", "تحویل مرحله‌به‌مرحله"],
-  },
-  {
-    id: "claude",
-    name: "Claude",
-    tagline: "نوشتن، خلاصه‌سازی و تحلیل متن‌های بلند",
-    price: 620000,
-    short: "Cl",
-    features: ["مناسب متن‌های بلند", "تحویل امن", "پشتیبانی استفاده"],
-  },
-  {
-    id: "grok",
-    name: "Grok",
-    tagline: "دسترسی سریع به هوش مصنوعی xAI",
-    price: 540000,
-    short: "Gr",
-    features: ["فعال‌سازی اکانت", "تمدید ماهانه", "پیگیری وضعیت"],
-  },
-  {
-    id: "spotify",
-    name: "Spotify",
-    tagline: "موسیقی بدون تبلیغ و دانلود آفلاین",
-    price: 149000,
-    short: "Sp",
-    features: ["بدون تبلیغ", "دانلود آفلاین", "پلن فردی و خانوادگی"],
-  },
-];
 
 const faqs = [
   {
@@ -190,19 +140,52 @@ const formatPrice = (price: number) =>
 export default function Home() {
   const [query, setQuery] = useState("");
   const [infoModal, setInfoModal] = useState<InfoModal>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState("");
+  const [loadVersion, setLoadVersion] = useState(0);
 
-  const filteredServices = useMemo(() => {
+  useEffect(() => {
+    let active = true;
+
+    api.catalog
+      .products()
+      .then((result) => {
+        if (active) setProducts(result.products);
+      })
+      .catch(() => {
+        if (active) setProductsError("دریافت محصولات انجام نشد. لطفاً دوباره تلاش کنید.");
+      })
+      .finally(() => {
+        if (active) setProductsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [loadVersion]);
+
+  function retryProducts() {
+    setProductsLoading(true);
+    setProductsError("");
+    setLoadVersion((value) => value + 1);
+  }
+
+  const filteredProducts = useMemo(() => {
     const value = query.trim().toLowerCase();
     if (!value) {
-      return services;
+      return products;
     }
 
-    return services.filter(
-      (service) =>
-        service.name.toLowerCase().includes(value) ||
-        service.tagline.toLowerCase().includes(value),
+    return products.filter(
+      (product) =>
+        product.title.toLowerCase().includes(value) ||
+        product.description?.toLowerCase().includes(value) ||
+        product.features?.some((feature) =>
+          feature.title.toLowerCase().includes(value),
+        ),
     );
-  }, [query]);
+  }, [products, query]);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-transparent text-gray-900 transition-colors duration-300 dark:text-gray-100">
@@ -258,14 +241,14 @@ export default function Home() {
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs opacity-80">
               <span>محبوب‌ها:</span>
-              {services.map((service) => (
+              {products.slice(0, 5).map((product) => (
                 <button
-                  key={service.id}
+                  key={product.id}
                   className="rounded-full border border-white/[0.55] bg-white/[0.65] px-3 py-1 text-gray-900 shadow-sm shadow-black/5 backdrop-blur-md transition hover:bg-white/[0.85] dark:border-white/15 dark:bg-white/[0.15] dark:text-white dark:hover:bg-white/25"
                   type="button"
-                  onClick={() => setQuery(service.name)}
+                  onClick={() => setQuery(product.title)}
                 >
-                  {service.name}
+                  {product.title}
                 </button>
               ))}
             </div>
@@ -274,7 +257,7 @@ export default function Home() {
                 asChild
                 className="w-full rounded-2xl bg-gray-900 px-5 py-2.5 text-sm text-white shadow-md transition hover:opacity-90 dark:bg-white dark:text-gray-900 sm:w-auto"
               >
-                <Link href="/store">
+                <Link href="#services">
                   <ShoppingCart className="size-4" />
                   شروع خرید
                 </Link>
@@ -304,14 +287,31 @@ export default function Home() {
         <section id="services" className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white dark:text-gray-100 sm:text-xl">خدمات محبوب</h2>
-          <span className="text-xs opacity-60">فقط ۵ سرویس فعال</span>
+          <span className="text-xs opacity-60">
+            {productsLoading ? "در حال به‌روزرسانی" : `${new Intl.NumberFormat("fa-IR").format(products.length)} سرویس فعال`}
+          </span>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-          {filteredServices.map((service, index) => (
-            <ServiceCard key={service.id} service={service} index={index} />
-          ))}
-        </div>
-        {filteredServices.length === 0 ? (
+        {productsLoading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <ServiceCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : productsError ? (
+          <Card className="rounded-3xl border-rose-200/70 bg-white/90 p-6 text-center text-sm shadow-sm dark:border-rose-900/70 dark:bg-gray-900/90">
+            <p>{productsError}</p>
+            <Button className="mt-4 rounded-2xl" type="button" variant="outline" onClick={retryProducts}>
+              تلاش دوباره
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredProducts.map((product, index) => (
+              <ServiceCard key={product.id} product={product} index={index} />
+            ))}
+          </div>
+        )}
+        {!productsLoading && !productsError && filteredProducts.length === 0 ? (
           <Card className="mt-4 rounded-3xl border-gray-200/70 bg-white p-6 text-center text-sm shadow-sm dark:border-gray-800/70 dark:bg-gray-900">
             سرویسی با این نام پیدا نشد.
           </Card>
@@ -332,7 +332,7 @@ export default function Home() {
               asChild
               className="rounded-2xl bg-gray-900 px-5 py-2.5 text-sm text-white shadow-md transition hover:opacity-90 dark:bg-white dark:text-gray-900"
             >
-              <Link href="/store">ثبت سفارش</Link>
+              <Link href="#services">انتخاب محصول</Link>
             </Button>
           </div>
         </div>
@@ -407,7 +407,7 @@ function Header() {
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
-          <Link className="text-sm opacity-80 transition hover:opacity-100" href="/store">
+          <Link className="text-sm opacity-80 transition hover:opacity-100" href="#services">
             خرید
           </Link>
           <Link className="text-sm opacity-80 transition hover:opacity-100" href="#services">
@@ -447,7 +447,7 @@ function Header() {
             <nav className="grid gap-1 text-sm font-medium">
               <Link
                 className="rounded-2xl px-4 py-3 transition hover:bg-gray-900/5 dark:hover:bg-white/10"
-                href="/store"
+                href="#services"
                 onClick={closeMobileMenu}
               >
                 خرید
@@ -499,28 +499,37 @@ function TrustItem({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   );
 }
 
-function ServiceCard({ service, index }: { service: Service; index: number }) {
+function productInitials(title: string) {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  return words.length > 1
+    ? words.slice(0, 2).map((word) => word[0]).join("").toUpperCase()
+    : title.slice(0, 2).toUpperCase();
+}
+
+function ServiceCard({ product, index }: { product: Product; index: number }) {
   return (
     <article
-      className={`group relative overflow-hidden rounded-3xl border border-gray-200/70 bg-white p-5 shadow-sm transition hover:shadow-md animate-in fade-in slide-in-from-bottom-2 dark:border-gray-800/70 dark:bg-gray-900 lg:col-span-2 ${
-        index === 3 ? "lg:col-start-2" : ""
-      }`}
+      className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-gray-200/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 dark:border-gray-800/70 dark:bg-gray-900"
       style={{ animationDelay: `${index * 40}ms` }}
     >
       <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-base font-bold">{service.name}</h3>
-          <p className="mt-1 text-xs opacity-70">{service.tagline}</p>
+        <div className="min-w-0">
+          <h3 className="text-base font-bold">{product.title}</h3>
+          {product.description ? (
+            <p className="mt-1 line-clamp-2 text-xs/5 opacity-70">
+              {product.description}
+            </p>
+          ) : null}
         </div>
         <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow">
-          <span className="text-xs font-bold">{service.short}</span>
+          <span className="text-xs font-bold">{productInitials(product.title)}</span>
         </div>
       </div>
-      <ul className="space-y-2 text-sm/6">
-        {service.features.map((feature) => (
-          <li key={feature} className="flex items-center gap-2">
-            <CheckCircle className="size-4 text-indigo-500 dark:text-fuchsia-400" />
-            <span className="opacity-90">{feature}</span>
+      <ul className="mb-auto space-y-2 text-sm/6">
+        {product.features?.map((feature) => (
+          <li key={feature.id} className="flex items-center gap-2">
+            <CheckCircle className="size-4 shrink-0 text-indigo-500 dark:text-fuchsia-400" />
+            <span className="opacity-90">{feature.title}</span>
           </li>
         ))}
       </ul>
@@ -528,7 +537,7 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
         <div>
           <div className="text-xs opacity-60">شروع قیمت از</div>
           <div className="mt-1 whitespace-nowrap text-2xl font-extrabold">
-            {formatPrice(service.price)}
+            {formatPrice(product.price)}
             <span className="me-1 text-sm font-medium opacity-70"> تومان</span>
           </div>
         </div>
@@ -536,7 +545,7 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
           asChild
           className="rounded-2xl bg-gray-900 px-4 py-2 text-sm text-white shadow-sm transition hover:opacity-90 dark:bg-white dark:text-gray-900"
         >
-          <Link href="/store">
+          <Link href={`/store?product=${encodeURIComponent(product.slug)}`}>
             ثبت سفارش
             <ChevronLeft className="size-4" />
           </Link>
@@ -544,6 +553,39 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 w-full origin-left scale-x-0 bg-gradient-to-l from-fuchsia-500 to-indigo-500 transition-transform duration-300 group-hover:scale-x-100" />
     </article>
+  );
+}
+
+function ServiceCardSkeleton() {
+  return (
+    <Card
+      aria-hidden="true"
+      className="min-h-64 animate-pulse rounded-3xl border-gray-200/70 bg-white/90 p-5 shadow-sm dark:border-gray-800/70 dark:bg-gray-900/90"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-3">
+          <div className="h-5 w-28 rounded-full bg-gray-200 dark:bg-gray-800" />
+          <div className="h-3 w-full rounded-full bg-gray-200 dark:bg-gray-800" />
+          <div className="h-3 w-3/4 rounded-full bg-gray-200 dark:bg-gray-800" />
+        </div>
+        <div className="size-10 rounded-2xl bg-gray-200 dark:bg-gray-800" />
+      </div>
+      <div className="mt-6 space-y-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div className="flex items-center gap-2" key={index}>
+            <div className="size-4 rounded-full bg-gray-200 dark:bg-gray-800" />
+            <div className="h-3 w-36 rounded-full bg-gray-200 dark:bg-gray-800" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-7 flex items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="h-3 w-20 rounded-full bg-gray-200 dark:bg-gray-800" />
+          <div className="h-7 w-32 rounded-full bg-gray-200 dark:bg-gray-800" />
+        </div>
+        <div className="h-10 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800" />
+      </div>
+    </Card>
   );
 }
 

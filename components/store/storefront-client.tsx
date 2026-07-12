@@ -2,32 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  ArrowRight,
+  CheckCircle,
   CheckCircle2,
   ClipboardList,
   Loader2,
-  Package,
+  ReceiptText,
   ShoppingCart,
   WalletCards,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import type { Order, Product, ProductField } from "@/types/api";
 
 type FieldValues = Record<string, string>;
-
-const productTypeLabels: Record<Product["type"], string> = {
-  CUSTOM_FORM: "فرم اختصاصی",
-  INSTANT_DELIVERY: "تحویل فوری",
-};
 
 function formatCurrency(amount: number) {
   return `${new Intl.NumberFormat("fa-IR").format(amount)} تومان`;
@@ -121,6 +117,8 @@ function apiErrorMessage(error: unknown) {
 }
 
 export function StorefrontClient() {
+  const searchParams = useSearchParams();
+  const requestedProduct = searchParams.get("product") ?? "";
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [fieldValues, setFieldValues] = useState<FieldValues>({});
@@ -143,7 +141,10 @@ export function StorefrontClient() {
         }
 
         setProducts(result.products);
-        setSelectedProductId((current) => current || result.products[0]?.id || "");
+        const product = result.products.find(
+          (item) => item.slug === requestedProduct || item.id === requestedProduct,
+        );
+        setSelectedProductId(product?.id ?? "");
       })
       .catch(() => {
         if (active) {
@@ -159,7 +160,7 @@ export function StorefrontClient() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [requestedProduct]);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -172,15 +173,6 @@ export function StorefrontClient() {
   );
 
   const totalAmount = selectedProduct ? selectedProduct.price * quantity : 0;
-
-  function selectProduct(product: Product) {
-    setSelectedProductId(product.id);
-    setFieldValues({});
-    setQuantity(1);
-    setNote("");
-    setCreatedOrder(null);
-    setSubmitError("");
-  }
 
   function updateFieldValue(key: string, value: string) {
     setFieldValues((current) => ({ ...current, [key]: value }));
@@ -264,9 +256,12 @@ export function StorefrontClient() {
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">فروشگاه</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-bold">
+              <ReceiptText className="size-6" />
+              صورت‌حساب
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              محصول را انتخاب کنید و سفارش را با موجودی کیف پول ثبت کنید.
+              جزئیات محصول را بررسی کنید و سفارش را با موجودی کیف پول ثبت کنید.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -280,29 +275,75 @@ export function StorefrontClient() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
           <section className="space-y-4">
             {loading ? (
-              <Card className="flex min-h-48 items-center justify-center p-6 text-sm text-muted-foreground">
-                <Loader2 className="ms-2 size-4 animate-spin" />
-                در حال دریافت محصولات...
+              <Card className="min-h-72 animate-pulse space-y-5 p-6">
+                <div className="h-6 w-40 rounded-full bg-muted" />
+                <div className="space-y-3">
+                  <div className="h-4 w-full rounded-full bg-muted" />
+                  <div className="h-4 w-3/4 rounded-full bg-muted" />
+                </div>
+                <div className="space-y-3 pt-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div className="flex items-center gap-2" key={index}>
+                      <div className="size-5 rounded-full bg-muted" />
+                      <div className="h-4 w-36 rounded-full bg-muted" />
+                    </div>
+                  ))}
+                </div>
               </Card>
             ) : loadError ? (
               <Card className="flex items-center gap-2 border-rose-200 bg-rose-50 p-5 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
                 <AlertCircle className="size-4" />
                 {loadError}
               </Card>
-            ) : products.length ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    selected={product.id === selectedProductId}
-                    onSelect={() => selectProduct(product)}
-                  />
-                ))}
-              </div>
+            ) : selectedProduct ? (
+              <Card className="overflow-hidden">
+                <div className="border-b border-border bg-muted/30 p-6">
+                  <p className="text-xs font-medium text-muted-foreground">محصول انتخاب‌شده</p>
+                  <h2 className="mt-2 text-2xl font-bold">{selectedProduct.title}</h2>
+                  {selectedProduct.description ? (
+                    <p className="mt-3 max-w-2xl text-sm/7 text-muted-foreground">
+                      {selectedProduct.description}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="p-6">
+                  {selectedProduct.features?.length ? (
+                    <div>
+                      <h3 className="text-sm font-bold">ویژگی‌های محصول</h3>
+                      <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {selectedProduct.features.map((feature) => (
+                          <li className="flex items-center gap-2 text-sm" key={feature.id}>
+                            <CheckCircle className="size-4 shrink-0 text-emerald-500" />
+                            {feature.title}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-border pt-5">
+                    <div>
+                      <p className="text-xs text-muted-foreground">قیمت واحد</p>
+                      <p className="mt-1 text-xl font-bold">{formatCurrency(selectedProduct.price)}</p>
+                    </div>
+                    <Button asChild variant="outline">
+                      <Link href="/#services">
+                        <ArrowRight className="size-4" />
+                        انتخاب محصول دیگر
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </Card>
             ) : (
-              <Card className="p-5 text-sm text-muted-foreground">
-                محصول فعالی برای نمایش وجود ندارد.
+              <Card className="p-6 text-center">
+                <AlertCircle className="mx-auto size-8 text-muted-foreground" />
+                <h2 className="mt-3 font-bold">محصول انتخاب‌شده پیدا نشد</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  ممکن است محصول غیرفعال شده باشد یا لینکی که باز کرده‌اید کامل نباشد.
+                </p>
+                <Button asChild className="mt-5">
+                  <Link href="/#services">بازگشت به محصولات</Link>
+                </Button>
               </Card>
             )}
           </section>
@@ -310,11 +351,11 @@ export function StorefrontClient() {
           <Card className="lg:sticky lg:top-6">
             <form className="space-y-5 p-5" onSubmit={handleSubmit}>
               <div>
-                <h2 className="text-base font-bold">ثبت سفارش</h2>
+                <h2 className="text-base font-bold">جزئیات صورت‌حساب</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {selectedProduct
                     ? selectedProduct.title
-                    : "ابتدا یک محصول انتخاب کنید."}
+                    : loading ? "در حال آماده‌سازی..." : "محصولی انتخاب نشده است."}
                 </p>
               </div>
 
@@ -400,7 +441,7 @@ export function StorefrontClient() {
                 </>
               ) : (
                 <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  بعد از دریافت محصولات، فرم سفارش اینجا نمایش داده می‌شود.
+                  از صفحهٔ اصلی محصول موردنظر را انتخاب کنید تا صورت‌حساب آن اینجا نمایش داده شود.
                 </div>
               )}
             </form>
@@ -408,67 +449,6 @@ export function StorefrontClient() {
         </div>
       </div>
     </main>
-  );
-}
-
-function ProductCard({
-  product,
-  selected,
-  onSelect,
-}: {
-  product: Product;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const availableItems = product.deliveryPool?._count?.items;
-
-  return (
-    <Card
-      className={cn(
-        "overflow-hidden transition-colors",
-        selected && "border-primary bg-primary/5",
-      )}
-    >
-      <button
-        aria-pressed={selected}
-        className="block h-full w-full p-5 text-right"
-        type="button"
-        onClick={onSelect}
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-bold">{product.title}</h2>
-              <Badge variant={selected ? "default" : "secondary"}>
-                {productTypeLabels[product.type]}
-              </Badge>
-            </div>
-            {product.description ? (
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                {product.description}
-              </p>
-            ) : null}
-          </div>
-          <span className="grid size-10 shrink-0 place-items-center rounded-md bg-muted">
-            <Package className="size-5 text-muted-foreground" />
-          </span>
-        </div>
-
-        <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground">قیمت</p>
-            <p className="mt-1 text-lg font-bold">{formatCurrency(product.price)}</p>
-          </div>
-          <div className="text-left text-xs text-muted-foreground">
-            {product.category?.title ? <p>{product.category.title}</p> : null}
-            {product.type === "INSTANT_DELIVERY" &&
-            typeof availableItems === "number" ? (
-              <p className="mt-1">{availableItems} آماده تحویل</p>
-            ) : null}
-          </div>
-        </div>
-      </button>
-    </Card>
   );
 }
 

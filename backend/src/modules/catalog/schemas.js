@@ -12,6 +12,11 @@ export const productFieldInputSchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
+export const productFeatureInputSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  sortOrder: z.number().int().default(0),
+});
+
 export const createProductSchema = z.object({
   slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/),
   title: z.string().trim().min(2).max(180),
@@ -22,12 +27,14 @@ export const createProductSchema = z.object({
   deliveryPoolId: z.string().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
+  features: z.array(productFeatureInputSchema).max(12).default([]),
   fields: z.array(productFieldInputSchema).default([]),
 });
 
 export const updateProductSchema = createProductSchema
   .partial()
   .extend({
+    features: z.array(productFeatureInputSchema).max(12).optional(),
     fields: z.array(productFieldInputSchema).optional(),
   });
 

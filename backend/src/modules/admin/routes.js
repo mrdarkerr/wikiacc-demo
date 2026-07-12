@@ -157,6 +157,7 @@ export async function adminRoutes(app) {
       include: {
         category: true,
         deliveryPool: true,
+        features: { orderBy: { sortOrder: "asc" } },
         fields: { orderBy: { sortOrder: "asc" } },
         _count: { select: { orderItems: true } },
       },
@@ -180,12 +181,20 @@ export async function adminRoutes(app) {
         deliveryPoolId: input.deliveryPoolId,
         isActive: input.isActive,
         sortOrder: input.sortOrder,
+        features: input.features.length
+          ? { create: input.features }
+          : undefined,
         fields:
           input.type === "CUSTOM_FORM" && input.fields.length
             ? { create: input.fields }
             : undefined,
       },
-      include: { fields: true, category: true, deliveryPool: true },
+      include: {
+        fields: true,
+        features: { orderBy: { sortOrder: "asc" } },
+        category: true,
+        deliveryPool: true,
+      },
     });
 
     return created(reply, { product });
@@ -218,6 +227,10 @@ export async function adminRoutes(app) {
         await tx.productField.deleteMany({ where: { productId: params.id } });
       }
 
+      if (input.features) {
+        await tx.productFeature.deleteMany({ where: { productId: params.id } });
+      }
+
       return tx.product.update({
         where: { id: params.id },
         data: {
@@ -230,12 +243,21 @@ export async function adminRoutes(app) {
           deliveryPoolId: input.deliveryPoolId,
           isActive: input.isActive,
           sortOrder: input.sortOrder,
+          features:
+            input.features && input.features.length
+              ? { create: input.features }
+              : undefined,
           fields:
             input.fields && input.fields.length
               ? { create: input.fields }
               : undefined,
         },
-        include: { fields: true, category: true, deliveryPool: true },
+        include: {
+          fields: true,
+          features: { orderBy: { sortOrder: "asc" } },
+          category: true,
+          deliveryPool: true,
+        },
       });
     });
 

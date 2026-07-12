@@ -27,6 +27,7 @@ export function listActiveProducts(prisma, filters = {}) {
           },
         },
       },
+      features: { orderBy: { sortOrder: "asc" } },
       fields: { orderBy: { sortOrder: "asc" } },
     },
     orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
@@ -47,6 +48,7 @@ export function findActiveProductBySlug(prisma, slug) {
           },
         },
       },
+      features: { orderBy: { sortOrder: "asc" } },
       fields: { orderBy: { sortOrder: "asc" } },
     },
   });

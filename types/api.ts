@@ -58,6 +58,12 @@ export type ProductField = {
   sortOrder: number;
 };
 
+export type ProductFeature = {
+  id: string;
+  title: string;
+  sortOrder: number;
+};
+
 export type ProductCategory = {
   id: string;
   slug: string;
@@ -87,6 +93,7 @@ export type Product = {
   sortOrder: number;
   category?: ProductCategory | null;
   deliveryPool?: DeliveryPoolSummary | null;
+  features: ProductFeature[];
   fields: ProductField[];
 };
 
@@ -304,6 +311,11 @@ export type CreateAdminProductFieldRequest = {
   sortOrder?: number;
 };
 
+export type CreateAdminProductFeatureRequest = {
+  title: string;
+  sortOrder?: number;
+};
+
 export type CreateAdminProductRequest = {
   slug: string;
   title: string;
@@ -314,6 +326,7 @@ export type CreateAdminProductRequest = {
   deliveryPoolId?: string;
   isActive?: boolean;
   sortOrder?: number;
+  features?: CreateAdminProductFeatureRequest[];
   fields?: CreateAdminProductFieldRequest[];
 };
 
