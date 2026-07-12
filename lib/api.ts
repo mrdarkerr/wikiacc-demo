@@ -262,6 +262,10 @@ export const api = {
           body,
           method: "PATCH",
         }),
+      remove: (id: string) =>
+        apiFetch<{ categoryId: string }>(`/admin/categories/${id}`, {
+          method: "DELETE",
+        }),
     },
     products: {
       list: () => apiFetch<{ products: Product[] }>("/admin/products"),
@@ -280,6 +284,11 @@ export const api = {
           body,
           method: "PATCH",
         }),
+      remove: (id: string) =>
+        apiFetch<
+          | { action: "ARCHIVED"; product: Product }
+          | { action: "DELETED"; productId: string }
+        >(`/admin/products/${id}`, { method: "DELETE" }),
     },
     deliveryPools: {
       list: () =>

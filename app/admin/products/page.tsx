@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Power, Search, Tags } from "lucide-react";
+import {
+  Archive,
+  Pencil,
+  Plus,
+  Power,
+  RotateCcw,
+  Search,
+  Tags,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import {
   formatCurrency,
@@ -14,6 +24,7 @@ import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DialogOverlay } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
@@ -40,6 +51,7 @@ export default function AdminProductsPage() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<ProductTypeFilter>("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   async function loadData() {
     const [productsResult, categoriesResult] = await Promise.all([
@@ -97,10 +109,61 @@ export default function AdminProductsPage() {
     }
   }
 
+  async function removeProduct(product: Product) {
+    const hasOrders = (product._count?.orderItems ?? 0) > 0;
+    const confirmed = window.confirm(
+      hasOrders
+        ? `محصول «${product.title}» سابقه خرید دارد و حذف نمی‌شود. آن را آرشیو می‌کنید؟`
+        : `محصول «${product.title}» برای همیشه حذف شود؟`,
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      const result = await api.admin.products.remove(product.id);
+      await loadData();
+      setMessage(
+        result.action === "ARCHIVED"
+          ? "محصول به دلیل داشتن سابقه خرید آرشیو شد."
+          : "محصول حذف شد.",
+      );
+      setError("");
+    } catch (removeError) {
+      setError(errorMessage(removeError));
+      setMessage("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function restoreProduct(product: Product) {
+    setSaving(true);
+    try {
+      await api.admin.products.setActive(product.id, { isActive: true });
+      await loadData();
+      setMessage("محصول از آرشیو خارج و فعال شد.");
+      setError("");
+    } catch (restoreError) {
+      setError(errorMessage(restoreError));
+      setMessage("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const archivedProducts = useMemo(
+    () => products.filter((product) => Boolean(product.archivedAt)),
+    [products],
+  );
+  const currentProducts = useMemo(
+    () => products.filter((product) => !product.archivedAt),
+    [products],
+  );
+
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return products.filter((product) => {
+    return currentProducts.filter((product) => {
       const matchesQuery = normalizedQuery
         ? [product.title, product.slug, product.category?.title]
             .filter(Boolean)
@@ -117,7 +180,7 @@ export default function AdminProductsPage() {
 
       return matchesQuery && matchesType && matchesCategory;
     });
-  }, [categoryFilter, products, query, typeFilter]);
+  }, [categoryFilter, currentProducts, query, typeFilter]);
 
   const productsTotalPages = Math.max(
     1,
@@ -127,11 +190,11 @@ export default function AdminProductsPage() {
     (productsPage - 1) * PRODUCTS_PER_PAGE,
     productsPage * PRODUCTS_PER_PAGE,
   );
-  const activeCount = products.filter((product) => product.isActive).length;
-  const customFormCount = products.filter(
+  const activeCount = currentProducts.filter((product) => product.isActive).length;
+  const customFormCount = currentProducts.filter(
     (product) => product.type === "CUSTOM_FORM",
   ).length;
-  const instantDeliveryCount = products.filter(
+  const instantDeliveryCount = currentProducts.filter(
     (product) => product.type === "INSTANT_DELIVERY",
   ).length;
 
@@ -160,6 +223,10 @@ export default function AdminProductsPage() {
       <AdminSection
         action={
           <div className="flex flex-wrap gap-2">
+            <Button size="sm" type="button" variant="outline" onClick={() => setArchiveOpen(true)}>
+              <Archive className="size-4" />
+              آرشیو محصولات ({archivedProducts.length})
+            </Button>
             <Button asChild size="sm" variant="outline">
               <Link href="/admin/products/categories">
                 <Tags className="size-4" />
@@ -246,6 +313,9 @@ export default function AdminProductsPage() {
                       {product.category?.title ?? "بدون دسته بندی"}
                     </Badge>
                     <Badge variant="outline">{product.fields.length} فیلد</Badge>
+                    <Badge variant="outline">
+                      {product._count?.orderItems ?? 0} خرید
+                    </Badge>
                   </div>
                   <p className="mt-3 text-sm font-semibold">
                     {formatCurrency(product.price)}
@@ -266,6 +336,22 @@ export default function AdminProductsPage() {
                     >
                       <Power className="size-4" />
                       {product.isActive ? "غیرفعال" : "فعال"}
+                    </Button>
+                    <Button
+                      disabled={saving}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={() => removeProduct(product)}
+                    >
+                      {(product._count?.orderItems ?? 0) > 0 ? (
+                        <Archive className="size-4" />
+                      ) : (
+                        <Trash2 className="size-4" />
+                      )}
+                      {(product._count?.orderItems ?? 0) > 0
+                        ? "آرشیو"
+                        : "حذف"}
                     </Button>
                   </div>
                 </article>
@@ -325,6 +411,22 @@ export default function AdminProductsPage() {
                             <Power className="size-4" />
                             {product.isActive ? "غیرفعال" : "فعال"}
                           </Button>
+                          <Button
+                            disabled={saving}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            onClick={() => removeProduct(product)}
+                          >
+                            {(product._count?.orderItems ?? 0) > 0 ? (
+                              <Archive className="size-4" />
+                            ) : (
+                              <Trash2 className="size-4" />
+                            )}
+                            {(product._count?.orderItems ?? 0) > 0
+                              ? "آرشیو"
+                              : "حذف"}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -344,6 +446,75 @@ export default function AdminProductsPage() {
           <AdminState>محصولی با این فیلترها پیدا نشد.</AdminState>
         )}
       </AdminSection>
+
+      {archiveOpen ? (
+        <DialogOverlay
+          ariaLabel="محصولات آرشیوشده"
+          contentClassName="max-w-3xl"
+          onClose={() => setArchiveOpen(false)}
+        >
+          <section
+            className="max-h-[calc(100dvh-2rem)] overflow-hidden rounded-lg border border-border bg-card shadow-xl"
+            dir="rtl"
+          >
+            <header className="flex items-center justify-between gap-4 border-b border-border p-4 sm:p-5">
+              <div>
+                <h2 className="text-lg font-bold">محصولات آرشیوشده</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  این محصولات در فروشگاه نمایش داده نمی‌شوند و سابقه خریدشان محفوظ است.
+                </p>
+              </div>
+              <Button
+                aria-label="بستن"
+                size="icon"
+                type="button"
+                variant="ghost"
+                onClick={() => setArchiveOpen(false)}
+              >
+                <X className="size-5" />
+              </Button>
+            </header>
+            <div className="max-h-[calc(100dvh-9rem)] overflow-y-auto p-4 sm:p-5">
+              {archivedProducts.length ? (
+                <div className="space-y-3">
+                  {archivedProducts.map((product) => (
+                    <article
+                      className="flex flex-col gap-4 rounded-lg border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
+                      key={product.id}
+                    >
+                      <div className="min-w-0">
+                        <h3 className="font-bold">{product.title}</h3>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline">{productTypeLabel(product.type)}</Badge>
+                          <Badge variant="outline">
+                            {product._count?.orderItems ?? 0} خرید
+                          </Badge>
+                          <Badge variant="outline">
+                            {product.category?.title ?? "بدون دسته بندی"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <Button
+                        className="shrink-0"
+                        disabled={saving}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={() => restoreProduct(product)}
+                      >
+                        <RotateCcw className="size-4" />
+                        بازگردانی و فعال‌سازی
+                      </Button>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <AdminState>محصول آرشیوشده‌ای وجود ندارد.</AdminState>
+              )}
+            </div>
+          </section>
+        </DialogOverlay>
+      ) : null}
     </div>
   );
 }

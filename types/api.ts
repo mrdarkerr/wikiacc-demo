@@ -71,6 +71,9 @@ export type ProductCategory = {
   description?: string | null;
   isActive: boolean;
   sortOrder: number;
+  _count?: {
+    products?: number;
+  };
 };
 
 export type DeliveryPoolSummary = {
@@ -90,11 +93,15 @@ export type Product = {
   type: ProductType;
   price: number;
   isActive: boolean;
+  archivedAt?: string | null;
   sortOrder: number;
   category?: ProductCategory | null;
   deliveryPool?: DeliveryPoolSummary | null;
   features: ProductFeature[];
   fields: ProductField[];
+  _count?: {
+    orderItems?: number;
+  };
 };
 
 export type OrderStatus =

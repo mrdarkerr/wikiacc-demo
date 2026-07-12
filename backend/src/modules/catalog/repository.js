@@ -9,6 +9,7 @@ export function listActiveProducts(prisma, filters = {}) {
   return prisma.product.findMany({
     where: {
       isActive: true,
+      archivedAt: null,
       ...(filters.categorySlug
         ? { category: { slug: filters.categorySlug, isActive: true } }
         : {}),
@@ -36,7 +37,7 @@ export function listActiveProducts(prisma, filters = {}) {
 
 export function findActiveProductBySlug(prisma, slug) {
   return prisma.product.findFirst({
-    where: { slug, isActive: true },
+    where: { slug, isActive: true, archivedAt: null },
     include: {
       category: true,
       deliveryPool: {
@@ -56,7 +57,7 @@ export function findActiveProductBySlug(prisma, slug) {
 
 export function findProductForOrder(prisma, productId) {
   return prisma.product.findFirst({
-    where: { id: productId, isActive: true },
+    where: { id: productId, isActive: true, archivedAt: null },
     include: {
       fields: { orderBy: { sortOrder: "asc" } },
       deliveryPool: true,

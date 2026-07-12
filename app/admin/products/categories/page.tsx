@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Power, RotateCcw, Search, Save } from "lucide-react";
+import { Pencil, Plus, Power, RotateCcw, Search, Save, Trash2 } from "lucide-react";
 
 import { shortId } from "@/components/admin/admin-formatters";
 import { ProductAdminNav } from "@/components/admin/product-admin-nav";
@@ -39,6 +39,13 @@ function optionalText(value: string) {
 }
 
 function errorMessage(error: unknown) {
+  if (
+    error instanceof ApiError &&
+    error.payload?.error?.code === "CATEGORY_HAS_PRODUCTS"
+  ) {
+    return "این دسته‌بندی به محصولی متصل است و تا زمانی که اتصال آن حذف نشود، قابل حذف نیست.";
+  }
+
   return error instanceof ApiError
     ? error.message
     : "عملیات دسته بندی انجام نشد.";
@@ -147,6 +154,36 @@ export default function AdminProductCategoriesPage() {
       setError("");
     } catch (updateError) {
       setError(errorMessage(updateError));
+      setMessage("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeCategory(category: ProductCategory) {
+    const productCount = category._count?.products ?? 0;
+    if (productCount > 0) {
+      setError(
+        `این دسته‌بندی به ${productCount} محصول متصل است و قابل حذف نیست.`,
+      );
+      setMessage("");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `دسته‌بندی «${category.title}» برای همیشه حذف شود؟`,
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      await api.admin.categories.remove(category.id);
+      if (editingCategoryId === category.id) resetCategoryForm();
+      await loadCategories();
+      setMessage("دسته‌بندی حذف شد.");
+      setError("");
+    } catch (removeError) {
+      setError(errorMessage(removeError));
       setMessage("");
     } finally {
       setSaving(false);
@@ -333,6 +370,9 @@ export default function AdminProductCategoriesPage() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge variant="outline">ترتیب {category.sortOrder}</Badge>
                     <Badge variant="secondary">{shortId(category.id)}</Badge>
+                    <Badge variant="outline">
+                      {category._count?.products ?? 0} محصول
+                    </Badge>
                   </div>
                   {category.description ? (
                     <p className="mt-3 text-sm text-muted-foreground">
@@ -358,6 +398,16 @@ export default function AdminProductCategoriesPage() {
                     >
                       <Power className="size-4" />
                       {category.isActive ? "غیرفعال" : "فعال"}
+                    </Button>
+                    <Button
+                      disabled={saving}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={() => removeCategory(category)}
+                    >
+                      <Trash2 className="size-4" />
+                      حذف
                     </Button>
                   </div>
                 </article>
@@ -413,6 +463,16 @@ export default function AdminProductCategoriesPage() {
                           >
                             <Power className="size-4" />
                             {category.isActive ? "غیرفعال" : "فعال"}
+                          </Button>
+                          <Button
+                            disabled={saving}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            onClick={() => removeCategory(category)}
+                          >
+                            <Trash2 className="size-4" />
+                            حذف
                           </Button>
                         </div>
                       </td>

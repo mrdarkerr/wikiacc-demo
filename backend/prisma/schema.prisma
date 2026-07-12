@@ -119,11 +119,12 @@ model Product {
   type           ProductType
   price          Int
   isActive       Boolean          @default(true)
+  archivedAt     DateTime?
   sortOrder      Int              @default(0)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  @@index([type, isActive, sortOrder])
+  @@index([type, isActive, archivedAt, sortOrder])
 }
 
 model ProductFeature {

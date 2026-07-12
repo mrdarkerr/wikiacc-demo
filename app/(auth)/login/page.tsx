@@ -109,9 +109,6 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold leading-tight">
               داشبورد سفارش، تیکت و کیف پول ویکی اکانت
             </h1>
-            <p className="mt-4 text-sm leading-7 text-muted-foreground">
-              ورود با session cookie انجام می شود؛ توکن در localStorage ذخیره نمی شود.
-            </p>
           </div>
         </section>
 

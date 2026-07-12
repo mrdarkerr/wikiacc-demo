@@ -1,4 +1,4 @@
-import { badRequest, notFound } from "../../shared/errors.js";
+import { badRequest, conflict, notFound } from "../../shared/errors.js";
 import { created, ok } from "../../shared/http/reply.js";
 import { parse } from "../../shared/validation/parse.js";
 import {
@@ -145,8 +145,32 @@ export async function adminRoutes(app) {
     return ok(reply, { category });
   });
 
+  app.delete("/categories/:id", async (request, reply) => {
+    const params = parse(idParamsSchema, request.params);
+    const category = await app.prisma.productCategory.findUnique({
+      where: { id: params.id },
+      include: { _count: { select: { products: true } } },
+    });
+
+    if (!category) {
+      throw notFound("CATEGORY_NOT_FOUND", "Category was not found");
+    }
+
+    if (category._count.products > 0) {
+      throw conflict(
+        "CATEGORY_HAS_PRODUCTS",
+        "Category is connected to one or more products",
+        { productCount: category._count.products },
+      );
+    }
+
+    await app.prisma.productCategory.delete({ where: { id: params.id } });
+    return ok(reply, { categoryId: params.id });
+  });
+
   app.get("/categories", async (request, reply) => {
     const categories = await app.prisma.productCategory.findMany({
+      include: { _count: { select: { products: true } } },
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
     });
     return ok(reply, { categories });
@@ -269,9 +293,36 @@ export async function adminRoutes(app) {
     const input = parse(setActiveSchema, request.body);
     const product = await app.prisma.product.update({
       where: { id: params.id },
-      data: { isActive: input.isActive },
+      data: {
+        isActive: input.isActive,
+        ...(input.isActive ? { archivedAt: null } : {}),
+      },
     });
     return ok(reply, { product });
+  });
+
+  app.delete("/products/:id", async (request, reply) => {
+    const params = parse(idParamsSchema, request.params);
+    const current = await findProductOrThrow(app.prisma, params.id);
+
+    if (current._count.orderItems > 0) {
+      const product = await app.prisma.product.update({
+        where: { id: params.id },
+        data: { archivedAt: new Date(), isActive: false },
+        include: {
+          category: true,
+          deliveryPool: true,
+          features: { orderBy: { sortOrder: "asc" } },
+          fields: { orderBy: { sortOrder: "asc" } },
+          _count: { select: { orderItems: true } },
+        },
+      });
+
+      return ok(reply, { action: "ARCHIVED", product });
+    }
+
+    await app.prisma.product.delete({ where: { id: params.id } });
+    return ok(reply, { action: "DELETED", productId: params.id });
   });
 
   app.get("/delivery-pools", async (request, reply) => {

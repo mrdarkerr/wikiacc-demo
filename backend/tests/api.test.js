@@ -287,4 +287,93 @@ describe("wikiacc backend api", () => {
     expect(ticket.user.email).toBe("user@test.local");
     expect(ticket.messages[0].body).toBe("Please check my order.");
   });
+
+  it("deletes a product immediately when it has no orders", async () => {
+    const product = await app.prisma.product.create({
+      data: {
+        slug: "unused-product",
+        title: "Unused Product",
+        type: "CUSTOM_FORM",
+        price: 10,
+      },
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/products/${product.id}`,
+      headers: { cookie: adminCookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.action).toBe("DELETED");
+    expect(
+      await app.prisma.product.findUnique({ where: { id: product.id } }),
+    ).toBeNull();
+  });
+
+  it("archives a purchased product and allows restoring it", async () => {
+    const archiveResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/products/${customProduct.id}`,
+      headers: { cookie: adminCookie },
+    });
+
+    expect(archiveResponse.statusCode).toBe(200);
+    expect(archiveResponse.json().data.action).toBe("ARCHIVED");
+    expect(archiveResponse.json().data.product.isActive).toBe(false);
+    expect(archiveResponse.json().data.product.archivedAt).toBeTruthy();
+
+    const catalogResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/products",
+    });
+    expect(
+      catalogResponse
+        .json()
+        .data.products.some((product) => product.id === customProduct.id),
+    ).toBe(false);
+
+    const restoreResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/admin/products/${customProduct.id}/active`,
+      headers: { cookie: adminCookie },
+      payload: { isActive: true },
+    });
+
+    expect(restoreResponse.statusCode).toBe(200);
+    expect(restoreResponse.json().data.product.isActive).toBe(true);
+    expect(restoreResponse.json().data.product.archivedAt).toBeNull();
+  });
+
+  it("only deletes a category when no product is connected", async () => {
+    const category = await app.prisma.productCategory.create({
+      data: { slug: "connected-category", title: "Connected Category" },
+    });
+    await app.prisma.product.update({
+      where: { id: instantProduct.id },
+      data: { categoryId: category.id },
+    });
+
+    const blockedResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/categories/${category.id}`,
+      headers: { cookie: adminCookie },
+    });
+
+    expect(blockedResponse.statusCode).toBe(409);
+    expect(blockedResponse.json().error.code).toBe("CATEGORY_HAS_PRODUCTS");
+
+    await app.prisma.product.update({
+      where: { id: instantProduct.id },
+      data: { categoryId: null },
+    });
+    const deletedResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/categories/${category.id}`,
+      headers: { cookie: adminCookie },
+    });
+
+    expect(deletedResponse.statusCode).toBe(200);
+    expect(deletedResponse.json().data.categoryId).toBe(category.id);
+  });
 });
