@@ -9,11 +9,9 @@ import {
   CreditCard,
   Headphones,
   Info,
-  LogIn,
   Menu,
   Search,
   ShieldCheck,
-  ShoppingCart,
   ScrollText,
   Star,
   X,
@@ -251,27 +249,6 @@ export default function Home() {
                   {product.title}
                 </button>
               ))}
-            </div>
-            <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button
-                asChild
-                className="w-full rounded-2xl bg-gray-900 px-5 py-2.5 text-sm text-white shadow-md transition hover:opacity-90 dark:bg-white dark:text-gray-900 sm:w-auto"
-              >
-                <Link href="#services">
-                  <ShoppingCart className="size-4" />
-                  شروع خرید
-                </Link>
-              </Button>
-              <Button
-                asChild
-                className="w-full rounded-2xl border-white/60 bg-white/75 px-5 py-2.5 text-sm text-gray-900 shadow-sm backdrop-blur-md transition hover:bg-white/90 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 sm:w-auto"
-                variant="outline"
-              >
-                <Link href="/login">
-                  <LogIn className="size-4" />
-                  ورود / ثبت‌نام
-                </Link>
-              </Button>
             </div>
           </div>
 
