@@ -47,6 +47,7 @@ describe("wikiacc backend api", () => {
   let userCookie;
   let userId;
   let instantProduct;
+  let emptyInstantProduct;
   let customProduct;
   let initialSiteContent;
   let siteContentDraft;
@@ -83,6 +84,23 @@ describe("wikiacc backend api", () => {
         type: "INSTANT_DELIVERY",
         price: 100,
         deliveryPoolId: pool.id,
+      },
+    });
+
+    const emptyPool = await app.prisma.deliveryPool.create({
+      data: {
+        slug: "empty-pool",
+        title: "Empty Pool",
+      },
+    });
+
+    emptyInstantProduct = await app.prisma.product.create({
+      data: {
+        slug: "empty-product",
+        title: "Empty Product",
+        type: "INSTANT_DELIVERY",
+        price: 100,
+        deliveryPoolId: emptyPool.id,
       },
     });
 
@@ -143,6 +161,24 @@ describe("wikiacc backend api", () => {
       "Fast activation",
       "Supported",
     ]);
+  });
+
+  it("returns available delivery inventory for invoice availability", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/products",
+    });
+
+    expect(response.statusCode).toBe(200);
+    const products = response.json().data.products;
+    expect(
+      products.find((product) => product.id === instantProduct.id).deliveryPool
+        ._count.items,
+    ).toBe(2);
+    expect(
+      products.find((product) => product.id === emptyInstantProduct.id).deliveryPool
+        ._count.items,
+    ).toBe(0);
   });
 
   it("allows CORS preflight for PATCH admin actions", async () => {
@@ -696,6 +732,30 @@ describe("wikiacc backend api", () => {
     expect(reset.content.hero.title).toBe("Private draft homepage title");
     expect(reset.draftVersion).toBe(saved.draftVersion + 1);
     expect(reset.hasUnpublishedChanges).toBe(false);
+  });
+
+  it("blocks an empty delivery pool without charging the wallet", async () => {
+    const walletBefore = await app.prisma.wallet.findUnique({ where: { userId } });
+    const orderCountBefore = await app.prisma.order.count({ where: { userId } });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: emptyInstantProduct.id,
+        quantity: 1,
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe("OUT_OF_STOCK");
+    expect(await app.prisma.wallet.findUnique({ where: { userId } })).toMatchObject({
+      balance: walletBefore.balance,
+    });
+    expect(await app.prisma.order.count({ where: { userId } })).toBe(
+      orderCountBefore,
+    );
   });
 
   it("creates an instant delivery order and consumes one ready item", async () => {

@@ -176,6 +176,13 @@ export function StorefrontClient() {
     [createdOrder],
   );
 
+  const availableDeliveryItems = selectedProduct?.deliveryPool?._count?.items;
+  const isUnavailable =
+    Boolean(selectedProduct?.deliveryPool) && availableDeliveryItems === 0;
+  const hasInsufficientDeliveryStock =
+    typeof availableDeliveryItems === "number" &&
+    availableDeliveryItems > 0 &&
+    quantity > availableDeliveryItems;
   const totalAmount = selectedProduct ? selectedProduct.price * quantity : 0;
 
   function updateFieldValue(key: string, value: string) {
@@ -186,6 +193,16 @@ export function StorefrontClient() {
     event.preventDefault();
 
     if (!selectedProduct) {
+      return;
+    }
+
+    if (isUnavailable) {
+      setSubmitError("این محصول ناموجود است و در حال حاضر امکان خرید آن وجود ندارد.");
+      return;
+    }
+
+    if (hasInsufficientDeliveryStock) {
+      setSubmitError("موجودی تحویل برای تعداد انتخاب‌شده کافی نیست.");
       return;
     }
 
@@ -312,7 +329,14 @@ export function StorefrontClient() {
               <Card className="overflow-hidden">
                 <div className="border-b border-border bg-muted/30 p-6">
                   <p className="text-xs font-medium text-muted-foreground">محصول انتخاب‌شده</p>
-                  <h2 className="mt-2 text-2xl font-bold">{selectedProduct.title}</h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <h2 className="text-2xl font-bold">{selectedProduct.title}</h2>
+                    {isUnavailable ? (
+                      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700 dark:bg-rose-950/50 dark:text-rose-200">
+                        ناموجود
+                      </span>
+                    ) : null}
+                  </div>
                   {selectedProduct.description ? (
                     <p className="mt-3 max-w-2xl text-sm/7 text-muted-foreground">
                       {selectedProduct.description}
@@ -368,6 +392,23 @@ export function StorefrontClient() {
                 <div className="h-20 animate-pulse rounded-md bg-muted" />
                 <div className="h-10 animate-pulse rounded-md bg-muted" />
               </div>
+            ) : isUnavailable ? (
+              <div className="p-5">
+                <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 size-5 shrink-0" />
+                    <div>
+                      <h2 className="font-bold">ناموجود</h2>
+                      <p className="mt-1 text-sm/6">
+                        موجودی تحویل این محصول تمام شده است. تا زمان شارژ مجدد، امکان ثبت و پرداخت سفارش وجود ندارد.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <Button asChild className="mt-4 w-full" variant="outline">
+                  <Link href="/#services">انتخاب محصول دیگر</Link>
+                </Button>
+              </div>
             ) : !user ? (
               <div className="p-5">
                 <div className="mb-5 rounded-md border border-primary/20 bg-primary/5 p-4">
@@ -418,7 +459,11 @@ export function StorefrontClient() {
                       <Input
                         className="h-9 w-24 text-center"
                         id="quantity"
-                        max={10}
+                        max={
+                          typeof availableDeliveryItems === "number"
+                            ? Math.min(10, availableDeliveryItems)
+                            : 10
+                        }
                         min={1}
                         type="number"
                         value={quantity}
@@ -434,6 +479,13 @@ export function StorefrontClient() {
                       </span>
                     </div>
                   </div>
+
+                  {hasInsufficientDeliveryStock ? (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>موجودی تحویل برای تعداد انتخاب‌شده کافی نیست.</span>
+                    </div>
+                  ) : null}
 
                   {selectedProduct.type === "CUSTOM_FORM" ? (
                     <div className="space-y-4">
@@ -473,7 +525,11 @@ export function StorefrontClient() {
                     <OrderResult order={createdOrder} deliveries={orderDeliveries} />
                   ) : null}
 
-                  <Button className="w-full" disabled={submitting} type="submit">
+                  <Button
+                    className="w-full"
+                    disabled={submitting || hasInsufficientDeliveryStock}
+                    type="submit"
+                  >
                     {submitting ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : (

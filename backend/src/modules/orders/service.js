@@ -1,6 +1,14 @@
 import { findProductForOrder } from "../catalog/repository.js";
-import { allocateDeliveryItems } from "../delivery/repository.js";
-import { badRequest, notFound, paymentRequired } from "../../shared/errors.js";
+import {
+  allocateDeliveryItems,
+  getPoolAvailability,
+} from "../delivery/repository.js";
+import {
+  badRequest,
+  conflict,
+  notFound,
+  paymentRequired,
+} from "../../shared/errors.js";
 import { countUserOrders, getUserOrder, listUserOrders } from "./repository.js";
 
 function withoutAdminFields(order) {
@@ -55,6 +63,16 @@ export async function createOrder(prisma, userId, input) {
   const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
 
   const orderId = await prisma.$transaction(async (tx) => {
+    if (product.type === "INSTANT_DELIVERY") {
+      const availableItems = await getPoolAvailability(tx, product.deliveryPoolId);
+      if (availableItems < quantity) {
+        throw conflict(
+          "OUT_OF_STOCK",
+          "Not enough ready delivery items are available",
+        );
+      }
+    }
+
     const wallet = await tx.wallet.upsert({
       where: { userId },
       update: {},
