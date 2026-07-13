@@ -21,11 +21,14 @@ import type {
   CreateTicketRequest,
   LoginRequest,
   LoginResponse,
+  OtpChallenge,
+  OtpRequest,
+  OtpVerifyRequest,
   Order,
   Product,
   ProductCategory,
-  RegisterRequest,
   RefundAdminOrderRequest,
+  SetPasswordRequest,
   SetAdminProductActiveRequest,
   AdminSiteContentState,
   PublicSiteContent,
@@ -38,6 +41,7 @@ import type {
   UpdateAdminProductRequest,
   UpdateAdminSmsSettingsRequest,
   UpdateAdminTicketStatusRequest,
+  UpdateProfileRequest,
   User,
   Wallet,
   WalletSummary,
@@ -181,10 +185,19 @@ export const api = {
   auth: {
     login: (body: LoginRequest) =>
       apiFetch<LoginResponse>("/auth/login", { body, method: "POST" }),
-    register: (body: RegisterRequest) =>
-      apiFetch<LoginResponse>("/auth/register", { body, method: "POST" }),
+    requestOtp: (body: OtpRequest) =>
+      apiFetch<{ challenge: OtpChallenge }>("/auth/otp/request", {
+        body,
+        method: "POST",
+      }),
+    verifyOtp: (body: OtpVerifyRequest) =>
+      apiFetch<LoginResponse>("/auth/otp/verify", { body, method: "POST" }),
     logout: () => apiFetch<void>("/auth/logout", { method: "POST" }),
     me: () => apiFetch<{ user: User }>("/auth/me"),
+    updateProfile: (body: UpdateProfileRequest) =>
+      apiFetch<LoginResponse>("/auth/profile", { body, method: "PATCH" }),
+    setPassword: (body: SetPasswordRequest) =>
+      apiFetch<LoginResponse>("/auth/password", { body, method: "PATCH" }),
   },
   catalog: {
     categories: () => apiFetch<{ categories: ProductCategory[] }>("/categories"),

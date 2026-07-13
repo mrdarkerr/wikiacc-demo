@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Loader2,
   ReceiptText,
+  ShieldCheck,
   ShoppingCart,
   WalletCards,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { OtpAuthForm } from "@/components/auth/otp-auth-form";
 import { api, ApiError } from "@/lib/api";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
 import type { Order, Product, ProductField } from "@/types/api";
@@ -119,7 +121,7 @@ function apiErrorMessage(error: unknown) {
 
 export function StorefrontClient() {
   const searchParams = useSearchParams();
-  const { loading: authLoading, user } = useCurrentUser();
+  const { loading: authLoading, refresh: refreshUser, user } = useCurrentUser();
   const requestedProduct = searchParams.get("product") ?? "";
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -360,7 +362,37 @@ export function StorefrontClient() {
           </section>
 
           <Card className="lg:sticky lg:top-6">
-            <form className="space-y-5 p-5" onSubmit={handleSubmit}>
+            {authLoading ? (
+              <div className="space-y-4 p-5">
+                <div className="h-6 w-40 animate-pulse rounded-full bg-muted" />
+                <div className="h-20 animate-pulse rounded-md bg-muted" />
+                <div className="h-10 animate-pulse rounded-md bg-muted" />
+              </div>
+            ) : !user ? (
+              <div className="p-5">
+                <div className="mb-5 rounded-md border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
+                    <div>
+                      <h2 className="font-bold">یک قدم تا نهایی کردن خرید</h2>
+                      <p className="mt-1 text-sm/6 text-muted-foreground">
+                        نام و شماره موبایل را وارد کنید. اگر حساب دارید وارد می‌شوید و اگر ندارید همان‌جا حساب شما ساخته می‌شود.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <OtpAuthForm
+                  mode="checkout"
+                  onAuthenticated={async () => {
+                    await refreshUser();
+                  }}
+                />
+                <p className="mt-4 text-center text-xs text-muted-foreground">
+                  محصول انتخاب‌شده حفظ می‌شود و بعد از تأیید، همین صورت‌حساب نمایش داده خواهد شد.
+                </p>
+              </div>
+            ) : (
+              <form className="space-y-5 p-5" onSubmit={handleSubmit}>
               <div>
                 <h2 className="text-base font-bold">جزئیات صورت‌حساب</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -455,7 +487,8 @@ export function StorefrontClient() {
                   از صفحهٔ اصلی محصول موردنظر را انتخاب کنید تا صورت‌حساب آن اینجا نمایش داده شود.
                 </div>
               )}
-            </form>
+              </form>
+            )}
           </Card>
         </div>
       </div>

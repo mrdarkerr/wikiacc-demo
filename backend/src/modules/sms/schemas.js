@@ -23,6 +23,7 @@ export const createSmsSenderSchema = z.object({
 export const updateSmsSettingsSchema = z
   .object({
     apiKey: z.string().trim().min(8).max(512).optional(),
+    authPatternCode: z.string().trim().min(2).max(128).optional(),
     defaultSenderId: z.string().min(1).optional(),
     removeApiKey: z.boolean().optional(),
   })
@@ -32,6 +33,7 @@ export const updateSmsSettingsSchema = z
   .refine(
     (input) =>
       input.apiKey !== undefined ||
+      input.authPatternCode !== undefined ||
       input.defaultSenderId !== undefined ||
       input.removeApiKey === true,
     { message: "At least one setting must be changed" },

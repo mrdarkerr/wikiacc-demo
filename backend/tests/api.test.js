@@ -30,7 +30,9 @@ execFileSync(process.execPath, [applySchemaScript], {
 });
 
 const { buildApp } = await import("../src/app.js");
-const { sendPatternSms } = await import("../src/modules/sms/service.js");
+const { sendAuthCodeSms, sendPatternSms } = await import(
+  "../src/modules/sms/service.js"
+);
 
 function getCookie(response) {
   const raw = response.headers["set-cookie"];
@@ -49,9 +51,17 @@ describe("wikiacc backend api", () => {
   let initialSiteContent;
   let siteContentDraft;
   let siteContentDraftVersion;
+  let latestOtpCode;
+  const sentOtpMessages = [];
 
   beforeAll(async () => {
-    app = await buildApp({ logger: false });
+    app = await buildApp({
+      logger: false,
+      sendCode: async (_prisma, message) => {
+        latestOtpCode = message.code;
+        sentOtpMessages.push(message);
+      },
+    });
 
     const pool = await app.prisma.deliveryPool.create({
       data: {
@@ -153,24 +163,188 @@ describe("wikiacc backend api", () => {
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
   });
 
-  it("registers a user and creates a wallet", async () => {
-    const response = await app.inject({
+  it("registers with a one-time code and blocks duplicate sends while it is valid", async () => {
+    const requestResponse = await app.inject({
       method: "POST",
-      url: "/api/v1/auth/register",
+      url: "/api/v1/auth/otp/request",
       payload: {
+        mode: "register",
         email: "user@test.local",
         name: "Test User",
-        password: "password123",
+        phone: "۰۹۱۲۰۰۰۰۰۰۱",
       },
     });
 
-    expect(response.statusCode).toBe(201);
+    expect(requestResponse.statusCode).toBe(201);
+    expect(sentOtpMessages.at(-1)).toMatchObject({
+      recipient: "09120000001",
+    });
+    const challenge = requestResponse.json().data.challenge;
+    expect(challenge.retryAfterSeconds).toBe(60);
+    expect(challenge.maskedPhone).toBe("0912***0001");
+    const storedChallenge = await app.prisma.authOtpChallenge.findUnique({
+      where: { id: challenge.challengeId },
+    });
+    expect(storedChallenge.codeHash).toHaveLength(64);
+    expect(storedChallenge.codeHash).not.toContain(latestOtpCode);
+
+    const duplicateResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/request",
+      payload: {
+        mode: "register",
+        email: "user@test.local",
+        name: "Test User",
+        phone: "09120000001",
+      },
+    });
+    expect(duplicateResponse.statusCode).toBe(429);
+    expect(duplicateResponse.json().error.code).toBe("OTP_ALREADY_SENT");
+    expect(duplicateResponse.headers["retry-after"]).toBeTruthy();
+    expect(sentOtpMessages).toHaveLength(1);
+
+    const wrongCode = latestOtpCode === "000000" ? "999999" : "000000";
+
+    const wrongCodeResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/verify",
+      payload: { challengeId: challenge.challengeId, code: wrongCode },
+    });
+    expect(wrongCodeResponse.statusCode).toBe(401);
+    expect(wrongCodeResponse.json().error).toMatchObject({
+      code: "OTP_INVALID",
+      details: { attemptsRemaining: 4 },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/verify",
+      payload: { challengeId: challenge.challengeId, code: latestOtpCode },
+    });
+    expect(response.statusCode).toBe(200);
     userCookie = getCookie(response);
     const body = response.json();
     userId = body.data.user.id;
+    expect(body.data.user).toMatchObject({
+      email: "user@test.local",
+      hasPassword: false,
+      phone: "09120000001",
+    });
 
     const wallet = await app.prisma.wallet.findUnique({ where: { userId } });
     expect(wallet.balance).toBe(0);
+  });
+
+  it("invalidates an OTP after five failed attempts", async () => {
+    const requestResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/request",
+      payload: {
+        mode: "checkout",
+        name: "Locked User",
+        phone: "09120000002",
+      },
+    });
+    const challengeId = requestResponse.json().data.challenge.challengeId;
+    const correctCode = latestOtpCode;
+    const wrongCode = correctCode === "111111" ? "222222" : "111111";
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/otp/verify",
+        payload: { challengeId, code: wrongCode },
+      });
+      expect(response.statusCode).toBe(401);
+      expect(response.json().error.code).toBe(
+        attempt === 5 ? "OTP_ATTEMPTS_EXCEEDED" : "OTP_INVALID",
+      );
+    }
+
+    const correctResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/verify",
+      payload: { challengeId, code: correctCode },
+    });
+    expect(correctResponse.statusCode).toBe(400);
+    expect(correctResponse.json().error.code).toBe("OTP_EXPIRED");
+  });
+
+  it("rejects expired OTPs and rate-limits repeated hourly sends", async () => {
+    const requestResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/request",
+      payload: {
+        mode: "checkout",
+        name: "Expired User",
+        phone: "09120000004",
+      },
+    });
+    const challengeId = requestResponse.json().data.challenge.challengeId;
+    const expiredCode = latestOtpCode;
+    await app.prisma.authOtpChallenge.update({
+      where: { id: challengeId },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const expiredResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/verify",
+      payload: { challengeId, code: expiredCode },
+    });
+    expect(expiredResponse.statusCode).toBe(400);
+    expect(expiredResponse.json().error.code).toBe("OTP_EXPIRED");
+
+    const now = new Date();
+    await app.prisma.authOtpChallenge.createMany({
+      data: Array.from({ length: 5 }, (_, index) => ({
+        codeHash: `rate-limit-hash-${index}`,
+        expiresAt: new Date(now.getTime() - 1000),
+        id: `hourly-rate-${index}`,
+        invalidatedAt: now,
+        phone: "09120000005",
+        purpose: "REGISTER",
+        registrationName: "Rate Limited User",
+        requestIpHash: "different-ip-hash",
+        sentAt: now,
+      })),
+    });
+
+    const sentCount = sentOtpMessages.length;
+    const limitedResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/otp/request",
+      payload: {
+        mode: "checkout",
+        name: "Rate Limited User",
+        phone: "09120000005",
+      },
+    });
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(limitedResponse.json().error.code).toBe("OTP_RATE_LIMITED");
+    expect(sentOtpMessages).toHaveLength(sentCount);
+  });
+
+  it("lets a signed-in user set an optional password", async () => {
+    const setPasswordResponse = await app.inject({
+      method: "PATCH",
+      url: "/api/v1/auth/password",
+      headers: { cookie: userCookie },
+      payload: { password: "new-password-123" },
+    });
+    expect(setPasswordResponse.statusCode).toBe(200);
+    expect(setPasswordResponse.json().data.user.hasPassword).toBe(true);
+
+    const passwordLoginResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        identifier: "09120000001",
+        password: "new-password-123",
+      },
+    });
+    expect(passwordLoginResponse.statusCode).toBe(200);
+    userCookie = getCookie(passwordLoginResponse);
   });
 
   it("allows admin to credit wallet", async () => {
@@ -210,6 +384,7 @@ describe("wikiacc backend api", () => {
     expect(settingsResponse.statusCode).toBe(200);
     const initialSettings = settingsResponse.json().data.settings;
     expect(initialSettings.hasApiKey).toBe(false);
+    expect(initialSettings.authPatternCode).toBe("a5gPP4cwpS");
     expect(initialSettings.senders.map((sender) => sender.lineNumber)).toEqual([
       "50002178584000",
       "PRO",
@@ -224,12 +399,14 @@ describe("wikiacc backend api", () => {
       headers: { cookie: adminCookie },
       payload: {
         apiKey: "test-iranpayamak-api-key-1234",
+        authPatternCode: "LOGIN_PATTERN",
         defaultSenderId: proSender.id,
       },
     });
     expect(updateResponse.statusCode).toBe(200);
     expect(updateResponse.json().data.settings).toMatchObject({
       apiKeyHint: "1234",
+      authPatternCode: "LOGIN_PATTERN",
       defaultSenderId: proSender.id,
       hasApiKey: true,
     });
@@ -312,6 +489,28 @@ describe("wikiacc backend api", () => {
       line_number: "PRO",
       number_format: "english",
       recipient: "09120000000",
+    });
+  });
+
+  it("uses the admin-configured authentication pattern for OTP messages", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ status: "success", data: 246810, messages: "queued" }),
+        { headers: { "Content-Type": "application/json" }, status: 201 },
+      ),
+    );
+
+    await sendAuthCodeSms(
+      app.prisma,
+      { code: "654321", recipient: "09120000003" },
+      { fetchImpl },
+    );
+
+    const [, request] = fetchImpl.mock.calls[0];
+    expect(JSON.parse(request.body)).toMatchObject({
+      attributes: { code: "654321" },
+      code: "LOGIN_PATTERN",
+      recipient: "09120000003",
     });
   });
 

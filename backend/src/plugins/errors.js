@@ -26,6 +26,9 @@ export const errorsPlugin = fp(async (app) => {
     }
 
     if (error instanceof AppError) {
+      if (error.statusCode === 429 && error.details?.retryAfterSeconds) {
+        reply.header("Retry-After", error.details.retryAfterSeconds);
+      }
       reply.code(error.statusCode).send({
         error: {
           code: error.code,

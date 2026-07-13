@@ -106,7 +106,7 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="py-3">{user.name}</td>
                     <td className="py-3" dir="ltr">
-                      {user.email}
+                      {user.email ?? "-"}
                     </td>
                     <td className="py-3" dir="ltr">
                       {user.phone ?? "-"}
@@ -162,7 +162,7 @@ export default function AdminUsersPage() {
             <div className="min-w-0">
               <h3 className="text-lg font-bold">{userLabel(selectedUser)}</h3>
               <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
-                {selectedUser.email}
+                {selectedUser.email ?? selectedUser.phone ?? "-"}
               </p>
             </div>
             <Button

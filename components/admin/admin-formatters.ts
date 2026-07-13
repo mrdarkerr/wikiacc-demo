@@ -29,9 +29,12 @@ export function orderCode(id?: string | null) {
   return id ? `WKA-${shortId(id, 6)}` : "-";
 }
 
-export function userLabel(user?: Pick<User, "name" | "email"> | null) {
+export function userLabel(
+  user?: (Pick<User, "name" | "email"> & Partial<Pick<User, "phone">>) | null,
+) {
   if (!user) return "-";
-  return user.name ? `${user.name} (${user.email})` : user.email;
+  const identity = user.email || user.phone || "بدون ایمیل";
+  return user.name ? `${user.name} (${identity})` : identity;
 }
 
 export function productTypeLabel(type: ProductType) {

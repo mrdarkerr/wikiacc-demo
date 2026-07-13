@@ -21,6 +21,7 @@ function errorMessage(error: unknown, fallback: string) {
 export default function AdminSmsSettingsPage() {
   const [settings, setSettings] = useState<AdminSmsSettings | null>(null);
   const [apiKey, setApiKey] = useState("");
+  const [authPatternCode, setAuthPatternCode] = useState("");
   const [defaultSenderId, setDefaultSenderId] = useState("");
   const [senderLabel, setSenderLabel] = useState("");
   const [senderLine, setSenderLine] = useState("");
@@ -35,6 +36,7 @@ export default function AdminSmsSettingsPage() {
     try {
       const result = await api.admin.sms.getSettings();
       setSettings(result.settings);
+      setAuthPatternCode(result.settings.authPatternCode ?? "");
       setDefaultSenderId(result.settings.defaultSenderId ?? "");
       setError("");
     } catch (loadError) {
@@ -54,6 +56,7 @@ export default function AdminSmsSettingsPage() {
       .then((result) => {
         if (!active) return;
         setSettings(result.settings);
+        setAuthPatternCode(result.settings.authPatternCode ?? "");
         setDefaultSenderId(result.settings.defaultSenderId ?? "");
         setError("");
       })
@@ -78,12 +81,16 @@ export default function AdminSmsSettingsPage() {
 
     const body: UpdateAdminSmsSettingsRequest = {};
     const trimmedApiKey = apiKey.trim();
+    const trimmedPatternCode = authPatternCode.trim();
     if (trimmedApiKey) body.apiKey = trimmedApiKey;
+    if (trimmedPatternCode !== (settings.authPatternCode ?? "")) {
+      body.authPatternCode = trimmedPatternCode;
+    }
     if (defaultSenderId && defaultSenderId !== settings.defaultSenderId) {
       body.defaultSenderId = defaultSenderId;
     }
 
-    if (!body.apiKey && !body.defaultSenderId) {
+    if (!body.apiKey && !body.authPatternCode && !body.defaultSenderId) {
       setSuccess("تغییری برای ذخیره وجود ندارد.");
       setError("");
       return;
@@ -93,6 +100,7 @@ export default function AdminSmsSettingsPage() {
     try {
       const result = await api.admin.sms.updateSettings(body);
       setSettings(result.settings);
+      setAuthPatternCode(result.settings.authPatternCode ?? "");
       setDefaultSenderId(result.settings.defaultSenderId ?? "");
       setApiKey("");
       setError("");
@@ -232,6 +240,21 @@ export default function AdminSmsSettingsPage() {
               />
               <span className="mt-2 block text-xs font-normal text-muted-foreground">
                 مقدار کامل کلید بعد از ذخیره از سرور برگردانده نمی‌شود.
+              </span>
+            </label>
+
+            <label className="block text-sm font-medium">
+              کد پترن ورود و ثبت‌نام
+              <Input
+                className="mt-2"
+                dir="ltr"
+                placeholder="a5gPP4cwpS"
+                required
+                value={authPatternCode}
+                onChange={(event) => setAuthPatternCode(event.target.value)}
+              />
+              <span className="mt-2 block text-xs font-normal text-muted-foreground">
+                متغیر این پترن باید با نام <code dir="ltr">code</code> در پنل پیامک تعریف شده باشد.
               </span>
             </label>
 

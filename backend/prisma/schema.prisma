@@ -12,6 +12,11 @@ enum UserRole {
   ADMIN
 }
 
+enum AuthOtpPurpose {
+  LOGIN
+  REGISTER
+}
+
 enum ProductType {
   CUSTOM_FORM
   INSTANT_DELIVERY
@@ -77,10 +82,10 @@ enum TicketPriority {
 
 model User {
   id                       String              @id @default(cuid())
-  email                    String              @unique
+  email                    String?             @unique
   phone                    String?             @unique
   name                     String
-  passwordHash             String
+  passwordHash             String?
   role                     UserRole            @default(USER)
   wallet                   Wallet?
   orders                   Order[]
@@ -323,6 +328,7 @@ model SmsProviderSettings {
   provider        String          @unique
   apiKeyEncrypted String?
   apiKeyHint      String?
+  authPatternCode String?         @default("a5gPP4cwpS")
   defaultSenderId String?
   senders         SmsSenderLine[]
   createdAt       DateTime        @default(now())
@@ -342,4 +348,26 @@ model SmsSenderLine {
 
   @@unique([settingsId, lineNumber])
   @@index([settingsId, isActive, sortOrder])
+}
+
+model AuthOtpChallenge {
+  id                String         @id @default(cuid())
+  phone             String
+  purpose           AuthOtpPurpose
+  codeHash          String
+  registrationName  String?
+  registrationEmail String?
+  requestIpHash     String
+  failedAttempts    Int            @default(0)
+  expiresAt         DateTime
+  sentAt            DateTime?
+  consumedAt        DateTime?
+  invalidatedAt     DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([phone, createdAt])
+  @@index([requestIpHash, createdAt])
+  @@index([expiresAt])
+  @@index([createdAt])
 }

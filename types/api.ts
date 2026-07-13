@@ -117,23 +117,58 @@ export type UserRole = "USER" | "ADMIN";
 
 export type User = {
   id: string;
-  email: string;
+  email?: string | null;
   phone?: string | null;
   name: string;
   role: UserRole;
+  hasPassword?: boolean;
   wallet?: { balance: number } | null;
   createdAt?: string;
   updatedAt?: string;
 };
 
 export type LoginRequest = {
-  email: string;
+  identifier: string;
   password: string;
 };
 
-export type RegisterRequest = LoginRequest & {
-  name: string;
-  phone?: string;
+export type OtpRequest =
+  | {
+      mode: "login";
+      phone: string;
+    }
+  | {
+      email?: string;
+      mode: "register";
+      name: string;
+      phone: string;
+    }
+  | {
+      mode: "checkout";
+      name: string;
+      phone: string;
+    };
+
+export type OtpChallenge = {
+  challengeId: string;
+  expiresAt: string;
+  maskedPhone: string;
+  retryAfterSeconds: number;
+};
+
+export type OtpVerifyRequest = {
+  challengeId: string;
+  code: string;
+};
+
+export type UpdateProfileRequest = {
+  email?: string;
+  name?: string;
+};
+
+export type SetPasswordRequest = {
+  currentPassword?: string;
+  password: string;
 };
 
 export type LoginResponse = {
@@ -396,6 +431,7 @@ export type AdminSmsSender = {
 
 export type AdminSmsSettings = {
   apiKeyHint?: string | null;
+  authPatternCode?: string | null;
   defaultSenderId?: string | null;
   hasApiKey: boolean;
   provider: "IRANPAYAMAK";
@@ -475,6 +511,7 @@ export type CreateAdminSmsSenderRequest = {
 
 export type UpdateAdminSmsSettingsRequest = {
   apiKey?: string;
+  authPatternCode?: string;
   defaultSenderId?: string;
   removeApiKey?: boolean;
 };

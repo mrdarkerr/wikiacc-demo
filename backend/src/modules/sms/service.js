@@ -25,6 +25,7 @@ function publicSender(sender) {
 function publicSettings(settings) {
   return {
     apiKeyHint: settings.apiKeyHint,
+    authPatternCode: settings.authPatternCode,
     defaultSenderId: settings.defaultSenderId,
     hasApiKey: Boolean(settings.apiKeyEncrypted),
     provider: settings.provider,
@@ -55,7 +56,31 @@ export async function updateAdminSmsSettings(prisma, input) {
     data.defaultSenderId = input.defaultSenderId;
   }
 
+  if (input.authPatternCode !== undefined) {
+    data.authPatternCode = input.authPatternCode;
+  }
+
   return publicSettings(await updateStoredSmsSettings(prisma, data));
+}
+
+export async function sendAuthCodeSms(prisma, { code, recipient }, options = {}) {
+  const settings = await ensureSmsSettings(prisma);
+  if (!settings.authPatternCode) {
+    throw serviceUnavailable(
+      "SMS_AUTH_PATTERN_NOT_CONFIGURED",
+      "Authentication SMS pattern code is not configured",
+    );
+  }
+
+  return sendPatternSms(
+    prisma,
+    {
+      attributes: { code },
+      patternCode: settings.authPatternCode,
+      recipient,
+    },
+    options,
+  );
 }
 
 export async function createAdminSmsSender(prisma, input) {

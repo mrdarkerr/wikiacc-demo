@@ -9,6 +9,7 @@ import {
   Headphones,
   LayoutDashboard,
   LogOut,
+  Settings,
   WalletCards,
 } from "lucide-react";
 
@@ -41,6 +42,11 @@ const navItems = [
     href: "/wallet",
     icon: WalletCards,
     label: "کیف پول",
+  },
+  {
+    href: "/settings",
+    icon: Settings,
+    label: "تنظیمات",
   },
 ];
 
@@ -134,7 +140,7 @@ export function PanelShell({ children }: PanelShellProps) {
         </div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-card lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card lg:hidden">
         {navItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;

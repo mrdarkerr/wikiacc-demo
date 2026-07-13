@@ -39,7 +39,11 @@ export async function buildApp(options = {}) {
     service: "wikiacc-backend",
   }));
 
-  await app.register(authRoutes, { prefix: "/api/v1/auth" });
+  await app.register(authRoutes, {
+    prefix: "/api/v1/auth",
+    sendCode: options.sendCode,
+    smsOptions: options.smsOptions,
+  });
   await app.register(catalogRoutes, { prefix: "/api/v1" });
   await app.register(siteContentRoutes, { prefix: "/api/v1/site-content" });
   await app.register(orderRoutes, { prefix: "/api/v1/orders" });

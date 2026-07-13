@@ -22,6 +22,9 @@ export const notFound = (code, message) => new AppError(404, code, message);
 export const conflict = (code, message, details) =>
   new AppError(409, code, message, details);
 
+export const tooManyRequests = (code, message, details) =>
+  new AppError(429, code, message, details);
+
 export const paymentRequired = (code, message, details) =>
   new AppError(402, code, message, details);
 

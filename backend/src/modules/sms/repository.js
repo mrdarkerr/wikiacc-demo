@@ -1,5 +1,6 @@
 import { conflict, notFound } from "../../shared/errors.js";
 import {
+  DEFAULT_AUTH_PATTERN_CODE,
   DEFAULT_SMS_SENDERS,
   IRANPAYAMAK_PROVIDER,
   SMS_SETTINGS_ID,
@@ -17,6 +18,7 @@ export async function ensureSmsSettings(prisma) {
       where: { id: SMS_SETTINGS_ID },
       update: {},
       create: {
+        authPatternCode: DEFAULT_AUTH_PATTERN_CODE,
         id: SMS_SETTINGS_ID,
         provider: IRANPAYAMAK_PROVIDER,
         senders: {
