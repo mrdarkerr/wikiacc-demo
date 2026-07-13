@@ -1,11 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-import { ArrowLeft, KeyRound, Loader2, LockKeyhole, LogIn, UserPlus } from "lucide-react";
+import { KeyRound, Loader2, LockKeyhole, LogIn, UserPlus } from "lucide-react";
 
 import { OtpAuthForm } from "@/components/auth/otp-auth-form";
 import { Button } from "@/components/ui/button";
@@ -216,14 +215,6 @@ export default function LoginPage() {
             </form>
           )}
 
-          <div className="mt-6 border-t border-border pt-4">
-            <Button asChild className="w-full" variant="outline">
-              <Link href="/">
-                <ArrowLeft className="size-4" />
-                بازگشت به سایت
-              </Link>
-            </Button>
-          </div>
         </section>
       </div>
     </main>
