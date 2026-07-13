@@ -12,6 +12,7 @@ import {
 } from "./modules/site-content/routes.js";
 import { ticketRoutes } from "./modules/tickets/routes.js";
 import { walletRoutes } from "./modules/wallet/routes.js";
+import { adminSmsRoutes } from "./modules/sms/admin-routes.js";
 import { authPlugin } from "./plugins/auth.js";
 import { corsPlugin } from "./plugins/cors.js";
 import { errorsPlugin } from "./plugins/errors.js";
@@ -45,6 +46,7 @@ export async function buildApp(options = {}) {
   await app.register(walletRoutes, { prefix: "/api/v1/wallet" });
   await app.register(ticketRoutes, { prefix: "/api/v1/tickets" });
   await app.register(adminRoutes, { prefix: "/api/v1/admin" });
+  await app.register(adminSmsRoutes, { prefix: "/api/v1/admin/sms" });
   await app.register(adminSiteContentRoutes, {
     prefix: "/api/v1/admin/site-content",
   });

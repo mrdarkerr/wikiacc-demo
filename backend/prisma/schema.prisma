@@ -317,3 +317,29 @@ model SiteContent {
   @@index([draftUpdatedById])
   @@index([publishedById])
 }
+
+model SmsProviderSettings {
+  id              String          @id
+  provider        String          @unique
+  apiKeyEncrypted String?
+  apiKeyHint      String?
+  defaultSenderId String?
+  senders         SmsSenderLine[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model SmsSenderLine {
+  id         String              @id @default(cuid())
+  settingsId String
+  settings   SmsProviderSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  label      String
+  lineNumber String
+  isActive   Boolean             @default(true)
+  sortOrder  Int                 @default(0)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([settingsId, lineNumber])
+  @@index([settingsId, isActive, sortOrder])
+}

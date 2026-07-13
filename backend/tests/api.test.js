@@ -4,12 +4,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import bcrypt from "bcryptjs";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 process.env.NODE_ENV = "test";
 const testDatabaseName = `test-${process.pid}.db`;
 process.env.DATABASE_URL = `file:./${testDatabaseName}`;
 process.env.JWT_SECRET = "test-secret-with-enough-length";
+process.env.SMS_CONFIG_ENCRYPTION_KEY = "test-sms-encryption-secret-with-enough-length";
 process.env.WEB_APP_URL = "http://localhost:3000";
 process.env.COOKIE_SECURE = "false";
 
@@ -29,6 +30,7 @@ execFileSync(process.execPath, [applySchemaScript], {
 });
 
 const { buildApp } = await import("../src/app.js");
+const { sendPatternSms } = await import("../src/modules/sms/service.js");
 
 function getCookie(response) {
   const raw = response.headers["set-cookie"];
@@ -191,6 +193,126 @@ describe("wikiacc backend api", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json().data.wallet.balance).toBe(1000);
+  });
+
+  it("lets admins configure SMS credentials and sender lines without exposing secrets", async () => {
+    const anonymousResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/sms/settings",
+    });
+    expect(anonymousResponse.statusCode).toBe(401);
+
+    const settingsResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/sms/settings",
+      headers: { cookie: adminCookie },
+    });
+    expect(settingsResponse.statusCode).toBe(200);
+    const initialSettings = settingsResponse.json().data.settings;
+    expect(initialSettings.hasApiKey).toBe(false);
+    expect(initialSettings.senders.map((sender) => sender.lineNumber)).toEqual([
+      "50002178584000",
+      "PRO",
+    ]);
+
+    const proSender = initialSettings.senders.find(
+      (sender) => sender.lineNumber === "PRO",
+    );
+    const updateResponse = await app.inject({
+      method: "PATCH",
+      url: "/api/v1/admin/sms/settings",
+      headers: { cookie: adminCookie },
+      payload: {
+        apiKey: "test-iranpayamak-api-key-1234",
+        defaultSenderId: proSender.id,
+      },
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json().data.settings).toMatchObject({
+      apiKeyHint: "1234",
+      defaultSenderId: proSender.id,
+      hasApiKey: true,
+    });
+    expect(updateResponse.json().data.settings.apiKey).toBeUndefined();
+
+    const storedSettings = await app.prisma.smsProviderSettings.findUnique({
+      where: { id: "iranpayamak" },
+    });
+    expect(storedSettings.apiKeyEncrypted).not.toContain(
+      "test-iranpayamak-api-key-1234",
+    );
+
+    const deleteDefaultSenderResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/sms/senders/${proSender.id}`,
+      headers: { cookie: adminCookie },
+    });
+    expect(deleteDefaultSenderResponse.statusCode).toBe(409);
+    expect(deleteDefaultSenderResponse.json().error.code).toBe(
+      "SMS_DEFAULT_SENDER_REQUIRED",
+    );
+
+    const createSenderResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/sms/senders",
+      headers: { cookie: adminCookie },
+      payload: { label: "Backup line", lineNumber: "50001234" },
+    });
+    expect(createSenderResponse.statusCode).toBe(201);
+
+    const senderId = createSenderResponse.json().data.sender.id;
+    const deleteSenderResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/sms/senders/${senderId}`,
+      headers: { cookie: adminCookie },
+    });
+    expect(deleteSenderResponse.statusCode).toBe(200);
+  });
+
+  it("sends pattern SMS through the configured default sender", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          status: "success",
+          data: 987654,
+          messages: "queued",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 201,
+        },
+      ),
+    );
+
+    const result = await sendPatternSms(
+      app.prisma,
+      {
+        attributes: { code: "2468", name: "Test User" },
+        patternCode: "WELCOME_PATTERN",
+        recipient: "09120000000",
+      },
+      { fetchImpl },
+    );
+
+    expect(result).toMatchObject({
+      provider: "IRANPAYAMAK",
+      providerMessageId: 987654,
+      sender: { lineNumber: "PRO" },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    const [url, request] = fetchImpl.mock.calls[0];
+    expect(url).toBe("https://api.iranpayamak.com/ws/v1/sms/pattern");
+    expect(request.headers["Api-Key"]).toBe(
+      "test-iranpayamak-api-key-1234",
+    );
+    expect(JSON.parse(request.body)).toEqual({
+      attributes: { code: "2468", name: "Test User" },
+      code: "WELCOME_PATTERN",
+      line_number: "PRO",
+      number_format: "english",
+      recipient: "09120000000",
+    });
   });
 
   it("serves published site content and protects the admin document", async () => {

@@ -11,6 +11,7 @@ import {
   List,
   ListPlus,
   LogOut,
+  MessageSquareText,
   PackagePlus,
   PanelsTopLeft,
   Tags,
@@ -44,6 +45,11 @@ const navItems = [
     href: "/admin/content",
     icon: PanelsTopLeft,
     label: "محتوای سایت",
+  },
+  {
+    href: "/admin/sms",
+    icon: MessageSquareText,
+    label: "پیامک",
   },
   {
     href: "/admin/orders",

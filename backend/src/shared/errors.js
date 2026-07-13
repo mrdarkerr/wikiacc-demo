@@ -24,3 +24,9 @@ export const conflict = (code, message, details) =>
 
 export const paymentRequired = (code, message, details) =>
   new AppError(402, code, message, details);
+
+export const badGateway = (code, message, details) =>
+  new AppError(502, code, message, details);
+
+export const serviceUnavailable = (code, message, details) =>
+  new AppError(503, code, message, details);

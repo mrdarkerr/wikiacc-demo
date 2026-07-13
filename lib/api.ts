@@ -3,6 +3,8 @@ import type {
   AdminDeliveryItem,
   AdminDeliveryPool,
   AdminOrder,
+  AdminSmsSender,
+  AdminSmsSettings,
   AdminTicket,
   AdminUser,
   AdminWalletAdjustmentRequest,
@@ -13,6 +15,7 @@ import type {
   CreateAdminCategoryRequest,
   CreateAdminDeliveryPoolRequest,
   CreateAdminProductRequest,
+  CreateAdminSmsSenderRequest,
   CreateAdminTicketMessageRequest,
   CreateOrderRequest,
   CreateTicketRequest,
@@ -33,6 +36,7 @@ import type {
   UpdateAdminOrderStatusRequest,
   UpdateAdminCategoryRequest,
   UpdateAdminProductRequest,
+  UpdateAdminSmsSettingsRequest,
   UpdateAdminTicketStatusRequest,
   User,
   Wallet,
@@ -335,6 +339,24 @@ export const api = {
             method: "POST",
           },
         ),
+    },
+    sms: {
+      getSettings: () =>
+        apiFetch<{ settings: AdminSmsSettings }>("/admin/sms/settings"),
+      updateSettings: (body: UpdateAdminSmsSettingsRequest) =>
+        apiFetch<{ settings: AdminSmsSettings }>("/admin/sms/settings", {
+          body,
+          method: "PATCH",
+        }),
+      createSender: (body: CreateAdminSmsSenderRequest) =>
+        apiFetch<{ sender: AdminSmsSender }>("/admin/sms/senders", {
+          body,
+          method: "POST",
+        }),
+      removeSender: (id: string) =>
+        apiFetch<{ senderId: string }>(`/admin/sms/senders/${id}`, {
+          method: "DELETE",
+        }),
     },
     wallet: {
       summary: () =>

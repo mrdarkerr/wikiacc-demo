@@ -384,6 +384,25 @@ export type AdminDeliveryItem = {
   updatedAt: string;
 };
 
+export type AdminSmsSender = {
+  id: string;
+  label: string;
+  lineNumber: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminSmsSettings = {
+  apiKeyHint?: string | null;
+  defaultSenderId?: string | null;
+  hasApiKey: boolean;
+  provider: "IRANPAYAMAK";
+  senders: AdminSmsSender[];
+  updatedAt: string;
+};
+
 export type AdminTicketMessage = TicketMessage & {
   sender?: Pick<User, "id" | "name" | "role"> | null;
 };
@@ -447,6 +466,17 @@ export type CreateAdminDeliveryPoolRequest = {
 export type AddAdminDeliveryItemsRequest = {
   content?: string;
   items?: string[];
+};
+
+export type CreateAdminSmsSenderRequest = {
+  label: string;
+  lineNumber: string;
+};
+
+export type UpdateAdminSmsSettingsRequest = {
+  apiKey?: string;
+  defaultSenderId?: string;
+  removeApiKey?: boolean;
 };
 
 export type AdminWalletAdjustmentRequest = {
