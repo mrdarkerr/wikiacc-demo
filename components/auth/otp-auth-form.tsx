@@ -65,6 +65,14 @@ function otpErrorMessage(error: unknown) {
   ) {
     return "سرویس پیامک هنوز کامل تنظیم نشده است. با پشتیبانی تماس بگیرید.";
   }
+  if (
+    code === "SMS_PROVIDER_UNAVAILABLE" ||
+    code === "SMS_PROVIDER_INVALID_RESPONSE" ||
+    code === "SMS_PROVIDER_REJECTED" ||
+    code === "SMS_CREDENTIALS_UNREADABLE"
+  ) {
+    return "ارسال پیامک با اختلال روبه‌رو شد. اگر کد برایتان ارسال شده، یک بار با همان کد امتحان کنید؛ در غیر این صورت کمی بعد دوباره تلاش کنید.";
+  }
 
   return error.message;
 }

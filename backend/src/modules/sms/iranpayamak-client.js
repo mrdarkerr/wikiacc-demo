@@ -9,7 +9,7 @@ function providerMessages(payload) {
 }
 
 export class IranPayamakClient {
-  constructor({ apiKey, fetchImpl = globalThis.fetch, timeoutMs = 10_000 }) {
+  constructor({ apiKey, fetchImpl = globalThis.fetch, timeoutMs = 25_000 }) {
     this.apiKey = apiKey;
     this.fetchImpl = fetchImpl;
     this.timeoutMs = timeoutMs;
