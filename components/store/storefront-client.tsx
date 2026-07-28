@@ -10,6 +10,7 @@ import {
   CheckCircle,
   CheckCircle2,
   ClipboardList,
+  CreditCard,
   Loader2,
   ReceiptText,
   ShieldCheck,
@@ -24,7 +25,7 @@ import { Select } from "@/components/ui/select";
 import { OtpAuthForm } from "@/components/auth/otp-auth-form";
 import { api, ApiError } from "@/lib/api";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
-import type { Order, Product, ProductField } from "@/types/api";
+import type { Order, PaymentMethod, Product, ProductField } from "@/types/api";
 
 type FieldValues = Record<string, string>;
 
@@ -116,6 +117,18 @@ function apiErrorMessage(error: unknown) {
     return "این محصول دیگر فعال نیست.";
   }
 
+  if (code === "TOO_MANY_PENDING_PAYMENTS") {
+    return "چند پرداخت مستقیم شما هنوز تعیین تکلیف نشده است؛ ابتدا وضعیت سفارش‌های قبلی را بررسی کنید.";
+  }
+
+  if (
+    code === "JIBIT_NOT_CONFIGURED" ||
+    code === "JIBIT_REQUEST_FAILED" ||
+    code === "JIBIT_UNAVAILABLE"
+  ) {
+    return "در حال حاضر اتصال به درگاه جیبیت ممکن نیست. کمی بعد دوباره تلاش کنید.";
+  }
+
   return error.message;
 }
 
@@ -128,6 +141,7 @@ export function StorefrontClient() {
   const [fieldValues, setFieldValues] = useState<FieldValues>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("JIBIT");
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -234,10 +248,15 @@ export function StorefrontClient() {
       const result = await api.orders.create({
         productId: selectedProduct.id,
         quantity: normalizedQuantity,
+        paymentMethod,
         ...(values ? { fieldValues: values } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
       });
 
+      if (result.payment) {
+        window.location.assign(result.payment.redirectUrl);
+        return;
+      }
       setCreatedOrder(result.order);
     } catch (error) {
       setSubmitError(apiErrorMessage(error));
@@ -291,7 +310,7 @@ export function StorefrontClient() {
               صورت‌حساب
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              جزئیات محصول را بررسی کنید و سفارش را با موجودی کیف پول ثبت کنید.
+              جزئیات محصول را بررسی کنید و روش پرداخت را انتخاب کنید.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -480,6 +499,56 @@ export function StorefrontClient() {
                     </div>
                   </div>
 
+                  <fieldset className="space-y-3">
+                    <legend className="text-sm font-medium">روش پرداخت</legend>
+                    <label
+                      className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
+                        paymentMethod === "JIBIT"
+                          ? "border-primary bg-primary/5"
+                          : "border-border"
+                      }`}
+                    >
+                      <input
+                        checked={paymentMethod === "JIBIT"}
+                        className="mt-1"
+                        name="paymentMethod"
+                        type="radio"
+                        value="JIBIT"
+                        onChange={() => setPaymentMethod("JIBIT")}
+                      />
+                      <CreditCard className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <span>
+                        <span className="block text-sm font-bold">پرداخت مستقیم با جیبیت</span>
+                        <span className="mt-1 block text-xs/5 text-muted-foreground">
+                          انتقال امن به درگاه بانکی و تحویل پس از تأیید پرداخت
+                        </span>
+                      </span>
+                    </label>
+                    <label
+                      className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
+                        paymentMethod === "WALLET"
+                          ? "border-primary bg-primary/5"
+                          : "border-border"
+                      }`}
+                    >
+                      <input
+                        checked={paymentMethod === "WALLET"}
+                        className="mt-1"
+                        name="paymentMethod"
+                        type="radio"
+                        value="WALLET"
+                        onChange={() => setPaymentMethod("WALLET")}
+                      />
+                      <WalletCards className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <span>
+                        <span className="block text-sm font-bold">پرداخت از کیف پول</span>
+                        <span className="mt-1 block text-xs/5 text-muted-foreground">
+                          موجودی فعلی: {formatCurrency(user.wallet?.balance ?? 0)}
+                        </span>
+                      </span>
+                    </label>
+                  </fieldset>
+
                   {hasInsufficientDeliveryStock ? (
                     <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                       <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -532,10 +601,14 @@ export function StorefrontClient() {
                   >
                     {submitting ? (
                       <Loader2 className="size-4 animate-spin" />
+                    ) : paymentMethod === "JIBIT" ? (
+                      <CreditCard className="size-4" />
                     ) : (
                       <ShoppingCart className="size-4" />
                     )}
-                    ثبت و پرداخت از کیف پول
+                    {paymentMethod === "JIBIT"
+                      ? "پرداخت مستقیم با جیبیت"
+                      : "ثبت و پرداخت از کیف پول"}
                   </Button>
                 </>
               ) : (

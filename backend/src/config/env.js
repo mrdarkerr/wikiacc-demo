@@ -17,6 +17,23 @@ const envSchema = z.object({
   SMS_CONFIG_ENCRYPTION_KEY: z.string().min(16).optional(),
   SESSION_COOKIE_NAME: z.string().min(1).default("wikiacc_session"),
   COOKIE_SECURE: booleanFromString.default(false),
+  JIBIT_ENABLED: booleanFromString.default(false),
+  JIBIT_API_KEY: z.string().min(1).optional(),
+  JIBIT_SECRET_KEY: z.string().min(1).optional(),
+  JIBIT_BASE_URL: z.string().url().default("https://napi.jibit.ir/ppg/v3"),
+  JIBIT_CALLBACK_URL: z.string().url().optional(),
+  JIBIT_RECONCILE_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(1_440)
+    .default(20),
+  JIBIT_RECONCILE_INTERVAL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(15)
+    .max(3_600)
+    .default(60),
 });
 
 const parsedEnv = envSchema.parse(process.env);
@@ -26,3 +43,12 @@ export const env = {
   SMS_CONFIG_ENCRYPTION_KEY:
     parsedEnv.SMS_CONFIG_ENCRYPTION_KEY ?? parsedEnv.JWT_SECRET,
 };
+
+if (
+  env.JIBIT_ENABLED &&
+  (!env.JIBIT_API_KEY || !env.JIBIT_SECRET_KEY || !env.JIBIT_CALLBACK_URL)
+) {
+  throw new Error(
+    "JIBIT_API_KEY, JIBIT_SECRET_KEY and JIBIT_CALLBACK_URL are required when JIBIT_ENABLED=true",
+  );
+}

@@ -15,6 +15,7 @@
   "dependencies": {
     "@fastify/cookie": "latest",
     "@fastify/cors": "latest",
+    "@fastify/formbody": "^8.0.2",
     "@fastify/jwt": "latest",
     "@fastify/rate-limit": "latest",
     "@fastify/swagger": "latest",
@@ -28,8 +29,8 @@
   },
   "devDependencies": {
     "prisma": "6.19.3",
-    "supertest": "latest",
     "sql.js": "latest",
+    "supertest": "latest",
     "vitest": "latest"
   },
   "prisma": {

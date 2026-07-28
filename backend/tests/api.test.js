@@ -47,6 +47,10 @@ describe("wikiacc backend api", () => {
   let userCookie;
   let userId;
   let instantProduct;
+  let directInstantProduct;
+  let directPool;
+  let successfulDirectOrderId;
+  let reviewDirectOrderId;
   let emptyInstantProduct;
   let customProduct;
   let initialSiteContent;
@@ -54,10 +58,54 @@ describe("wikiacc backend api", () => {
   let siteContentDraftVersion;
   let latestOtpCode;
   const sentOtpMessages = [];
+  const jibitPurchases = new Map();
+  let jibitSequence = 0;
+  let failNextJibitCreate = false;
+  let failNextJibitVerify = false;
+  const jibitClient = {
+    createPurchase: vi.fn(async (input) => {
+      if (failNextJibitCreate) {
+        failNextJibitCreate = false;
+        const error = new Error("provider unavailable");
+        error.code = "JIBIT_UNAVAILABLE";
+        error.statusCode = 503;
+        throw error;
+      }
+      const purchaseId = String(900000 + ++jibitSequence);
+      jibitPurchases.set(purchaseId, {
+        ...input,
+        purchaseId,
+        purchaseIdStr: purchaseId,
+        status: "PENDING",
+      });
+      return {
+        purchaseId,
+        redirectUrl: `https://napi.jibit.ir/ppg/v3/purchases/${purchaseId}/payments`,
+      };
+    }),
+    verifyPurchase: vi.fn(async (purchaseId) => {
+      if (failNextJibitVerify) {
+        failNextJibitVerify = false;
+        const error = new Error("provider unavailable");
+        error.code = "JIBIT_UNAVAILABLE";
+        throw error;
+      }
+      const purchase = jibitPurchases.get(String(purchaseId));
+      return { status: purchase?.status ?? "UNKNOWN" };
+    }),
+    getPurchase: vi.fn(async (purchaseId) =>
+      jibitPurchases.get(String(purchaseId)),
+    ),
+  };
 
   beforeAll(async () => {
     app = await buildApp({
       logger: false,
+      enableJibitReconciliation: false,
+      jibitCallbackUrl: "http://localhost:4001/api/v1/payments/jibit/callback",
+      jibitClient,
+      jibitReconcileMinutes: 20,
+      webAppUrl: "http://localhost:3000",
       sendCode: async (_prisma, message) => {
         latestOtpCode = message.code;
         sentOtpMessages.push(message);
@@ -84,6 +132,27 @@ describe("wikiacc backend api", () => {
         type: "INSTANT_DELIVERY",
         price: 100,
         deliveryPoolId: pool.id,
+      },
+    });
+
+    directPool = await app.prisma.deliveryPool.create({
+      data: {
+        slug: "direct-ready-pool",
+        title: "Direct Ready Pool",
+        items: {
+          create: Array.from({ length: 10 }, (_, index) => ({
+            content: `DIRECT-CODE-${index + 1}`,
+          })),
+        },
+      },
+    });
+    directInstantProduct = await app.prisma.product.create({
+      data: {
+        slug: "direct-ready-product",
+        title: "Direct Ready Product",
+        type: "INSTANT_DELIVERY",
+        price: 125,
+        deliveryPoolId: directPool.id,
       },
     });
 
@@ -146,6 +215,26 @@ describe("wikiacc backend api", () => {
       unlinkSync(testDbPath);
     }
   });
+
+  function latestJibitPurchase() {
+    const input = jibitClient.createPurchase.mock.calls.at(-1)[0];
+    const callback = new URL(input.callbackUrl);
+    const purchaseId = [...jibitPurchases.keys()].at(-1);
+    return { callback, input, purchase: jibitPurchases.get(purchaseId), purchaseId };
+  }
+
+  function sendJibitCallback(callback, purchaseId) {
+    const url = new URL(callback);
+    return app.inject({
+      method: "POST",
+      url: `${url.pathname}${url.search}`,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      payload: new URLSearchParams({
+        purchaseId,
+        status: jibitPurchases.get(purchaseId)?.status ?? "UNKNOWN",
+      }).toString(),
+    });
+  }
 
   it("returns product display features in catalog order", async () => {
     const response = await app.inject({
@@ -734,6 +823,379 @@ describe("wikiacc backend api", () => {
     expect(reset.hasUnpublishedChanges).toBe(false);
   });
 
+  it("creates a Jibit payment, reserves inventory, verifies and fulfills once", async () => {
+    const walletBefore = await app.prisma.wallet.findUnique({ where: { userId } });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        quantity: 1,
+        paymentMethod: "JIBIT",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const created = response.json().data;
+    successfulDirectOrderId = created.order.id;
+    expect(created.order).toMatchObject({
+      paymentMethod: "JIBIT",
+      paymentStatus: "UNPAID",
+      status: "DRAFT",
+      totalAmount: 125,
+    });
+    expect(created.payment).toMatchObject({
+      provider: "JIBIT",
+      redirectUrl: expect.stringContaining("napi.jibit.ir"),
+    });
+    expect(created.payment).not.toHaveProperty("callbackToken");
+
+    const { callback, input, purchase, purchaseId } = latestJibitPurchase();
+    expect(input).toMatchObject({
+      amount: 1250,
+      clientReferenceNumber: expect.stringMatching(/^WKA-/),
+      currency: "IRR",
+      userIdentifier: "09120000001",
+    });
+    expect(input.callbackUrl).toContain("attempt=");
+    expect(input.callbackUrl).not.toContain("token=");
+    expect(
+      await app.prisma.deliveryItem.count({
+        where: { poolId: directPool.id, status: "RESERVED" },
+      }),
+    ).toBe(1);
+    expect(created.order.items[0].deliveries).toHaveLength(0);
+
+    const invalidCallback = await sendJibitCallback(
+      callback,
+      `${purchaseId}-mismatch`,
+    );
+    expect(invalidCallback.statusCode).toBe(400);
+    expect(invalidCallback.json().error.code).toBe("PAYMENT_CALLBACK_INVALID");
+
+    purchase.status = "SUCCESSFUL";
+    purchase.pspReferenceNumber = "PSP-REFERENCE-1";
+    purchase.pspMaskedCardNumber = "6037-**-1234";
+    const callbackResponse = await sendJibitCallback(callback, purchaseId);
+    expect(callbackResponse.statusCode).toBe(303);
+    expect(callbackResponse.headers["cache-control"]).toBe("no-store");
+    expect(callbackResponse.headers.location).toContain(
+      `/payment/result?order=${created.order.id}&status=successful`,
+    );
+
+    const paidOrder = await app.prisma.order.findUnique({
+      where: { id: created.order.id },
+      include: { items: { include: { deliveries: true } } },
+    });
+    expect(paidOrder).toMatchObject({
+      paymentStatus: "PAID",
+      status: "DELIVERED",
+      walletTransactionId: null,
+    });
+    expect(paidOrder.items[0].deliveries).toHaveLength(1);
+    expect(paidOrder.items[0].deliveries[0].contentSnapshot).toBe("DIRECT-CODE-1");
+    expect(await app.prisma.wallet.findUnique({ where: { userId } })).toMatchObject({
+      balance: walletBefore.balance,
+    });
+
+    const verifyCalls = jibitClient.verifyPurchase.mock.calls.length;
+    const duplicateCallback = await sendJibitCallback(callback, purchaseId);
+    expect(duplicateCallback.statusCode).toBe(303);
+    expect(jibitClient.verifyPurchase).toHaveBeenCalledTimes(verifyCalls);
+    expect(
+      await app.prisma.orderDelivery.count({
+        where: { orderItemId: paidOrder.items[0].id },
+      }),
+    ).toBe(1);
+  });
+
+  it("fulfills exactly once when callback and user verification race", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const order = response.json().data.order;
+    const { callback, purchase, purchaseId } = latestJibitPurchase();
+    purchase.status = "SUCCESSFUL";
+
+    const [callbackResponse, verifyResponse] = await Promise.all([
+      sendJibitCallback(callback, purchaseId),
+      app.inject({
+        method: "POST",
+        url: `/api/v1/payments/jibit/orders/${order.id}/verify`,
+        headers: { cookie: userCookie },
+      }),
+    ]);
+
+    expect(callbackResponse.statusCode).toBe(303);
+    expect(verifyResponse.statusCode).toBe(200);
+    expect(verifyResponse.json().data.payment.status).toBe("successful");
+    const paidOrder = await app.prisma.order.findUnique({
+      where: { id: order.id },
+      include: { items: { include: { deliveries: true } } },
+    });
+    expect(paidOrder).toMatchObject({
+      paymentStatus: "PAID",
+      status: "DELIVERED",
+    });
+    expect(paidOrder.items[0].deliveries).toHaveLength(1);
+    expect(
+      await app.prisma.deliveryItem.count({
+        where: { reservedForOrderItemId: order.items[0].id },
+      }),
+    ).toBe(0);
+  });
+
+  it("recovers after provider verification succeeded before the local commit", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const order = response.json().data.order;
+    const provider = latestJibitPurchase();
+    provider.purchase.status = "SUCCESSFUL";
+    failNextJibitVerify = true;
+
+    const callbackResponse = await sendJibitCallback(
+      provider.callback,
+      provider.purchaseId,
+    );
+    expect(callbackResponse.statusCode).toBe(303);
+    expect(callbackResponse.headers.location).toContain("status=successful");
+    expect(
+      await app.prisma.order.findUnique({ where: { id: order.id } }),
+    ).toMatchObject({ paymentStatus: "PAID", status: "DELIVERED" });
+  });
+
+  it("does not convert a Jibit refund into wallet credit", async () => {
+    const walletBefore = await app.prisma.wallet.findUnique({ where: { userId } });
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/orders/${successfulDirectOrderId}/refund`,
+      headers: { cookie: adminCookie },
+      payload: { note: "provider refund required" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe(
+      "DIRECT_PAYMENT_REFUND_REQUIRES_PROVIDER",
+    );
+    expect(await app.prisma.wallet.findUnique({ where: { userId } })).toMatchObject({
+      balance: walletBefore.balance,
+    });
+  });
+
+  it("releases reserved inventory after a failed Jibit payment", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const order = response.json().data.order;
+    const { callback, purchase, purchaseId } = latestJibitPurchase();
+    purchase.status = "FAILED";
+
+    const callbackResponse = await sendJibitCallback(callback, purchaseId);
+    expect(callbackResponse.statusCode).toBe(303);
+    expect(callbackResponse.headers.location).toContain("status=failed");
+    expect(
+      await app.prisma.order.findUnique({ where: { id: order.id } }),
+    ).toMatchObject({ paymentStatus: "UNPAID", status: "CANCELLED" });
+    expect(
+      await app.prisma.deliveryItem.count({
+        where: { poolId: directPool.id, status: "RESERVED" },
+      }),
+    ).toBe(0);
+  });
+
+  it("does not fulfill a Jibit payment when the verified amount mismatches", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const order = response.json().data.order;
+    reviewDirectOrderId = order.id;
+    const { callback, purchase, purchaseId } = latestJibitPurchase();
+    purchase.status = "SUCCESSFUL";
+    purchase.amount += 10;
+
+    const callbackResponse = await sendJibitCallback(callback, purchaseId);
+    expect(callbackResponse.statusCode).toBe(303);
+    expect(callbackResponse.headers.location).toContain("status=review");
+    expect(
+      await app.prisma.order.findUnique({ where: { id: order.id } }),
+    ).toMatchObject({ paymentStatus: "UNPAID", status: "DRAFT" });
+    expect(
+      await app.prisma.paymentAttempt.findFirst({ where: { orderId: order.id } }),
+    ).toMatchObject({
+      lastErrorCode: "JIBIT_PAYMENT_MISMATCH",
+      status: "REVIEW_REQUIRED",
+    });
+    expect(
+      await app.prisma.orderDelivery.count({
+        where: { orderItemId: order.items[0].id },
+      }),
+    ).toBe(0);
+  });
+
+  it("blocks manual admin status changes while a direct payment is unresolved", async () => {
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/admin/orders/${reviewDirectOrderId}/status`,
+      headers: { cookie: adminCookie },
+      payload: { status: "CANCELLED" },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe("DIRECT_PAYMENT_STATUS_LOCKED");
+    expect(
+      await app.prisma.order.findUnique({ where: { id: reviewDirectOrderId } }),
+    ).toMatchObject({ paymentStatus: "UNPAID", status: "DRAFT" });
+  });
+
+  it("cancels the local order and releases inventory when Jibit initiation fails", async () => {
+    const availableBefore = await app.prisma.deliveryItem.count({
+      where: { poolId: directPool.id, status: "AVAILABLE" },
+    });
+    failNextJibitCreate = true;
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+
+    expect(response.statusCode).toBe(500);
+    const failedAttempt = await app.prisma.paymentAttempt.findFirst({
+      where: { lastErrorCode: "JIBIT_UNAVAILABLE" },
+      orderBy: { createdAt: "desc" },
+      include: { order: true },
+    });
+    expect(failedAttempt).toMatchObject({
+      status: "FAILED",
+      order: { paymentStatus: "UNPAID", status: "CANCELLED" },
+    });
+    expect(
+      await app.prisma.deliveryItem.count({
+        where: { poolId: directPool.id, status: "AVAILABLE" },
+      }),
+    ).toBe(availableBefore);
+  });
+
+  it("keeps a verified callback retryable when Jibit is temporarily unavailable", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const order = response.json().data.order;
+    const provider = latestJibitPurchase();
+
+    failNextJibitVerify = true;
+    const pendingCallback = await sendJibitCallback(
+      provider.callback,
+      provider.purchaseId,
+    );
+    expect(pendingCallback.statusCode).toBe(303);
+    expect(pendingCallback.headers["cache-control"]).toBe("no-store");
+    expect(pendingCallback.headers.location).toContain("status=pending");
+    expect(
+      await app.prisma.paymentAttempt.findFirst({ where: { orderId: order.id } }),
+    ).toMatchObject({ status: "PENDING" });
+
+    provider.purchase.status = "SUCCESSFUL";
+    const successfulRetry = await sendJibitCallback(
+      provider.callback,
+      provider.purchaseId,
+    );
+    expect(successfulRetry.statusCode).toBe(303);
+    expect(successfulRetry.headers.location).toContain("status=successful");
+    expect(
+      await app.prisma.order.findUnique({ where: { id: order.id } }),
+    ).toMatchObject({ paymentStatus: "PAID", status: "DELIVERED" });
+  });
+
+  it("reconciles stale pending payments without releasing inventory blindly", async () => {
+    const staleResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+    expect(staleResponse.statusCode).toBe(201);
+    const staleOrder = staleResponse.json().data.order;
+    const staleProvider = latestJibitPurchase();
+    await app.prisma.paymentAttempt.updateMany({
+      where: { orderId: staleOrder.id },
+      data: { reconcileAfter: new Date(Date.now() - 1_000) },
+    });
+
+    const nextResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/orders",
+      headers: { cookie: userCookie },
+      payload: {
+        productId: directInstantProduct.id,
+        paymentMethod: "JIBIT",
+      },
+    });
+    expect(nextResponse.statusCode).toBe(201);
+    const nextProvider = latestJibitPurchase();
+
+    expect(
+      await app.prisma.paymentAttempt.findFirst({ where: { orderId: staleOrder.id } }),
+    ).toMatchObject({ status: "PENDING", providerStatus: "PENDING" });
+    expect(
+      await app.prisma.deliveryItem.findFirst({
+        where: { reservedForOrderItemId: staleOrder.items[0].id },
+      }),
+    ).toMatchObject({ status: "RESERVED" });
+
+    staleProvider.purchase.status = "FAILED";
+    nextProvider.purchase.status = "FAILED";
+    expect(
+      (await sendJibitCallback(staleProvider.callback, staleProvider.purchaseId))
+        .statusCode,
+    ).toBe(303);
+    expect(
+      (await sendJibitCallback(nextProvider.callback, nextProvider.purchaseId))
+        .statusCode,
+    ).toBe(303);
+  });
+
   it("blocks an empty delivery pool without charging the wallet", async () => {
     const walletBefore = await app.prisma.wallet.findUnique({ where: { userId } });
     const orderCountBefore = await app.prisma.order.count({ where: { userId } });
@@ -775,7 +1237,7 @@ describe("wikiacc backend api", () => {
     expect(order.items[0].deliveries[0].contentSnapshot).toBe("READY-CODE-1");
 
     const availableCount = await app.prisma.deliveryItem.count({
-      where: { status: "AVAILABLE" },
+      where: { poolId: instantProduct.deliveryPoolId, status: "AVAILABLE" },
     });
     expect(availableCount).toBe(1);
   });

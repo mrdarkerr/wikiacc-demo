@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { created, ok } from "../../shared/http/reply.js";
 import { parse } from "../../shared/validation/parse.js";
+import { initiateJibitPayment } from "../payments/service.js";
 import {
   createOrderSchema,
   submitOrderFieldValuesSchema,
@@ -28,9 +29,23 @@ function paginationMeta(page, perPage, total) {
   };
 }
 
-export async function orderRoutes(app) {
+export async function orderRoutes(app, options) {
   app.post("/", { preHandler: app.authenticate }, async (request, reply) => {
     const input = parse(createOrderSchema, request.body);
+    if (input.paymentMethod === "JIBIT") {
+      const result = await initiateJibitPayment(
+        app.prisma,
+        request.user.id,
+        input,
+        {
+          callbackBaseUrl: options.jibitCallbackUrl,
+          client: options.jibitClient,
+          logger: app.log,
+          reconcileMinutes: options.jibitReconcileMinutes,
+        },
+      );
+      return created(reply, result);
+    }
     const order = await createOrder(app.prisma, request.user.id, input);
     return created(reply, { order });
   });

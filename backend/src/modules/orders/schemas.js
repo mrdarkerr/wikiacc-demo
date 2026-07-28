@@ -8,6 +8,7 @@ export const orderFieldValueSchema = z.record(
 export const createOrderSchema = z.object({
   productId: z.string().min(1),
   quantity: z.number().int().min(1).max(10).default(1),
+  paymentMethod: z.enum(["WALLET", "JIBIT"]).default("WALLET"),
   fieldValues: orderFieldValueSchema.optional(),
   note: z.string().trim().max(1000).optional(),
 });

@@ -1,4 +1,4 @@
-import { paymentRequired } from "../../shared/errors.js";
+import { badRequest, paymentRequired } from "../../shared/errors.js";
 import {
   countWalletTransactions,
   getWalletByUserId,
@@ -60,6 +60,12 @@ export async function refundOrderByAdmin(prisma, adminId, orderId, note) {
 
     if (!order || order.paymentStatus !== "PAID") {
       return null;
+    }
+    if (order.paymentMethod !== "WALLET") {
+      throw badRequest(
+        "DIRECT_PAYMENT_REFUND_REQUIRES_PROVIDER",
+        "Direct payments must be refunded through the payment provider",
+      );
     }
 
     const updatedWallet = await tx.wallet.update({

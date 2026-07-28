@@ -2,6 +2,8 @@ import { findProductForOrder } from "../catalog/repository.js";
 import {
   allocateDeliveryItems,
   getPoolAvailability,
+  releaseDeliveryItems,
+  reserveDeliveryItems,
 } from "../delivery/repository.js";
 import {
   badRequest,
@@ -46,6 +48,139 @@ function normalizeFieldValues(fields, values = {}) {
     missingRequired,
     values: normalized,
   };
+}
+
+export async function createPendingJibitOrder(
+  prisma,
+  userId,
+  input,
+  {
+    attemptId,
+    clientReferenceNumber,
+    reconcileAfter,
+  },
+) {
+  const product = await findProductForOrder(prisma, input.productId);
+  if (!product) {
+    throw notFound("PRODUCT_NOT_FOUND", "Product was not found or is inactive");
+  }
+  if (product.type === "INSTANT_DELIVERY" && !product.deliveryPoolId) {
+    throw badRequest("DELIVERY_POOL_MISSING", "Product has no delivery pool");
+  }
+
+  const quantity = input.quantity ?? 1;
+  const totalAmount = product.price * quantity;
+  const providerAmountRial = totalAmount * 10;
+  if (!Number.isSafeInteger(providerAmountRial) || providerAmountRial <= 0) {
+    throw badRequest("PAYMENT_AMOUNT_INVALID", "Payment amount is invalid");
+  }
+  const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
+
+  const orderId = await prisma.$transaction(async (tx) => {
+    const activePayments = await tx.paymentAttempt.count({
+      where: {
+        provider: "JIBIT",
+        status: { in: ["CREATED", "PENDING", "REVIEW_REQUIRED"] },
+        order: { userId, paymentStatus: "UNPAID" },
+      },
+    });
+    if (activePayments >= 3) {
+      throw conflict(
+        "TOO_MANY_PENDING_PAYMENTS",
+        "Too many direct payments are awaiting confirmation",
+      );
+    }
+
+    if (product.type === "INSTANT_DELIVERY") {
+      const availableItems = await getPoolAvailability(tx, product.deliveryPoolId);
+      if (availableItems < quantity) {
+        throw conflict(
+          "OUT_OF_STOCK",
+          "Not enough ready delivery items are available",
+        );
+      }
+    }
+
+    const order = await tx.order.create({
+      data: {
+        userId,
+        status: "DRAFT",
+        paymentStatus: "UNPAID",
+        paymentMethod: "JIBIT",
+        totalAmount,
+        note: input.note,
+      },
+    });
+    const orderItem = await tx.orderItem.create({
+      data: {
+        orderId: order.id,
+        productId: product.id,
+        titleSnapshot: product.title,
+        priceSnapshot: product.price,
+        productTypeSnapshot: product.type,
+        quantity,
+      },
+    });
+
+    if (product.type === "CUSTOM_FORM" && fieldState.values.length) {
+      await tx.orderFieldValue.createMany({
+        data: fieldState.values.map((value) => ({
+          ...value,
+          orderItemId: orderItem.id,
+        })),
+      });
+    }
+    if (product.type === "INSTANT_DELIVERY") {
+      await reserveDeliveryItems(tx, product.deliveryPoolId, orderItem.id, quantity);
+    }
+
+    await tx.paymentAttempt.create({
+      data: {
+        id: attemptId,
+        orderId: order.id,
+        provider: "JIBIT",
+        status: "CREATED",
+        clientReferenceNumber,
+        providerAmountRial,
+        reconcileAfter,
+      },
+    });
+    return order.id;
+  });
+
+  return {
+    order: withoutAdminFields(await getUserOrder(prisma, userId, orderId)),
+    attempt: await prisma.paymentAttempt.findUnique({ where: { id: attemptId } }),
+    fieldState,
+  };
+}
+
+export async function failPendingJibitOrder(prisma, attemptId, errorCode) {
+  return prisma.$transaction(async (tx) => {
+    const attempt = await tx.paymentAttempt.findUnique({
+      where: { id: attemptId },
+      include: { order: { include: { items: true } } },
+    });
+    if (!attempt || attempt.status === "SUCCESSFUL") {
+      return attempt;
+    }
+
+    for (const item of attempt.order.items) {
+      await releaseDeliveryItems(tx, item.id);
+    }
+    await tx.order.update({
+      where: { id: attempt.orderId },
+      data: { status: "CANCELLED" },
+    });
+    return tx.paymentAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        status: "FAILED",
+        failedAt: new Date(),
+        lastErrorCode: errorCode,
+      },
+    });
+  });
 }
 
 export async function createOrder(prisma, userId, input) {

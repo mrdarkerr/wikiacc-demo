@@ -244,6 +244,14 @@ export type OrderStatus =
   | "REFUNDED";
 
 export type PaymentStatus = "UNPAID" | "PAID" | "REFUNDED";
+export type PaymentMethod = "WALLET" | "JIBIT";
+export type PaymentAttemptStatus =
+  | "CREATED"
+  | "PENDING"
+  | "SUCCESSFUL"
+  | "FAILED"
+  | "EXPIRED"
+  | "REVIEW_REQUIRED";
 
 export type OrderFieldValue = {
   id: string;
@@ -273,6 +281,7 @@ export type Order = {
   id: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
   totalAmount: number;
   note?: string | null;
   createdAt: string;
@@ -312,8 +321,26 @@ export type CreateTicketRequest = {
 export type CreateOrderRequest = {
   productId: string;
   quantity?: number;
+  paymentMethod?: PaymentMethod;
   fieldValues?: Record<string, string>;
   note?: string;
+};
+
+export type DirectPayment = {
+  attemptId: string;
+  reconcileAfter: string;
+  provider: "JIBIT";
+  redirectUrl: string;
+};
+
+export type CreateOrderResponse = {
+  order: Order;
+  payment?: DirectPayment;
+};
+
+export type DirectPaymentResult = {
+  orderId: string;
+  status: "successful" | "failed" | "pending" | "review";
 };
 
 export type Wallet = {
@@ -379,8 +406,27 @@ export type AdminUser = User & {
   wallet?: Wallet | null;
 };
 
+export type PaymentAttemptSummary = {
+  id: string;
+  provider: "JIBIT";
+  status: PaymentAttemptStatus;
+  clientReferenceNumber: string;
+  providerPurchaseId?: string | null;
+  providerAmountRial: number;
+  providerStatus?: string | null;
+  pspReferenceNumber?: string | null;
+  pspMaskedCardNumber?: string | null;
+  lastErrorCode?: string | null;
+  reconcileAfter: string;
+  verifiedAt?: string | null;
+  failedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AdminOrder = Order & {
   adminNote?: string | null;
+  paymentAttempts: PaymentAttemptSummary[];
   user?: Pick<User, "id" | "email" | "name" | "phone"> | null;
   items: Array<
     OrderItem & {

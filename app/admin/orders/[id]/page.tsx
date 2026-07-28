@@ -30,6 +30,15 @@ const orderStatuses: OrderStatus[] = [
   "REFUNDED",
 ];
 
+const paymentAttemptLabels = {
+  CREATED: "در حال ایجاد",
+  PENDING: "در انتظار تأیید",
+  SUCCESSFUL: "موفق",
+  FAILED: "ناموفق",
+  EXPIRED: "منقضی",
+  REVIEW_REQUIRED: "نیازمند بررسی دستی",
+} as const;
+
 const statusLabels: Record<OrderStatus, string> = {
   AWAITING_ADMIN: "در انتظار ادمین",
   CANCELLED: "لغو شده",
@@ -96,6 +105,15 @@ export default function AdminOrderDetailPage() {
   const deliveries = useMemo(
     () => order?.items.flatMap((item) => item.deliveries) ?? [],
     [order],
+  );
+  const latestPaymentAttempt = order?.paymentAttempts[0];
+  const directStatusLocked = Boolean(
+    order?.paymentMethod === "JIBIT" &&
+      order.paymentStatus === "UNPAID" &&
+      latestPaymentAttempt &&
+      ["CREATED", "PENDING", "REVIEW_REQUIRED"].includes(
+        latestPaymentAttempt.status,
+      ),
   );
 
   async function updateStatus(event: FormEvent<HTMLFormElement>) {
@@ -178,8 +196,14 @@ export default function AdminOrderDetailPage() {
 
       {message ? <AdminState tone="success">{message}</AdminState> : null}
       {error ? <AdminState tone="danger">{error}</AdminState> : null}
+      {latestPaymentAttempt?.status === "REVIEW_REQUIRED" ? (
+        <AdminState tone="danger">
+          پرداخت جیبیت به‌دلیل عدم تطبیق اطلاعات نیازمند بررسی دستی است. تا پیش از
+          تطبیق مبلغ و شناسه‌های جیبیت، سفارش را تحویل ندهید.
+        </AdminState>
+      ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <p className="text-sm text-muted-foreground">کاربر</p>
           <p className="mt-2 font-medium">{userLabel(order.user)}</p>
@@ -189,6 +213,17 @@ export default function AdminOrderDetailPage() {
           <p className="mt-2 text-lg font-bold">
             {formatCurrency(order.totalAmount)}
           </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">روش پرداخت</p>
+          <p className="mt-2 font-medium">
+            {order.paymentMethod === "JIBIT" ? "درگاه جیبیت" : "کیف پول"}
+          </p>
+          {latestPaymentAttempt ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {paymentAttemptLabels[latestPaymentAttempt.status]}
+            </p>
+          ) : null}
         </div>
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <p className="text-sm text-muted-foreground">فرم‌های ارسالی</p>
@@ -274,6 +309,50 @@ export default function AdminOrderDetailPage() {
                 {order.note || "یادداشتی ثبت نشده است."}
               </p>
             </div>
+
+            {latestPaymentAttempt ? (
+              <div className="rounded-md border border-border p-4">
+                <h3 className="text-sm font-semibold">جزئیات امن پرداخت جیبیت</h3>
+                <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-muted-foreground">شناسه خرید جیبیت</dt>
+                    <dd className="mt-1 break-all" dir="ltr">
+                      {latestPaymentAttempt.providerPurchaseId || "-"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">مرجع داخلی</dt>
+                    <dd className="mt-1 break-all" dir="ltr">
+                      {latestPaymentAttempt.clientReferenceNumber}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">وضعیت جیبیت</dt>
+                    <dd className="mt-1" dir="ltr">
+                      {latestPaymentAttempt.providerStatus || "-"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">مبلغ درگاه</dt>
+                    <dd className="mt-1">
+                      {latestPaymentAttempt.providerAmountRial.toLocaleString("fa-IR")} ریال
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">مرجع PSP</dt>
+                    <dd className="mt-1 break-all" dir="ltr">
+                      {latestPaymentAttempt.pspReferenceNumber || "-"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">کد بررسی</dt>
+                    <dd className="mt-1 break-all" dir="ltr">
+                      {latestPaymentAttempt.lastErrorCode || "-"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
           </div>
         </AdminSection>
 
@@ -283,7 +362,7 @@ export default function AdminOrderDetailPage() {
               وضعیت سفارش
               <Select
                 className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                disabled={saving}
+                disabled={saving || directStatusLocked}
                 value={status}
                 onChange={(event) => setStatus(event.target.value as OrderStatus)}
               >
@@ -293,6 +372,11 @@ export default function AdminOrderDetailPage() {
                   </option>
                 ))}
               </Select>
+              {directStatusLocked ? (
+                <span className="mt-2 block text-xs text-amber-700 dark:text-amber-300">
+                  تا تعیین نتیجه پرداخت جیبیت، تغییر وضعیت سفارش قفل است.
+                </span>
+              ) : null}
             </label>
 
             <label className="block text-sm font-medium">
@@ -315,6 +399,7 @@ export default function AdminOrderDetailPage() {
               className="w-full"
               disabled={
                 saving ||
+                order.paymentMethod !== "WALLET" ||
                 order.paymentStatus !== "PAID" ||
                 order.status === "REFUNDED"
               }
@@ -323,7 +408,9 @@ export default function AdminOrderDetailPage() {
               onClick={refundOrder}
             >
               <RotateCcw className="size-4" />
-              بازگشت وجه
+              {order.paymentMethod === "JIBIT"
+                ? "بازگشت وجه از پنل جیبیت"
+                : "بازگشت وجه"}
             </Button>
           </div>
         </AdminSection>

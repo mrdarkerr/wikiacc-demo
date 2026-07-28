@@ -18,7 +18,9 @@ import type {
   CreateAdminSmsSenderRequest,
   CreateAdminTicketMessageRequest,
   CreateOrderRequest,
+  CreateOrderResponse,
   CreateTicketRequest,
+  DirectPaymentResult,
   LoginRequest,
   LoginResponse,
   OtpChallenge,
@@ -206,7 +208,7 @@ export const api = {
   },
   orders: {
     create: (body: CreateOrderRequest) =>
-      apiFetch<{ order: Order }>("/orders", { body, method: "POST" }),
+      apiFetch<CreateOrderResponse>("/orders", { body, method: "POST" }),
     list: () =>
       apiFetch<{ orders: Order[] }>("/orders/my", {
         query: { page: 1, perPage: 50 },
@@ -214,6 +216,13 @@ export const api = {
     listPage: (query?: { page?: number; perPage?: number }) =>
       apiFetchWithMeta<{ orders: Order[] }>("/orders/my", { query }),
     get: (id: string) => apiFetch<{ order: Order }>(`/orders/${id}`),
+  },
+  payments: {
+    verifyJibitOrder: (orderId: string) =>
+      apiFetch<{ payment: DirectPaymentResult }>(
+        `/payments/jibit/orders/${orderId}/verify`,
+        { method: "POST" },
+      ),
   },
   siteContent: {
     get: () => apiFetch<PublicSiteContent>("/site-content"),

@@ -41,6 +41,26 @@ async function findProductOrThrow(prisma, id) {
 
 const adminOrderInclude = {
   user: { select: { id: true, email: true, name: true, phone: true } },
+  paymentAttempts: {
+    select: {
+      id: true,
+      provider: true,
+      status: true,
+      clientReferenceNumber: true,
+      providerPurchaseId: true,
+      providerAmountRial: true,
+      providerStatus: true,
+      pspReferenceNumber: true,
+      pspMaskedCardNumber: true,
+      lastErrorCode: true,
+      reconcileAfter: true,
+      verifiedAt: true,
+      failedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  },
   items: {
     include: {
       product: true,
@@ -102,14 +122,42 @@ export async function adminRoutes(app) {
   app.patch("/orders/:id/status", async (request, reply) => {
     const params = parse(idParamsSchema, request.params);
     const input = parse(updateOrderStatusSchema, request.body);
-    const order = await app.prisma.order.update({
-      where: { id: params.id },
-      data: {
-        status: input.status,
-        ...(input.adminNote === undefined ? {} : { adminNote: input.adminNote }),
-        ...(input.note === undefined ? {} : { note: input.note }),
-      },
-      include: adminOrderInclude,
+    const order = await app.prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id: params.id },
+        include: {
+          paymentAttempts: {
+            where: {
+              status: { in: ["CREATED", "PENDING", "REVIEW_REQUIRED"] },
+            },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      });
+      if (!current) {
+        throw notFound("ORDER_NOT_FOUND", "Order was not found");
+      }
+      if (
+        current.paymentMethod === "JIBIT" &&
+        current.paymentStatus === "UNPAID" &&
+        current.status !== input.status &&
+        current.paymentAttempts.length > 0
+      ) {
+        throw conflict(
+          "DIRECT_PAYMENT_STATUS_LOCKED",
+          "Direct payment status cannot change before payment reconciliation",
+        );
+      }
+      return tx.order.update({
+        where: { id: params.id },
+        data: {
+          status: input.status,
+          ...(input.adminNote === undefined ? {} : { adminNote: input.adminNote }),
+          ...(input.note === undefined ? {} : { note: input.note }),
+        },
+        include: adminOrderInclude,
+      });
     });
     return ok(reply, { order });
   });

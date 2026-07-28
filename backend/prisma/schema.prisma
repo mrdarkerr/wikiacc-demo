@@ -53,6 +53,24 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentMethod {
+  WALLET
+  JIBIT
+}
+
+enum PaymentProvider {
+  JIBIT
+}
+
+enum PaymentAttemptStatus {
+  CREATED
+  PENDING
+  SUCCESSFUL
+  FAILED
+  EXPIRED
+  REVIEW_REQUIRED
+}
+
 enum WalletTransactionType {
   ADMIN_CREDIT
   ADMIN_DEBIT
@@ -81,22 +99,22 @@ enum TicketPriority {
 }
 
 model User {
-  id                       String              @id @default(cuid())
-  email                    String?             @unique
-  phone                    String?             @unique
-  name                     String
-  passwordHash             String?
-  role                     UserRole            @default(USER)
-  wallet                   Wallet?
-  orders                   Order[]
-  tickets                  Ticket[]
-  ticketMessages           TicketMessage[]
-  walletTransactions       WalletTransaction[] @relation("WalletTransactionUser")
-  adminWalletTransactions  WalletTransaction[] @relation("WalletTransactionAdmin")
-  siteContentDraftUpdates  SiteContent[]       @relation("SiteContentDraftUpdater")
-  siteContentPublications  SiteContent[]       @relation("SiteContentPublisher")
-  createdAt                DateTime            @default(now())
-  updatedAt                DateTime            @updatedAt
+  id                      String              @id @default(cuid())
+  email                   String?             @unique
+  phone                   String?             @unique
+  name                    String
+  passwordHash            String?
+  role                    UserRole            @default(USER)
+  wallet                  Wallet?
+  orders                  Order[]
+  tickets                 Ticket[]
+  ticketMessages          TicketMessage[]
+  walletTransactions      WalletTransaction[] @relation("WalletTransactionUser")
+  adminWalletTransactions WalletTransaction[] @relation("WalletTransactionAdmin")
+  siteContentDraftUpdates SiteContent[]       @relation("SiteContentDraftUpdater")
+  siteContentPublications SiteContent[]       @relation("SiteContentPublisher")
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
 }
 
 model ProductCategory {
@@ -181,12 +199,15 @@ model DeliveryItem {
   orderDeliveries        OrderDelivery[]
   content                String
   status                 DeliveryItemStatus @default(AVAILABLE)
+  reservedForOrderItemId String?
+  reservedAt             DateTime?
   deliveredToOrderItemId String?
   deliveredAt            DateTime?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
   @@index([poolId, status, createdAt])
+  @@index([reservedForOrderItemId])
 }
 
 model Order {
@@ -194,10 +215,12 @@ model Order {
   userId              String
   user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   items               OrderItem[]
+  paymentAttempts     PaymentAttempt[]
   tickets             Ticket[]
   walletTransactionId String?
   status              OrderStatus      @default(DRAFT)
   paymentStatus       PaymentStatus    @default(UNPAID)
+  paymentMethod       PaymentMethod    @default(WALLET)
   totalAmount         Int
   note                String?
   adminNote           String?
@@ -221,6 +244,30 @@ model OrderItem {
   productTypeSnapshot ProductType
   quantity            Int               @default(1)
   createdAt           DateTime          @default(now())
+}
+
+model PaymentAttempt {
+  id                    String               @id
+  orderId               String
+  order                 Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider              PaymentProvider      @default(JIBIT)
+  status                PaymentAttemptStatus @default(CREATED)
+  clientReferenceNumber String               @unique
+  providerPurchaseId    String?              @unique
+  providerAmountRial    Int
+  providerStatus        String?
+  redirectUrl           String?
+  pspReferenceNumber    String?
+  pspMaskedCardNumber   String?
+  lastErrorCode         String?
+  reconcileAfter        DateTime
+  verifiedAt            DateTime?
+  failedAt              DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@index([orderId, createdAt])
+  @@index([status, reconcileAfter])
 }
 
 model OrderFieldValue {
