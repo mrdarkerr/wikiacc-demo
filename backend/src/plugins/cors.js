@@ -19,7 +19,7 @@ export const corsPlugin = fp(async (app) => {
         return;
       }
 
-      callback(new Error("Origin is not allowed"), false);
+      callback(null, false);
     },
   });
 });

@@ -16,6 +16,13 @@ import {
 } from "../orders/service.js";
 
 const ACTIVE_ATTEMPT_STATUSES = ["CREATED", "PENDING"];
+const FAILED_PROVIDER_STATUSES = new Set([
+  "FAILED",
+  "EXPIRED",
+  "CANCELED",
+  "CANCELLED",
+]);
+const SUCCESSFUL_PROVIDER_STATUS = "SUCCESSFUL";
 
 function buildCallbackUrl(baseUrl, attemptId) {
   const url = new URL(baseUrl);
@@ -27,6 +34,30 @@ function providerValue(value) {
   return typeof value === "string" || typeof value === "number"
     ? String(value)
     : undefined;
+}
+
+function normalizedProviderStatus(value) {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toUpperCase();
+  return normalized || undefined;
+}
+
+function responseProviderStatus(response, fields = ["status", "state"]) {
+  for (const field of fields) {
+    const status = normalizedProviderStatus(response?.[field]);
+    if (status) return status;
+  }
+  return undefined;
+}
+
+function isFailedProviderStatus(status) {
+  return FAILED_PROVIDER_STATUSES.has(status);
+}
+
+function terminalProviderOutcome(status) {
+  if (status === SUCCESSFUL_PROVIDER_STATUS) return "successful";
+  if (isFailedProviderStatus(status)) return "failed";
+  return undefined;
 }
 
 function providerAmount(purchase) {
@@ -296,17 +327,44 @@ export async function verifyJibitPayment(
     verificationError = error;
   }
   const purchase = await client.getPurchase(attempt.providerPurchaseId);
-  const inquiryStatus = providerValue(purchase.status) ?? "UNKNOWN";
-  if (verificationError && inquiryStatus !== "SUCCESSFUL") {
+  const verificationStatus = responseProviderStatus(verification);
+  const inquiryStatus = responseProviderStatus(purchase, ["state", "status"]);
+  if (
+    verificationError &&
+    inquiryStatus !== SUCCESSFUL_PROVIDER_STATUS &&
+    !isFailedProviderStatus(inquiryStatus)
+  ) {
     throw verificationError;
   }
-  const providerStatus =
-    providerValue(verification?.status ?? purchase.status) ?? "UNKNOWN";
 
-  if (["FAILED", "CANCELLED", "EXPIRED"].includes(providerStatus)) {
+  const verificationOutcome = terminalProviderOutcome(verificationStatus);
+  const inquiryOutcome = terminalProviderOutcome(inquiryStatus);
+  if (
+    verificationOutcome &&
+    inquiryOutcome &&
+    verificationOutcome !== inquiryOutcome
+  ) {
+    return markReviewRequired(
+      prisma,
+      attempt,
+      `${verificationStatus}/${inquiryStatus}`,
+      "JIBIT_PAYMENT_STATE_CONFLICT",
+    );
+  }
+
+  let providerStatus = verificationStatus ?? inquiryStatus ?? "UNKNOWN";
+  if (inquiryOutcome === "failed") {
+    providerStatus = inquiryStatus;
+  } else if (verificationOutcome) {
+    providerStatus = verificationStatus;
+  } else if (inquiryOutcome === "successful") {
+    providerStatus = inquiryStatus;
+  }
+
+  if (isFailedProviderStatus(providerStatus)) {
     return markFailed(prisma, attempt, providerStatus);
   }
-  if (providerStatus !== "SUCCESSFUL") {
+  if (providerStatus !== SUCCESSFUL_PROVIDER_STATUS) {
     await prisma.paymentAttempt.updateMany({
       where: { id: attempt.id, status: { in: ACTIVE_ATTEMPT_STATUSES } },
       data: {
