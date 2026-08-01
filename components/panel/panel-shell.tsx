@@ -130,6 +130,17 @@ export function PanelShell({ children }: PanelShellProps) {
               <Bell className="size-4" />
             </Button>
             <ThemeToggle />
+            <Button
+              aria-label="خروج از حساب کاربری"
+              className="lg:hidden"
+              size="icon"
+              title="خروج"
+              type="button"
+              variant="outline"
+              onClick={handleLogout}
+            >
+              <LogOut className="size-4" />
+            </Button>
           </div>
         </div>
       </header>

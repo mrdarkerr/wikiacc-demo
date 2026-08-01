@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import {
   Boxes,
   ClipboardList,
@@ -11,12 +12,14 @@ import {
   List,
   ListPlus,
   LogOut,
+  Menu,
   MessageSquareText,
   PackagePlus,
   PanelsTopLeft,
   Tags,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -139,15 +142,168 @@ function getPageTitle(pathname: string) {
   return "پنل ادمین";
 }
 
+type AdminNavigationProps = {
+  className?: string;
+  onNavigate?: () => void;
+  pathname: string;
+};
+
+function AdminNavigation({
+  className,
+  onNavigate,
+  pathname,
+}: AdminNavigationProps) {
+  return (
+    <nav
+      aria-label="منوی مدیریت"
+      className={cn("grid content-start gap-1 p-3", className)}
+    >
+      {navItems.map((item) => {
+        const active = isActivePath(pathname, item.href);
+        const Icon = item.icon;
+
+        return (
+          <div key={item.href}>
+            <Link
+              aria-current={active && !item.children ? "page" : undefined}
+              className={cn(
+                "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground",
+                active &&
+                  "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+              )}
+              href={item.href}
+              onClick={onNavigate}
+            >
+              <Icon className="size-4" />
+              {item.label}
+            </Link>
+            {item.children ? (
+              <div className="mt-1 grid gap-1 pr-7">
+                {item.children.map((child) => {
+                  const childActive = isChildActivePath(pathname, child.href);
+                  const ChildIcon = child.icon;
+
+                  return (
+                    <Link
+                      aria-current={childActive ? "page" : undefined}
+                      className={cn(
+                        "flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground",
+                        childActive && "bg-muted text-foreground",
+                      )}
+                      href={child.href}
+                      key={child.href}
+                      onClick={onNavigate}
+                    >
+                      <ChildIcon className="size-3.5" />
+                      {child.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+type AdminSidebarFooterProps = {
+  onLogout: () => void;
+};
+
+function AdminSidebarFooter({ onLogout }: AdminSidebarFooterProps) {
+  return (
+    <div className="border-t border-border p-4">
+      <div className="rounded-md bg-muted p-3 text-sm">
+        <p className="font-medium">دسترسی مدیریتی</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          مدیریت سفارش ها، تیکت ها و کیف پول کاربران
+        </p>
+      </div>
+      <Button
+        className="mt-3 w-full justify-start"
+        type="button"
+        variant="ghost"
+        onClick={onLogout}
+      >
+        <LogOut className="size-4" />
+        خروج
+      </Button>
+    </div>
+  );
+}
+
 export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const pageTitle = getPageTitle(pathname);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    mobileMenuCloseButtonRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    const desktopMediaQuery = window.matchMedia("(min-width: 1024px)");
+
+    function handleDesktopChange(event: MediaQueryListEvent) {
+      if (event.matches) setMobileMenuOpen(false);
+    }
+
+    desktopMediaQuery.addEventListener("change", handleDesktopChange);
+    return () =>
+      desktopMediaQuery.removeEventListener("change", handleDesktopChange);
+  }, []);
 
   async function handleLogout() {
+    setMobileMenuOpen(false);
     await api.auth.logout();
     router.push("/login");
     router.refresh();
+  }
+
+  function handleMobileMenuKeyDown(
+    event: React.KeyboardEvent<HTMLElement>,
+  ) {
+    if (event.key !== "Tab") return;
+
+    const focusableElements = Array.from(
+      mobileMenuRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    );
+    const firstElement = focusableElements.at(0);
+    const lastElement = focusableElements.at(-1);
+
+    if (!firstElement || !lastElement) return;
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
   }
 
   return (
@@ -167,75 +323,32 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
         </div>
 
-        <nav className="grid gap-1 p-3">
-          {navItems.map((item) => {
-            const active = isActivePath(pathname, item.href);
-            const Icon = item.icon;
-
-            return (
-              <div key={item.href}>
-                <Link
-                  className={cn(
-                    "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground",
-                    active &&
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-                  )}
-                  href={item.href}
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </Link>
-                {item.children ? (
-                  <div className="mt-1 grid gap-1 pr-7">
-                    {item.children.map((child) => {
-                      const childActive = isChildActivePath(pathname, child.href);
-                      const ChildIcon = child.icon;
-
-                      return (
-                        <Link
-                          className={cn(
-                            "flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground",
-                            childActive && "bg-muted text-foreground",
-                          )}
-                          href={child.href}
-                          key={child.href}
-                        >
-                          <ChildIcon className="size-3.5" />
-                          {child.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="mt-auto border-t border-border p-4">
-          <div className="rounded-md bg-muted p-3 text-sm">
-            <p className="font-medium">دسترسی مدیریتی</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              مدیریت سفارش ها، تیکت ها و کیف پول کاربران
-            </p>
-          </div>
-          <Button
-            className="mt-3 w-full justify-start"
-            type="button"
-            variant="ghost"
-            onClick={handleLogout}
-          >
-            <LogOut className="size-4" />
-            خروج
-          </Button>
-        </div>
+        <AdminNavigation
+          className="min-h-0 flex-1 overflow-y-auto"
+          pathname={pathname}
+        />
+        <AdminSidebarFooter onLogout={handleLogout} />
       </aside>
 
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur lg:mr-64">
         <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xs text-muted-foreground">ویکی اکانت</p>
-            <h1 className="text-lg font-bold">{pageTitle}</h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <Button
+              aria-controls="admin-mobile-navigation"
+              aria-expanded={mobileMenuOpen}
+              aria-label="باز کردن منوی مدیریت"
+              className="lg:hidden"
+              size="icon"
+              type="button"
+              variant="outline"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu className="size-5" />
+            </Button>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">ویکی اکانت</p>
+              <h1 className="truncate text-lg font-bold">{pageTitle}</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button asChild size="sm" variant="outline">
@@ -246,34 +359,63 @@ export function AdminShell({ children }: AdminShellProps) {
         </div>
       </header>
 
-      <main className="pb-24 lg:mr-64 lg:pb-8">
+      <main className="pb-8 lg:mr-64">
         <div className="mx-auto w-full max-w-7xl min-w-0 px-4 py-6 sm:px-6 lg:px-8">
           {children}
         </div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 overflow-x-auto border-t border-border bg-card lg:hidden">
-        <div className="flex min-w-max">
-          {navItems.map((item) => {
-            const active = isActivePath(pathname, item.href);
-            const Icon = item.icon;
-
-            return (
-              <Link
-                key={item.href}
-                className={cn(
-                  "flex h-16 w-24 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground",
-                  active && "text-primary",
-                )}
-                href={item.href}
+      {mobileMenuOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            aria-hidden="true"
+            className="absolute inset-0 animate-in bg-foreground/40 fade-in duration-200"
+            tabIndex={-1}
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside
+            ref={mobileMenuRef}
+            aria-label="منوی مدیریت"
+            aria-modal="true"
+            className="absolute inset-y-0 right-0 flex w-[min(20rem,88vw)] animate-in flex-col border-l border-border bg-card shadow-2xl slide-in-from-right duration-200"
+            id="admin-mobile-navigation"
+            role="dialog"
+            onKeyDown={handleMobileMenuKeyDown}
+          >
+            <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4">
+              <Image
+                alt="ویکی اکانت"
+                className="size-9 rounded-md object-contain"
+                height={36}
+                src="/wiki-high-resolution-logo-transparent.png"
+                width={36}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-bold">ویکی اکانت</p>
+                <p className="text-xs text-muted-foreground">پنل ادمین</p>
+              </div>
+              <Button
+                ref={mobileMenuCloseButtonRef}
+                aria-label="بستن منوی مدیریت"
+                size="icon"
+                type="button"
+                variant="ghost"
+                onClick={() => setMobileMenuOpen(false)}
               >
-                <Icon className="size-5" />
-                {item.label}
-              </Link>
-            );
-          })}
+                <X className="size-5" />
+              </Button>
+            </div>
+
+            <AdminNavigation
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+              pathname={pathname}
+              onNavigate={() => setMobileMenuOpen(false)}
+            />
+            <AdminSidebarFooter onLogout={handleLogout} />
+          </aside>
         </div>
-      </nav>
+      ) : null}
     </div>
   );
 }
