@@ -19,6 +19,7 @@ import {
 import { ticketRoutes } from "./modules/tickets/routes.js";
 import { walletRoutes } from "./modules/wallet/routes.js";
 import { adminSmsRoutes } from "./modules/sms/admin-routes.js";
+import { startSmsQueueWorker } from "./modules/sms/queue.js";
 import { authPlugin } from "./plugins/auth.js";
 import { corsPlugin } from "./plugins/cors.js";
 import { errorsPlugin } from "./plugins/errors.js";
@@ -123,6 +124,19 @@ export async function buildApp(options = {}) {
     reconcileMinutes:
       options.jibitReconcileMinutes ?? env.JIBIT_RECONCILE_MINUTES,
   });
+
+  const smsQueueOptions = options.smsQueueOptions ?? {};
+  const smsQueueEnabled =
+    smsQueueOptions.enabled ?? env.NODE_ENV !== "test";
+  if (smsQueueEnabled) {
+    const smsQueueWorker = startSmsQueueWorker(app.prisma, {
+      ...smsQueueOptions,
+      logger: smsQueueOptions.logger ?? app.log,
+    });
+    app.addHook("onClose", async () => {
+      await smsQueueWorker.stop();
+    });
+  }
 
   return app;
 }

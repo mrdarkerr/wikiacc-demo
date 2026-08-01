@@ -13,6 +13,7 @@ import {
   createDeliveryPoolSchema,
 } from "../delivery/schemas.js";
 import { addDeliveryItems, createDeliveryPool } from "../delivery/service.js";
+import { enqueueOrderCompletedNotification } from "../sms/notifications.js";
 import { createTicketMessageSchema, updateTicketStatusSchema } from "../tickets/schemas.js";
 import { addTicketMessage } from "../tickets/service.js";
 import { walletAdjustmentSchema } from "../wallet/schemas.js";
@@ -133,6 +134,7 @@ export async function adminRoutes(app) {
             select: { id: true },
             take: 1,
           },
+          user: { select: { phone: true } },
         },
       });
       if (!current) {
@@ -149,7 +151,8 @@ export async function adminRoutes(app) {
           "Direct payment status cannot change before payment reconciliation",
         );
       }
-      return tx.order.update({
+
+      const updated = await tx.order.update({
         where: { id: params.id },
         data: {
           status: input.status,
@@ -158,6 +161,15 @@ export async function adminRoutes(app) {
         },
         include: adminOrderInclude,
       });
+
+      if (current.status !== "DELIVERED" && input.status === "DELIVERED") {
+        await enqueueOrderCompletedNotification(tx, {
+          orderId: updated.id,
+          userPhone: current.user.phone,
+        });
+      }
+
+      return updated;
     });
     return ok(reply, { order });
   });

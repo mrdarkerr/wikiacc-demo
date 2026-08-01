@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { iranPhoneSchema } from "../auth/schemas.js";
+
 export const smsSenderIdParamsSchema = z.object({
   id: z.string().min(1),
 });
@@ -22,10 +24,24 @@ export const createSmsSenderSchema = z.object({
 
 export const updateSmsSettingsSchema = z
   .object({
+    adminNotificationsEnabled: z.boolean().optional(),
+    adminPhone: z
+      .union([
+        iranPhoneSchema,
+        z.literal("").transform(() => null),
+        z.null(),
+      ])
+      .optional(),
+    adminTicketActivityPatternCode: z.string().trim().min(1).max(128).optional(),
     apiKey: z.string().trim().min(8).max(512).optional(),
     authPatternCode: z.string().trim().min(2).max(128).optional(),
     defaultSenderId: z.string().min(1).optional(),
+    orderCompletedPatternCode: z.string().trim().min(1).max(128).optional(),
+    orderCreatedPatternCode: z.string().trim().min(1).max(128).optional(),
     removeApiKey: z.boolean().optional(),
+    ticketAnsweredPatternCode: z.string().trim().min(1).max(128).optional(),
+    ticketCreatedPatternCode: z.string().trim().min(1).max(128).optional(),
+    userNotificationsEnabled: z.boolean().optional(),
   })
   .refine((input) => !(input.apiKey && input.removeApiKey), {
     message: "API key cannot be updated and removed at the same time",
@@ -33,9 +49,17 @@ export const updateSmsSettingsSchema = z
   .refine(
     (input) =>
       input.apiKey !== undefined ||
+      input.adminNotificationsEnabled !== undefined ||
+      input.adminPhone !== undefined ||
+      input.adminTicketActivityPatternCode !== undefined ||
       input.authPatternCode !== undefined ||
       input.defaultSenderId !== undefined ||
-      input.removeApiKey === true,
+      input.orderCompletedPatternCode !== undefined ||
+      input.orderCreatedPatternCode !== undefined ||
+      input.removeApiKey === true ||
+      input.ticketAnsweredPatternCode !== undefined ||
+      input.ticketCreatedPatternCode !== undefined ||
+      input.userNotificationsEnabled !== undefined,
     { message: "At least one setting must be changed" },
   );
 

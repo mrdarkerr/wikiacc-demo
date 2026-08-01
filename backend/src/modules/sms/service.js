@@ -24,13 +24,22 @@ function publicSender(sender) {
 
 function publicSettings(settings) {
   return {
+    adminNotificationsEnabled: settings.adminNotificationsEnabled,
+    adminPhone: settings.adminPhone,
+    adminTicketActivityPatternCode:
+      settings.adminTicketActivityPatternCode,
     apiKeyHint: settings.apiKeyHint,
     authPatternCode: settings.authPatternCode,
     defaultSenderId: settings.defaultSenderId,
     hasApiKey: Boolean(settings.apiKeyEncrypted),
+    orderCompletedPatternCode: settings.orderCompletedPatternCode,
+    orderCreatedPatternCode: settings.orderCreatedPatternCode,
     provider: settings.provider,
     senders: settings.senders.map(publicSender),
+    ticketAnsweredPatternCode: settings.ticketAnsweredPatternCode,
+    ticketCreatedPatternCode: settings.ticketCreatedPatternCode,
     updatedAt: settings.updatedAt,
+    userNotificationsEnabled: settings.userNotificationsEnabled,
   };
 }
 
@@ -56,8 +65,21 @@ export async function updateAdminSmsSettings(prisma, input) {
     data.defaultSenderId = input.defaultSenderId;
   }
 
-  if (input.authPatternCode !== undefined) {
-    data.authPatternCode = input.authPatternCode;
+  const editableSettings = [
+    "adminNotificationsEnabled",
+    "adminPhone",
+    "adminTicketActivityPatternCode",
+    "authPatternCode",
+    "orderCompletedPatternCode",
+    "orderCreatedPatternCode",
+    "ticketAnsweredPatternCode",
+    "ticketCreatedPatternCode",
+    "userNotificationsEnabled",
+  ];
+  for (const field of editableSettings) {
+    if (input[field] !== undefined) {
+      data[field] = input[field];
+    }
   }
 
   return publicSettings(await updateStoredSmsSettings(prisma, data));

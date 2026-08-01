@@ -1,34 +1,53 @@
 import { badRequest, notFound } from "../../shared/errors.js";
+import {
+  enqueueTicketCreatedNotifications,
+  enqueueTicketMessageNotification,
+} from "../sms/notifications.js";
 import { countUserTickets, getUserTicket, listUserTickets } from "./repository.js";
 
 export async function createTicket(prisma, userId, input) {
-  if (input.orderId) {
-    const order = await prisma.order.findFirst({
-      where: { id: input.orderId, userId },
-    });
-    if (!order) {
-      throw badRequest("ORDER_NOT_FOUND", "Order does not belong to this user");
+  return prisma.$transaction(async (tx) => {
+    if (input.orderId) {
+      const order = await tx.order.findFirst({
+        where: { id: input.orderId, userId },
+      });
+      if (!order) {
+        throw badRequest("ORDER_NOT_FOUND", "Order does not belong to this user");
+      }
     }
-  }
 
-  return prisma.ticket.create({
-    data: {
-      userId,
-      orderId: input.orderId,
-      subject: input.subject,
-      priority: input.priority,
-      messages: {
-        create: {
-          senderId: userId,
-          body: input.body,
-          isAdmin: false,
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { phone: true },
+    });
+
+    const ticket = await tx.ticket.create({
+      data: {
+        userId,
+        orderId: input.orderId,
+        subject: input.subject,
+        priority: input.priority,
+        messages: {
+          create: {
+            senderId: userId,
+            body: input.body,
+            isAdmin: false,
+          },
         },
       },
-    },
-    include: {
-      messages: true,
-      order: { select: { id: true, status: true, totalAmount: true } },
-    },
+      include: {
+        messages: true,
+        order: { select: { id: true, status: true, totalAmount: true } },
+      },
+    });
+
+    await enqueueTicketCreatedNotifications(tx, {
+      messageId: ticket.messages[0].id,
+      ticketId: ticket.id,
+      userPhone: user.phone,
+    });
+
+    return ticket;
   });
 }
 
@@ -50,47 +69,58 @@ export async function getMyTicket(prisma, userId, ticketId) {
 }
 
 export async function addTicketMessage(prisma, userId, ticketId, input, isAdmin = false) {
-  const ticket = isAdmin
-    ? await prisma.ticket.findUnique({ where: { id: ticketId } })
-    : await prisma.ticket.findFirst({ where: { id: ticketId, userId } });
+  return prisma.$transaction(async (tx) => {
+    const ticket = isAdmin
+      ? await tx.ticket.findUnique({
+          where: { id: ticketId },
+          include: { user: { select: { phone: true } } },
+        })
+      : await tx.ticket.findFirst({
+          where: { id: ticketId, userId },
+          include: { user: { select: { phone: true } } },
+        });
 
-  if (!ticket) {
-    throw notFound("TICKET_NOT_FOUND", "Ticket was not found");
-  }
+    if (!ticket) {
+      throw notFound("TICKET_NOT_FOUND", "Ticket was not found");
+    }
 
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId,
-      senderId: userId,
-      body: input.body,
-      isAdmin,
-    },
-  });
-
-  await prisma.ticket.update({
-    where: { id: ticketId },
-    data: { status: isAdmin ? "ANSWERED" : "OPEN" },
-    include: {
-      messages: {
-        include: { sender: { select: { id: true, name: true, role: true } } },
-        orderBy: { createdAt: "asc" },
+    const message = await tx.ticketMessage.create({
+      data: {
+        ticketId,
+        senderId: userId,
+        body: input.body,
+        isAdmin,
       },
-    },
-  });
+    });
 
-  return isAdmin
-    ? prisma.ticket.findUnique({
-        where: { id: ticketId },
-        include: {
-          user: { select: { id: true, email: true, name: true } },
-          order: { select: { id: true, status: true, totalAmount: true } },
-          messages: {
-            include: { sender: { select: { id: true, name: true, role: true } } },
-            orderBy: { createdAt: "asc" },
+    await tx.ticket.update({
+      where: { id: ticketId },
+      data: { status: isAdmin ? "ANSWERED" : "OPEN" },
+    });
+
+    await enqueueTicketMessageNotification(tx, {
+      isAdmin,
+      messageId: message.id,
+      ticketId,
+      userPhone: ticket.user.phone,
+    });
+
+    return isAdmin
+      ? tx.ticket.findUnique({
+          where: { id: ticketId },
+          include: {
+            user: { select: { id: true, email: true, name: true } },
+            order: { select: { id: true, status: true, totalAmount: true } },
+            messages: {
+              include: {
+                sender: { select: { id: true, name: true, role: true } },
+              },
+              orderBy: { createdAt: "asc" },
+            },
           },
-        },
-      })
-    : getUserTicket(prisma, userId, ticketId);
+        })
+      : getUserTicket(tx, userId, ticketId);
+  });
 }
 
 export async function closeTicket(prisma, userId, ticketId) {

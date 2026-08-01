@@ -1,7 +1,12 @@
 import { conflict, notFound } from "../../shared/errors.js";
 import {
+  DEFAULT_ADMIN_TICKET_ACTIVITY_PATTERN_CODE,
   DEFAULT_AUTH_PATTERN_CODE,
+  DEFAULT_ORDER_COMPLETED_PATTERN_CODE,
+  DEFAULT_ORDER_CREATED_PATTERN_CODE,
   DEFAULT_SMS_SENDERS,
+  DEFAULT_TICKET_ANSWERED_PATTERN_CODE,
+  DEFAULT_TICKET_CREATED_PATTERN_CODE,
   IRANPAYAMAK_PROVIDER,
   SMS_SETTINGS_ID,
 } from "./constants.js";
@@ -18,12 +23,18 @@ export async function ensureSmsSettings(prisma) {
       where: { id: SMS_SETTINGS_ID },
       update: {},
       create: {
+        adminTicketActivityPatternCode:
+          DEFAULT_ADMIN_TICKET_ACTIVITY_PATTERN_CODE,
         authPatternCode: DEFAULT_AUTH_PATTERN_CODE,
         id: SMS_SETTINGS_ID,
+        orderCompletedPatternCode: DEFAULT_ORDER_COMPLETED_PATTERN_CODE,
+        orderCreatedPatternCode: DEFAULT_ORDER_CREATED_PATTERN_CODE,
         provider: IRANPAYAMAK_PROVIDER,
         senders: {
           create: DEFAULT_SMS_SENDERS,
         },
+        ticketAnsweredPatternCode: DEFAULT_TICKET_ANSWERED_PATTERN_CODE,
+        ticketCreatedPatternCode: DEFAULT_TICKET_CREATED_PATTERN_CODE,
       },
     });
 

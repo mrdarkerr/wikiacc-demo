@@ -36,6 +36,9 @@ const { reconcileStaleJibitPayments } = await import(
 const { sendAuthCodeSms, sendPatternSms } = await import(
   "../src/modules/sms/service.js"
 );
+const { processSmsQueueBatch } = await import(
+  "../src/modules/sms/queue.js"
+);
 
 function getCookie(response) {
   const raw = response.headers["set-cookie"];
@@ -532,6 +535,16 @@ describe("wikiacc backend api", () => {
     const initialSettings = settingsResponse.json().data.settings;
     expect(initialSettings.hasApiKey).toBe(false);
     expect(initialSettings.authPatternCode).toBe("a5gPP4cwpS");
+    expect(initialSettings).toMatchObject({
+      adminNotificationsEnabled: true,
+      adminPhone: null,
+      adminTicketActivityPatternCode: "bvDXpCSNbU",
+      orderCompletedPatternCode: "d8RdZIfeIs",
+      orderCreatedPatternCode: "DBh0eWEV0p",
+      ticketAnsweredPatternCode: "ojtukzfpWZ",
+      ticketCreatedPatternCode: "6bZHqMLbrY",
+      userNotificationsEnabled: true,
+    });
     expect(initialSettings.senders.map((sender) => sender.lineNumber)).toEqual([
       "50002178584000",
       "PRO",
@@ -545,14 +558,18 @@ describe("wikiacc backend api", () => {
       url: "/api/v1/admin/sms/settings",
       headers: { cookie: adminCookie },
       payload: {
+        adminNotificationsEnabled: true,
+        adminPhone: "09120000009",
         apiKey: "test-iranpayamak-api-key-1234",
         authPatternCode: "LOGIN_PATTERN",
         defaultSenderId: proSender.id,
+        userNotificationsEnabled: true,
       },
     });
     expect(updateResponse.statusCode).toBe(200);
     expect(updateResponse.json().data.settings).toMatchObject({
       apiKeyHint: "1234",
+      adminPhone: "09120000009",
       authPatternCode: "LOGIN_PATTERN",
       defaultSenderId: proSender.id,
       hasApiKey: true,
@@ -1383,6 +1400,20 @@ describe("wikiacc backend api", () => {
       where: { poolId: instantProduct.deliveryPoolId, status: "AVAILABLE" },
     });
     expect(availableCount).toBe(1);
+
+    const smsJobs = await app.prisma.smsQueueJob.findMany({
+      where: { referenceId: order.id, referenceType: "ORDER" },
+      orderBy: { eventType: "asc" },
+    });
+    expect(smsJobs.map((job) => job.eventType)).toEqual([
+      "ORDER_COMPLETED",
+      "ORDER_CREATED",
+    ]);
+    expect(smsJobs.every((job) => job.status === "PENDING")).toBe(true);
+    expect(smsJobs.map((job) => JSON.parse(job.attributesJson))).toEqual([
+      { order: order.id },
+      { order: order.id },
+    ]);
   });
 
   it("creates a custom form order and stores customer fields", async () => {
@@ -1401,6 +1432,14 @@ describe("wikiacc backend api", () => {
     customOrderId = order.id;
     expect(order.status).toBe("AWAITING_ADMIN");
     expect(order.items[0].fieldValues[0].value).toBe("customer@example.com");
+    expect(
+      await app.prisma.smsQueueJob.count({
+        where: {
+          eventType: "ORDER_CREATED",
+          referenceId: order.id,
+        },
+      }),
+    ).toBe(1);
   });
 
   it("allows admin to update order status and keep admin note internal", async () => {
@@ -1419,6 +1458,30 @@ describe("wikiacc backend api", () => {
     expect(order.status).toBe("READY");
     expect(order.adminNote).toBe("Prepared manually");
     expect(order.items[0].fieldValues[0].value).toBe("customer@example.com");
+
+    const deliveredResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/admin/orders/${customOrderId}/status`,
+      headers: { cookie: adminCookie },
+      payload: { status: "DELIVERED" },
+    });
+    expect(deliveredResponse.statusCode).toBe(200);
+
+    const repeatedDeliveredResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/admin/orders/${customOrderId}/status`,
+      headers: { cookie: adminCookie },
+      payload: { status: "DELIVERED" },
+    });
+    expect(repeatedDeliveredResponse.statusCode).toBe(200);
+    expect(
+      await app.prisma.smsQueueJob.count({
+        where: {
+          eventType: "ORDER_COMPLETED",
+          referenceId: customOrderId,
+        },
+      }),
+    ).toBe(1);
 
     const userResponse = await app.inject({
       method: "GET",
@@ -1444,6 +1507,127 @@ describe("wikiacc backend api", () => {
     const ticket = response.json().data.ticket;
     ticketId = ticket.id;
     expect(ticket.messages[0].body).toBe("Please check my order.");
+
+    const smsJobs = await app.prisma.smsQueueJob.findMany({
+      where: { referenceId: ticket.id, referenceType: "TICKET" },
+      orderBy: { audience: "asc" },
+    });
+    expect(smsJobs).toHaveLength(2);
+    expect(smsJobs.map((job) => [job.audience, job.eventType, job.recipient])).toEqual([
+      ["ADMIN", "ADMIN_TICKET_ACTIVITY", "09120000009"],
+      ["USER", "TICKET_CREATED", "09120000001"],
+    ]);
+  });
+
+  it("queues ticket reply notifications for the opposite audience", async () => {
+    const userReply = await app.inject({
+      method: "POST",
+      url: `/api/v1/tickets/${ticketId}/messages`,
+      headers: { cookie: userCookie },
+      payload: { body: "Any update?" },
+    });
+    expect(userReply.statusCode).toBe(201);
+
+    const adminReply = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/tickets/${ticketId}/messages`,
+      headers: { cookie: adminCookie },
+      payload: { body: "We are checking it." },
+    });
+    expect(adminReply.statusCode).toBe(201);
+
+    const smsJobs = await app.prisma.smsQueueJob.findMany({
+      where: { referenceId: ticketId, referenceType: "TICKET" },
+      orderBy: [{ createdAt: "asc" }, { eventType: "asc" }],
+    });
+    expect(smsJobs).toHaveLength(4);
+    expect(
+      smsJobs.map((job) => [job.audience, job.eventType, job.recipient]),
+    ).toEqual(
+      expect.arrayContaining([
+        ["USER", "TICKET_CREATED", "09120000001"],
+        ["ADMIN", "ADMIN_TICKET_ACTIVITY", "09120000009"],
+        ["ADMIN", "ADMIN_TICKET_ACTIVITY", "09120000009"],
+        ["USER", "TICKET_ANSWERED", "09120000001"],
+      ]),
+    );
+    expect(new Set(smsJobs.map((job) => job.dedupeKey)).size).toBe(4);
+  });
+
+  it("processes queued notifications and retries transient failures", async () => {
+    const pendingBefore = await app.prisma.smsQueueJob.count({
+      where: { status: "PENDING" },
+    });
+    const sentBefore = await app.prisma.smsQueueJob.count({
+      where: { status: "SENT" },
+    });
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ status: "success", data: 112233, messages: "queued" }),
+        { headers: { "Content-Type": "application/json" }, status: 201 },
+      ),
+    );
+
+    const result = await processSmsQueueBatch(app.prisma, {
+      batchSize: 50,
+      fetchImpl,
+    });
+    expect(result).toEqual({
+      claimed: pendingBefore,
+      failed: 0,
+      retried: 0,
+      sent: pendingBefore,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(pendingBefore);
+    expect(
+      await app.prisma.smsQueueJob.count({ where: { status: "SENT" } }),
+    ).toBe(sentBefore + pendingBefore);
+
+    const retryJob = await app.prisma.smsQueueJob.create({
+      data: {
+        attributesJson: JSON.stringify({ ticket: ticketId }),
+        audience: "ADMIN",
+        dedupeKey: `RETRY_TEST:${ticketId}`,
+        eventType: "RETRY_TEST",
+        patternCode: "bvDXpCSNbU",
+        recipient: "09120000009",
+        referenceId: ticketId,
+        referenceType: "TICKET",
+      },
+    });
+    const failedFetch = vi.fn(async () => {
+      throw new Error("temporary network failure");
+    });
+    const failedResult = await processSmsQueueBatch(app.prisma, {
+      batchSize: 1,
+      fetchImpl: failedFetch,
+    });
+    expect(failedResult.retried).toBe(1);
+
+    const pendingRetry = await app.prisma.smsQueueJob.findUniqueOrThrow({
+      where: { id: retryJob.id },
+    });
+    expect(pendingRetry).toMatchObject({
+      attempts: 1,
+      status: "PENDING",
+    });
+    expect(pendingRetry.lastError).toContain("SMS_PROVIDER_UNAVAILABLE");
+
+    const successfulRetry = await processSmsQueueBatch(app.prisma, {
+      batchSize: 1,
+      fetchImpl,
+      now: new Date(pendingRetry.availableAt.getTime() + 1),
+    });
+    expect(successfulRetry.sent).toBe(1);
+    expect(
+      await app.prisma.smsQueueJob.findUniqueOrThrow({
+        where: { id: retryJob.id },
+      }),
+    ).toMatchObject({
+      attempts: 2,
+      providerMessageId: "112233",
+      status: "SENT",
+    });
   });
 
   it("allows admin to update ticket status and returns ticket details", async () => {

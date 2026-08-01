@@ -11,6 +11,7 @@ import {
   notFound,
   paymentRequired,
 } from "../../shared/errors.js";
+import { enqueueOrderNotifications } from "../sms/notifications.js";
 import { countUserOrders, getUserOrder, listUserOrders } from "./repository.js";
 
 function withoutAdminFields(order) {
@@ -198,6 +199,11 @@ export async function createOrder(prisma, userId, input) {
   const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
 
   const orderId = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { phone: true },
+    });
+
     if (product.type === "INSTANT_DELIVERY") {
       const availableItems = await getPoolAvailability(tx, product.deliveryPoolId);
       if (availableItems < quantity) {
@@ -282,6 +288,12 @@ export async function createOrder(prisma, userId, input) {
     if (product.type === "INSTANT_DELIVERY") {
       await allocateDeliveryItems(tx, product.deliveryPoolId, orderItem.id, quantity);
     }
+
+    await enqueueOrderNotifications(tx, {
+      completed: initialStatus === "DELIVERED",
+      orderId: order.id,
+      userPhone: user.phone,
+    });
 
     return order.id;
   });
