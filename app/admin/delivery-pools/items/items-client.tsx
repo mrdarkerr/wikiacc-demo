@@ -338,7 +338,7 @@ export function DeliveryItemsClient() {
                     </p>
                     <AdminStatusBadge type="delivery" value={item.status} />
                   </div>
-                  <code className="mt-3 block max-h-36 overflow-auto whitespace-pre-wrap rounded-md bg-muted px-3 py-2 text-xs">
+                  <code className="mt-3 block max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted px-3 py-2 text-xs">
                     {item.content}
                   </code>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -367,7 +367,7 @@ export function DeliveryItemsClient() {
                         {shortId(item.id)}
                       </td>
                       <td className="py-3">
-                        <code className="block max-w-xl whitespace-pre-wrap rounded-md bg-muted px-2 py-1 text-xs">
+                        <code className="block max-w-xl whitespace-pre-wrap break-all rounded-md bg-muted px-2 py-1 text-xs">
                           {item.content}
                         </code>
                       </td>
