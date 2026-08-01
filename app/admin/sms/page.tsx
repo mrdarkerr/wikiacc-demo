@@ -2,7 +2,16 @@
 
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
-import { KeyRound, MessageSquareText, Plus, Save, Trash2 } from "lucide-react";
+import {
+  BellRing,
+  KeyRound,
+  MessageSquareText,
+  Plus,
+  Save,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { Button } from "@/components/ui/button";
@@ -21,10 +30,23 @@ function errorMessage(error: unknown, fallback: string) {
 export default function AdminSmsSettingsPage() {
   const [settings, setSettings] = useState<AdminSmsSettings | null>(null);
   const [apiKey, setApiKey] = useState("");
+  const [adminNotificationsEnabled, setAdminNotificationsEnabled] =
+    useState(true);
+  const [adminPhone, setAdminPhone] = useState("");
+  const [adminTicketActivityPatternCode, setAdminTicketActivityPatternCode] =
+    useState("");
   const [authPatternCode, setAuthPatternCode] = useState("");
   const [defaultSenderId, setDefaultSenderId] = useState("");
+  const [orderCompletedPatternCode, setOrderCompletedPatternCode] =
+    useState("");
+  const [orderCreatedPatternCode, setOrderCreatedPatternCode] = useState("");
   const [senderLabel, setSenderLabel] = useState("");
   const [senderLine, setSenderLine] = useState("");
+  const [ticketAnsweredPatternCode, setTicketAnsweredPatternCode] =
+    useState("");
+  const [ticketCreatedPatternCode, setTicketCreatedPatternCode] = useState("");
+  const [userNotificationsEnabled, setUserNotificationsEnabled] =
+    useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [addingSender, setAddingSender] = useState(false);
@@ -32,12 +54,30 @@ export default function AdminSmsSettingsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const applySettings = useCallback((nextSettings: AdminSmsSettings) => {
+    setSettings(nextSettings);
+    setAdminNotificationsEnabled(nextSettings.adminNotificationsEnabled);
+    setAdminPhone(nextSettings.adminPhone ?? "");
+    setAdminTicketActivityPatternCode(
+      nextSettings.adminTicketActivityPatternCode ?? "",
+    );
+    setAuthPatternCode(nextSettings.authPatternCode ?? "");
+    setDefaultSenderId(nextSettings.defaultSenderId ?? "");
+    setOrderCompletedPatternCode(
+      nextSettings.orderCompletedPatternCode ?? "",
+    );
+    setOrderCreatedPatternCode(nextSettings.orderCreatedPatternCode ?? "");
+    setTicketAnsweredPatternCode(
+      nextSettings.ticketAnsweredPatternCode ?? "",
+    );
+    setTicketCreatedPatternCode(nextSettings.ticketCreatedPatternCode ?? "");
+    setUserNotificationsEnabled(nextSettings.userNotificationsEnabled);
+  }, []);
+
   const loadSettings = useCallback(async () => {
     try {
       const result = await api.admin.sms.getSettings();
-      setSettings(result.settings);
-      setAuthPatternCode(result.settings.authPatternCode ?? "");
-      setDefaultSenderId(result.settings.defaultSenderId ?? "");
+      applySettings(result.settings);
       setError("");
     } catch (loadError) {
       setError(
@@ -46,7 +86,7 @@ export default function AdminSmsSettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applySettings]);
 
   useEffect(() => {
     let active = true;
@@ -55,9 +95,7 @@ export default function AdminSmsSettingsPage() {
       .getSettings()
       .then((result) => {
         if (!active) return;
-        setSettings(result.settings);
-        setAuthPatternCode(result.settings.authPatternCode ?? "");
-        setDefaultSenderId(result.settings.defaultSenderId ?? "");
+        applySettings(result.settings);
         setError("");
       })
       .catch((loadError) => {
@@ -73,7 +111,7 @@ export default function AdminSmsSettingsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [applySettings]);
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,16 +119,62 @@ export default function AdminSmsSettingsPage() {
 
     const body: UpdateAdminSmsSettingsRequest = {};
     const trimmedApiKey = apiKey.trim();
-    const trimmedPatternCode = authPatternCode.trim();
     if (trimmedApiKey) body.apiKey = trimmedApiKey;
-    if (trimmedPatternCode !== (settings.authPatternCode ?? "")) {
-      body.authPatternCode = trimmedPatternCode;
+
+    const patternChanges = [
+      [
+        "adminTicketActivityPatternCode",
+        adminTicketActivityPatternCode.trim(),
+        settings.adminTicketActivityPatternCode ?? "",
+      ],
+      [
+        "authPatternCode",
+        authPatternCode.trim(),
+        settings.authPatternCode ?? "",
+      ],
+      [
+        "orderCompletedPatternCode",
+        orderCompletedPatternCode.trim(),
+        settings.orderCompletedPatternCode ?? "",
+      ],
+      [
+        "orderCreatedPatternCode",
+        orderCreatedPatternCode.trim(),
+        settings.orderCreatedPatternCode ?? "",
+      ],
+      [
+        "ticketAnsweredPatternCode",
+        ticketAnsweredPatternCode.trim(),
+        settings.ticketAnsweredPatternCode ?? "",
+      ],
+      [
+        "ticketCreatedPatternCode",
+        ticketCreatedPatternCode.trim(),
+        settings.ticketCreatedPatternCode ?? "",
+      ],
+    ] as const;
+
+    for (const [field, value, currentValue] of patternChanges) {
+      if (value !== currentValue) body[field] = value;
     }
+
     if (defaultSenderId && defaultSenderId !== settings.defaultSenderId) {
       body.defaultSenderId = defaultSenderId;
     }
+    const normalizedAdminPhone = adminPhone.trim() || null;
+    if (normalizedAdminPhone !== (settings.adminPhone ?? null)) {
+      body.adminPhone = normalizedAdminPhone;
+    }
+    if (
+      adminNotificationsEnabled !== settings.adminNotificationsEnabled
+    ) {
+      body.adminNotificationsEnabled = adminNotificationsEnabled;
+    }
+    if (userNotificationsEnabled !== settings.userNotificationsEnabled) {
+      body.userNotificationsEnabled = userNotificationsEnabled;
+    }
 
-    if (!body.apiKey && !body.authPatternCode && !body.defaultSenderId) {
+    if (Object.keys(body).length === 0) {
       setSuccess("تغییری برای ذخیره وجود ندارد.");
       setError("");
       return;
@@ -99,9 +183,7 @@ export default function AdminSmsSettingsPage() {
     setSaving(true);
     try {
       const result = await api.admin.sms.updateSettings(body);
-      setSettings(result.settings);
-      setAuthPatternCode(result.settings.authPatternCode ?? "");
-      setDefaultSenderId(result.settings.defaultSenderId ?? "");
+      applySettings(result.settings);
       setApiKey("");
       setError("");
       setSuccess("تنظیمات پیامک ذخیره شد.");
@@ -128,7 +210,7 @@ export default function AdminSmsSettingsPage() {
     setSaving(true);
     try {
       const result = await api.admin.sms.updateSettings({ removeApiKey: true });
-      setSettings(result.settings);
+      applySettings(result.settings);
       setApiKey("");
       setError("");
       setSuccess("کلید API حذف شد.");
@@ -292,6 +374,196 @@ export default function AdminSmsSettingsPage() {
                 </Button>
               ) : null}
             </div>
+          </form>
+        )}
+      </AdminSection>
+
+      <AdminSection
+        description="ارسال پیامک‌های سفارش و تیکت را برای کاربران و مدیر سیستم کنترل کنید."
+        title="اعلان‌های خودکار"
+      >
+        {!settings ? (
+          <AdminState tone="danger">تنظیمات اعلان‌ها در دسترس نیست.</AdminState>
+        ) : (
+          <form className="space-y-6" onSubmit={saveSettings}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <label className="flex cursor-pointer items-start gap-4 rounded-md border border-border p-4 transition hover:bg-muted/30">
+                <input
+                  checked={userNotificationsEnabled}
+                  className="mt-1 size-5 accent-primary"
+                  type="checkbox"
+                  onChange={(event) =>
+                    setUserNotificationsEnabled(event.target.checked)
+                  }
+                />
+                <span className="flex min-w-0 gap-3">
+                  <span className="rounded-md bg-primary/10 p-2 text-primary">
+                    <UserRound className="size-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold">
+                      پیامک‌های کاربر
+                    </span>
+                    <span className="mt-1 block text-xs leading-6 text-muted-foreground">
+                      ثبت و تکمیل سفارش، ثبت تیکت و پاسخ ادمین برای کاربر
+                      ارسال شود.
+                    </span>
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-4 rounded-md border border-border p-4 transition hover:bg-muted/30">
+                <input
+                  checked={adminNotificationsEnabled}
+                  className="mt-1 size-5 accent-primary"
+                  type="checkbox"
+                  onChange={(event) =>
+                    setAdminNotificationsEnabled(event.target.checked)
+                  }
+                />
+                <span className="flex min-w-0 gap-3">
+                  <span className="rounded-md bg-primary/10 p-2 text-primary">
+                    <ShieldCheck className="size-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold">
+                      پیامک‌های ادمین
+                    </span>
+                    <span className="mt-1 block text-xs leading-6 text-muted-foreground">
+                      ایجاد تیکت یا پاسخ جدید کاربر به شماره مدیر اطلاع داده
+                      شود.
+                    </span>
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="rounded-md border border-border bg-muted/20 p-4">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="rounded-md bg-primary/10 p-2 text-primary">
+                  <BellRing className="size-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold">مقصد اعلان‌های ادمین</p>
+                  <p className="text-xs text-muted-foreground">
+                    این شماره فقط برای اعلان فعالیت تیکت استفاده می‌شود.
+                  </p>
+                </div>
+              </div>
+              <label className="block max-w-md text-sm font-medium">
+                شماره موبایل ادمین
+                <Input
+                  className="mt-2"
+                  dir="ltr"
+                  inputMode="tel"
+                  placeholder="09120000000"
+                  value={adminPhone}
+                  onChange={(event) => setAdminPhone(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div>
+              <div className="mb-4">
+                <h3 className="text-sm font-bold">پترن‌های رویدادی</h3>
+                <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                  نام متغیر کنار هر پترن باید دقیقاً با همان نام انگلیسی در
+                  پنل IranPayamak تعریف شده باشد.
+                </p>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <label className="rounded-md border border-border p-4 text-sm font-medium">
+                  ثبت تیکت برای کاربر
+                  <Input
+                    className="mt-2"
+                    dir="ltr"
+                    placeholder="6bZHqMLbrY"
+                    required
+                    value={ticketCreatedPatternCode}
+                    onChange={(event) =>
+                      setTicketCreatedPatternCode(event.target.value)
+                    }
+                  />
+                  <span className="mt-2 block text-xs font-normal text-muted-foreground">
+                    متغیر: <code dir="ltr">ticket</code>
+                  </span>
+                </label>
+
+                <label className="rounded-md border border-border p-4 text-sm font-medium">
+                  پاسخ ادمین به تیکت
+                  <Input
+                    className="mt-2"
+                    dir="ltr"
+                    placeholder="ojtukzfpWZ"
+                    required
+                    value={ticketAnsweredPatternCode}
+                    onChange={(event) =>
+                      setTicketAnsweredPatternCode(event.target.value)
+                    }
+                  />
+                  <span className="mt-2 block text-xs font-normal text-muted-foreground">
+                    متغیر: <code dir="ltr">ticket</code>
+                  </span>
+                </label>
+
+                <label className="rounded-md border border-border p-4 text-sm font-medium">
+                  فعالیت جدید تیکت برای ادمین
+                  <Input
+                    className="mt-2"
+                    dir="ltr"
+                    placeholder="bvDXpCSNbU"
+                    required
+                    value={adminTicketActivityPatternCode}
+                    onChange={(event) =>
+                      setAdminTicketActivityPatternCode(event.target.value)
+                    }
+                  />
+                  <span className="mt-2 block text-xs font-normal text-muted-foreground">
+                    متغیر: <code dir="ltr">ticket</code>
+                  </span>
+                </label>
+
+                <label className="rounded-md border border-border p-4 text-sm font-medium">
+                  ثبت سفارش
+                  <Input
+                    className="mt-2"
+                    dir="ltr"
+                    placeholder="DBh0eWEV0p"
+                    required
+                    value={orderCreatedPatternCode}
+                    onChange={(event) =>
+                      setOrderCreatedPatternCode(event.target.value)
+                    }
+                  />
+                  <span className="mt-2 block text-xs font-normal text-muted-foreground">
+                    متغیر: <code dir="ltr">order</code>
+                  </span>
+                </label>
+
+                <label className="rounded-md border border-border p-4 text-sm font-medium lg:col-span-2">
+                  تکمیل سفارش
+                  <Input
+                    className="mt-2 lg:max-w-[calc(50%-0.5rem)]"
+                    dir="ltr"
+                    placeholder="d8RdZIfeIs"
+                    required
+                    value={orderCompletedPatternCode}
+                    onChange={(event) =>
+                      setOrderCompletedPatternCode(event.target.value)
+                    }
+                  />
+                  <span className="mt-2 block text-xs font-normal text-muted-foreground">
+                    متغیر: <code dir="ltr">order</code>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <Button disabled={saving} type="submit">
+              <Save className="size-4" />
+              {saving ? "در حال ذخیره..." : "ذخیره اعلان‌ها"}
+            </Button>
           </form>
         )}
       </AdminSection>

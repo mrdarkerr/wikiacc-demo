@@ -476,13 +476,21 @@ export type AdminSmsSender = {
 };
 
 export type AdminSmsSettings = {
+  adminNotificationsEnabled: boolean;
+  adminPhone?: string | null;
+  adminTicketActivityPatternCode?: string | null;
   apiKeyHint?: string | null;
   authPatternCode?: string | null;
   defaultSenderId?: string | null;
   hasApiKey: boolean;
+  orderCompletedPatternCode?: string | null;
+  orderCreatedPatternCode?: string | null;
   provider: "IRANPAYAMAK";
   senders: AdminSmsSender[];
+  ticketAnsweredPatternCode?: string | null;
+  ticketCreatedPatternCode?: string | null;
   updatedAt: string;
+  userNotificationsEnabled: boolean;
 };
 
 export type AdminTicketMessage = TicketMessage & {
@@ -556,10 +564,18 @@ export type CreateAdminSmsSenderRequest = {
 };
 
 export type UpdateAdminSmsSettingsRequest = {
+  adminNotificationsEnabled?: boolean;
+  adminPhone?: string | null;
+  adminTicketActivityPatternCode?: string;
   apiKey?: string;
   authPatternCode?: string;
   defaultSenderId?: string;
+  orderCompletedPatternCode?: string;
+  orderCreatedPatternCode?: string;
   removeApiKey?: boolean;
+  ticketAnsweredPatternCode?: string;
+  ticketCreatedPatternCode?: string;
+  userNotificationsEnabled?: boolean;
 };
 
 export type AdminWalletAdjustmentRequest = {
