@@ -238,6 +238,8 @@ export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const pageTitle = getPageTitle(pathname);
+  const isTicketConversation =
+    /^\/admin\/tickets\/[^/]+\/?$/.test(pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuCloseButtonRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLElement>(null);
@@ -307,7 +309,13 @@ export function AdminShell({ children }: AdminShellProps) {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-muted/30 text-foreground" dir="rtl">
+    <div
+      className={cn(
+        "min-h-dvh overflow-x-hidden bg-muted/30 text-foreground",
+        isTicketConversation && "h-dvh min-h-0 overflow-hidden",
+      )}
+      dir="rtl"
+    >
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 border-l border-border bg-card lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-3 border-b border-border px-5">
           <Image
@@ -359,8 +367,19 @@ export function AdminShell({ children }: AdminShellProps) {
         </div>
       </header>
 
-      <main className="pb-8 lg:mr-64">
-        <div className="mx-auto w-full max-w-7xl min-w-0 px-4 py-6 sm:px-6 lg:px-8">
+      <main
+        className={cn(
+          "pb-8 lg:mr-64",
+          isTicketConversation &&
+            "h-[calc(100dvh-4rem)] overflow-hidden pb-0",
+        )}
+      >
+        <div
+          className={cn(
+            "mx-auto w-full max-w-7xl min-w-0 px-4 py-6 sm:px-6 lg:px-8",
+            isTicketConversation && "h-full max-w-none p-0 lg:max-w-7xl lg:px-8 lg:py-6",
+          )}
+        >
           {children}
         </div>
       </main>

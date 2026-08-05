@@ -57,7 +57,7 @@ function MobileDialog({
   return (
     <DialogOverlay
       className="xl:hidden"
-      contentClassName="max-h-[calc(100svh-2rem)] max-w-md overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xl"
+      contentClassName="max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xl"
       onClose={onClose}
     >
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -316,8 +316,8 @@ export default function TicketDetailPage() {
   }
 
   return (
-    <div className="flex h-[calc(100svh-12rem)] min-h-[420px] flex-col gap-3 lg:h-[calc(100svh-8rem)]">
-      <div className="shrink-0 space-y-3">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden xl:gap-3">
+      <div className="hidden shrink-0 xl:block">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <Button asChild size="sm" variant="ghost">
@@ -339,47 +339,31 @@ export default function TicketDetailPage() {
             <StatusBadge type="ticket" value={currentTicket.status} />
           </div>
         </div>
-
-        {message ? (
-          <p className="text-sm text-emerald-600 dark:text-emerald-300">
-            {message}
-          </p>
-        ) : null}
-        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-
-        <div className="flex gap-2 xl:hidden">
-          <Button
-            className="flex-1"
-            size="sm"
-            type="button"
-            variant="outline"
-            onClick={() => setActiveDialog("status")}
-          >
-            <Settings2 className="size-4" />
-            وضعیت
-          </Button>
-          <Button
-            className="flex-1"
-            size="sm"
-            type="button"
-            variant="outline"
-            onClick={() => setActiveDialog("details")}
-          >
-            <Info className="size-4" />
-            اطلاعات
-          </Button>
-        </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-muted/20">
+      <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-4">
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-muted/20 xl:rounded-lg xl:border xl:border-border">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-3 py-3 sm:px-4">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+              <Button
+                asChild
+                aria-label="بازگشت به تیکت‌ها"
+                className="shrink-0 xl:hidden"
+                size="icon"
+                variant="ghost"
+              >
+                <Link href="/tickets">
+                  <ArrowRight className="size-5" />
+                </Link>
+              </Button>
+              <span className="hidden size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary xl:grid">
                 <MessageSquare className="size-5" />
               </span>
               <div className="min-w-0">
-                <p className="truncate font-semibold">پشتیبانی ویکی اکانت</p>
+                <p className="truncate font-semibold">
+                  <span className="xl:hidden">{currentTicket.subject}</span>
+                  <span className="hidden xl:inline">پشتیبانی ویکی اکانت</span>
+                </p>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
                   {currentTicket.orderId
                     ? `سفارش مرتبط: ${currentTicket.orderId}`
@@ -387,13 +371,51 @@ export default function TicketDetailPage() {
                 </p>
               </div>
             </div>
-            <p className="shrink-0 text-xs text-muted-foreground">
-              {messages.length} پیام
-            </p>
+            <div className="flex shrink-0 items-center gap-1">
+              <p className="hidden text-xs text-muted-foreground sm:block">
+                {messages.length} پیام
+              </p>
+              <Button
+                aria-label="وضعیت تیکت"
+                className="xl:hidden"
+                size="icon"
+                title="وضعیت تیکت"
+                type="button"
+                variant="ghost"
+                onClick={() => setActiveDialog("status")}
+              >
+                <Settings2 className="size-4" />
+              </Button>
+              <Button
+                aria-label="اطلاعات تیکت"
+                className="xl:hidden"
+                size="icon"
+                title="اطلاعات تیکت"
+                type="button"
+                variant="ghost"
+                onClick={() => setActiveDialog("details")}
+              >
+                <Info className="size-4" />
+              </Button>
+            </div>
           </div>
 
+          {message || error ? (
+            <div
+              aria-live="polite"
+              className="shrink-0 border-b border-border bg-card px-3 py-2 text-sm sm:px-4"
+            >
+              {message ? (
+                <p className="text-emerald-600 dark:text-emerald-300">
+                  {message}
+                </p>
+              ) : null}
+              {error ? <p className="text-rose-600">{error}</p> : null}
+            </div>
+          ) : null}
+
           <div
-            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3 sm:p-4"
+            className="min-h-0 min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-4"
             ref={messagesScrollRef}
             onScroll={handleMessagesScroll}
           >
@@ -424,7 +446,7 @@ export default function TicketDetailPage() {
                 >
                   <article
                     className={cn(
-                      "max-w-[90%] rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[72%]",
+                      "min-w-0 max-w-[90%] overflow-hidden rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[72%]",
                       isUserMessage
                         ? "rounded-br-md bg-primary text-primary-foreground"
                         : "rounded-bl-md border border-border bg-background",
@@ -434,7 +456,7 @@ export default function TicketDetailPage() {
                       <span>{ticketMessage.isAdmin ? "پشتیبانی" : "شما"}</span>
                       <span>{formatMessageTime(ticketMessage.createdAt)}</span>
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap leading-7">
+                    <p className="mt-2 whitespace-pre-wrap break-words leading-7 [overflow-wrap:anywhere]">
                       {ticketMessage.body}
                     </p>
                   </article>
@@ -444,7 +466,7 @@ export default function TicketDetailPage() {
           </div>
 
           <form
-            className="shrink-0 border-t border-border bg-card p-2 shadow-[0_-10px_24px_rgba(15,23,42,0.08)] sm:p-3"
+            className="shrink-0 border-t border-border bg-card px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_24px_rgba(15,23,42,0.08)] sm:p-3"
             onSubmit={sendReply}
           >
             {ticketClosed ? (
@@ -458,7 +480,7 @@ export default function TicketDetailPage() {
                 </label>
                 <div className="flex items-end gap-2 sm:gap-3">
                   <textarea
-                    className="max-h-32 min-h-12 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-7 ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="max-h-32 min-h-12 min-w-0 flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2 text-sm leading-7 ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     id="ticket-reply"
                     placeholder="پیام خود را بنویسید..."
                     required
@@ -466,7 +488,7 @@ export default function TicketDetailPage() {
                     onChange={(event) => setReplyBody(event.target.value)}
                   />
                   <Button
-                    className="h-12 shrink-0 px-4"
+                    className="h-12 shrink-0 rounded-full px-4"
                     disabled={saving || !replyBody.trim()}
                     type="submit"
                   >
