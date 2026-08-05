@@ -26,7 +26,7 @@ export function shortId(id?: string | null, length = 8) {
 }
 
 export function orderCode(id?: string | null) {
-  return id ? `WKA-${shortId(id, 6)}` : "-";
+  return id ? `GMA-${shortId(id, 6)}` : "-";
 }
 
 export function userLabel(

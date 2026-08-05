@@ -5,7 +5,7 @@ import { StorefrontClient } from "@/components/store/storefront-client";
 import { Card } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "فروشگاه | ویکی اکانت",
+  title: "فروشگاه | جیمی اکانت",
 };
 
 export default function StorePage() {

@@ -1,6 +1,6 @@
-# WikiAcc Backend
+# GimiAcc Backend
 
-Lightweight Fastify backend for the WikiAcc storefront MVP.
+Lightweight Fastify backend for the GimiAcc storefront MVP.
 
 ## Core decisions
 

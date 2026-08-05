@@ -20,7 +20,7 @@ import type { DirectPaymentResult, Order } from "@/types/api";
 type ResultStatus = DirectPaymentResult["status"];
 
 function orderCode(order: Order) {
-  return `WKA-${order.id.slice(-6).toUpperCase()}`;
+  return `GMA-${order.id.slice(-6).toUpperCase()}`;
 }
 
 function paymentErrorMessage(reason: unknown) {

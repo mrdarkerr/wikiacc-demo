@@ -142,7 +142,7 @@ export async function initiateJibitPayment(
   }
 
   const attemptId = randomUUID();
-  const clientReferenceNumber = `WKA-${attemptId}`;
+  const clientReferenceNumber = `GMA-${attemptId}`;
   const reconcileAfter = new Date(Date.now() + reconcileMinutes * 60_000);
   const pending = await createPendingJibitOrder(prisma, userId, input, {
     attemptId,
@@ -156,7 +156,7 @@ export async function initiateJibitPayment(
       callbackUrl: buildCallbackUrl(callbackBaseUrl, attemptId),
       clientReferenceNumber,
       currency: "IRR",
-      description: `WikiAcc order ${pending.order.id}`,
+      description: `GimiAcc order ${pending.order.id}`,
       userIdentifier: user.phone ?? user.id,
     });
 

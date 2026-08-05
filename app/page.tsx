@@ -102,7 +102,7 @@ export default function Home() {
         event.source !== window.parent ||
         typeof event.data !== "object" ||
         event.data === null ||
-        event.data.type !== "wikiacc:cms-preview" ||
+        event.data.type !== "gimiacc:cms-preview" ||
         typeof event.data.content !== "object" ||
         event.data.content === null
       ) {
@@ -184,7 +184,7 @@ export default function Home() {
     setSelectedSection(section);
     setInfoModal(section === "about" || section === "terms" ? section : null);
     window.parent.postMessage(
-      { type: "wikiacc:cms-select", section },
+      { type: "gimiacc:cms-select", section },
       window.location.origin,
     );
   }
@@ -447,7 +447,7 @@ function Header({ brandName }: { brandName: string }) {
             className="h-9 w-9 rounded-2xl object-contain shadow-lg transition-transform group-hover:scale-105"
             height={36}
             priority
-            src="/wiki-high-resolution-logo-transparent.png"
+            src="/gimi-high-resolution-logo-transparent.png"
             width={36}
           />
           <span className="text-lg font-bold tracking-tight">{brandName}</span>
@@ -784,41 +784,6 @@ function TermsContent({ content }: { content: SiteContent["terms"] }) {
   );
 }
 
-function EnamadSeal({ label }: { label: string }) {
-  const [loaded, setLoaded] = useState(false);
-
-  return (
-    <a
-      referrerPolicy="origin"
-      target="_blank"
-      rel="noopener"
-      href="https://trustseal.enamad.ir/?id=644002&Code=frDMiNn3bP7yVs4bFGR06i7W9nu4zxhe"
-      className="inline-flex rounded-2xl border border-gray-200/70 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-gray-800/70 dark:bg-gray-900"
-      aria-label={label}
-    >
-      <span
-        className={`grid h-24 w-24 place-items-center rounded-xl bg-gray-100 text-center text-xs leading-5 text-gray-500 dark:bg-gray-800 dark:text-gray-400 ${
-          loaded ? "hidden" : ""
-        }`}
-      >
-        {label}
-        <span className="mt-1 block h-2 w-14 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700" />
-      </span>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        referrerPolicy="origin"
-        src="https://trustseal.enamad.ir/logo.aspx?id=644002&Code=frDMiNn3bP7yVs4bFGR06i7W9nu4zxhe"
-        alt={label}
-        className={`h-24 w-24 object-contain ${loaded ? "block" : "hidden"}`}
-        width="96"
-        height="96"
-        style={{ cursor: "pointer" }}
-        onLoad={() => setLoaded(true)}
-      />
-    </a>
-  );
-}
-
 function Footer({
   cmsPreview,
   content,
@@ -845,7 +810,7 @@ function Footer({
               alt={footer.brandName}
               className="h-9 w-9 rounded-2xl object-contain shadow-lg"
               height={36}
-              src="/wiki-high-resolution-logo-transparent.png"
+              src="/gimi-high-resolution-logo-transparent.png"
               width={36}
             />
             <span className="text-base font-extrabold">{footer.brandName}</span>
@@ -905,10 +870,7 @@ function Footer({
           </ul>
         </div>
 
-        <div>
-          <div className="mb-3 font-bold">{footer.trustTitle}</div>
-          <EnamadSeal label={footer.trustTitle} />
-        </div>
+        <div aria-hidden="true" />
       </div>
 
       <div className="mx-auto mt-10 max-w-7xl px-4 text-center opacity-60 sm:px-6 lg:px-8">

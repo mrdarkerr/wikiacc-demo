@@ -45,7 +45,7 @@ function getCookie(response) {
   return Array.isArray(raw) ? raw[0] : raw;
 }
 
-describe("wikiacc backend api", () => {
+describe("gimiacc backend api", () => {
   let app;
   let adminCookie;
   let customOrderId;
@@ -688,6 +688,12 @@ describe("wikiacc backend api", () => {
     expect(publicResponse.json().data.version).toBe(1);
     initialSiteContent = publicResponse.json().data.content;
     expect(initialSiteContent.hero.title).toBeTruthy();
+    expect(initialSiteContent.footer.brandName).toBe("جیمی اکانت");
+    expect(initialSiteContent.footer.address).toBe(
+      "کرمان، خیابان شفا، بین شفا ۸ الی ۷",
+    );
+    expect(initialSiteContent.footer.phone).toBe("+989135034866");
+    expect(initialSiteContent.footer.trustTitle).toBe("");
 
     const anonymousResponse = await app.inject({
       method: "GET",
@@ -893,7 +899,7 @@ describe("wikiacc backend api", () => {
     const { callback, input, purchase, purchaseId } = latestJibitPurchase();
     expect(input).toMatchObject({
       amount: 1250,
-      clientReferenceNumber: expect.stringMatching(/^WKA-/),
+      clientReferenceNumber: expect.stringMatching(/^GMA-/),
       currency: "IRR",
       userIdentifier: "09120000001",
     });

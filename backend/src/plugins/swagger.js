@@ -6,7 +6,7 @@ export const swaggerPlugin = fp(async (app) => {
   await app.register(swagger, {
     openapi: {
       info: {
-        title: "WikiAcc Backend API",
+        title: "GimiAcc Backend API",
         version: "0.1.0",
       },
     },

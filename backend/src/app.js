@@ -84,7 +84,7 @@ export async function buildApp(options = {}) {
 
   app.get("/health", async () => ({
     ok: true,
-    service: "wikiacc-backend",
+    service: "gimiacc-backend",
   }));
 
   await app.register(authRoutes, {

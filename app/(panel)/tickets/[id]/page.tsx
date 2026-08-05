@@ -379,7 +379,7 @@ export default function TicketDetailPage() {
                 <MessageSquare className="size-5" />
               </span>
               <div className="min-w-0">
-                <p className="truncate font-semibold">پشتیبانی ویکی اکانت</p>
+                <p className="truncate font-semibold">پشتیبانی جیمی اکانت</p>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
                   {currentTicket.orderId
                     ? `سفارش مرتبط: ${currentTicket.orderId}`

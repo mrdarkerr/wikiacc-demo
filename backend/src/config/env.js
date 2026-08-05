@@ -15,7 +15,7 @@ const envSchema = z.object({
   WEB_APP_URL: z.string().url().default("http://localhost:3000"),
   JWT_SECRET: z.string().min(16).default("change-this-dev-secret"),
   SMS_CONFIG_ENCRYPTION_KEY: z.string().min(16).optional(),
-  SESSION_COOKIE_NAME: z.string().min(1).default("wikiacc_session"),
+  SESSION_COOKIE_NAME: z.string().min(1).default("gimiacc_session"),
   COOKIE_SECURE: booleanFromString.default(false),
   JIBIT_ENABLED: booleanFromString.default(false),
   JIBIT_API_KEY: z.string().min(1).optional(),

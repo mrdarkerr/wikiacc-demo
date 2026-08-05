@@ -243,7 +243,7 @@ export function SiteContentEditor() {
     if (!draft || !iframeReady) return;
     iframeRef.current?.contentWindow?.postMessage(
       {
-        type: "wikiacc:cms-preview",
+        type: "gimiacc:cms-preview",
         content: draft,
         selectedSection,
       },
@@ -260,7 +260,7 @@ export function SiteContentEditor() {
       if (
         event.origin !== window.location.origin ||
         event.source !== iframeRef.current?.contentWindow ||
-        event.data?.type !== "wikiacc:cms-select"
+        event.data?.type !== "gimiacc:cms-select"
       ) {
         return;
       }
@@ -809,7 +809,6 @@ function SectionInspector({
         <EditorField label="متن تیکت" value={content.footer.supportTicket} onChange={(value) => update((next) => { next.footer.supportTicket = value; })} />
         <EditorField multiline label="آدرس" value={content.footer.address} onChange={(value) => update((next) => { next.footer.address = value; })} />
         <EditorField dir="ltr" label="شماره تلفن" value={content.footer.phone} onChange={(value) => update((next) => { next.footer.phone = value; })} />
-        <EditorField label="عنوان نماد اعتماد" value={content.footer.trustTitle} onChange={(value) => update((next) => { next.footer.trustTitle = value; })} />
         <EditorField hint="برای سال جاری از {year} استفاده کنید." label="کپی‌رایت" value={content.footer.copyright} onChange={(value) => update((next) => { next.footer.copyright = value; })} />
       </div>
     );

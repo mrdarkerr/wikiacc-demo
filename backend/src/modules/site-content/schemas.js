@@ -87,7 +87,7 @@ export const siteContentDocumentSchema = z
         supportTicket: body(500),
         address: body(700),
         phone: label(80),
-        trustTitle: label(120),
+        trustTitle: plainText(120, 0),
         copyright: body(400),
       })
       .strict(),

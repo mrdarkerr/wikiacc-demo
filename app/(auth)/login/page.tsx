@@ -89,11 +89,11 @@ export default function LoginPage() {
         <section className="hidden lg:block">
           <div className="max-w-lg">
             <Image
-              alt="ویکی اکانت"
+              alt="جیمی اکانت"
               className="mb-6 size-16 rounded-lg object-contain"
               height={64}
               priority
-              src="/wiki-high-resolution-logo-transparent.png"
+              src="/gimi-high-resolution-logo-transparent.png"
               width={64}
             />
             <p className="text-sm font-medium text-primary">ورود امن و سریع</p>
@@ -109,16 +109,16 @@ export default function LoginPage() {
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">WikiAcc</p>
+              <p className="text-sm text-muted-foreground">GimiAcc</p>
               <h2 className="mt-1 text-2xl font-bold">
                 {mode === "register" ? "ساخت حساب" : "ورود به حساب"}
               </h2>
             </div>
             <Image
-              alt="ویکی اکانت"
+              alt="جیمی اکانت"
               className="size-12 rounded-md object-contain lg:hidden"
               height={48}
-              src="/wiki-high-resolution-logo-transparent.png"
+              src="/gimi-high-resolution-logo-transparent.png"
               width={48}
             />
           </div>

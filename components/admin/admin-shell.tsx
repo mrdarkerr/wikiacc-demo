@@ -311,14 +311,14 @@ export function AdminShell({ children }: AdminShellProps) {
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 border-l border-border bg-card lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-3 border-b border-border px-5">
           <Image
-            alt="ویکی اکانت"
+            alt="جیمی اکانت"
             className="size-9 rounded-md object-contain"
             height={36}
-            src="/wiki-high-resolution-logo-transparent.png"
+            src="/gimi-high-resolution-logo-transparent.png"
             width={36}
           />
           <div>
-            <p className="font-bold">ویکی اکانت</p>
+            <p className="font-bold">جیمی اکانت</p>
             <p className="text-xs text-muted-foreground">پنل ادمین</p>
           </div>
         </div>
@@ -346,7 +346,7 @@ export function AdminShell({ children }: AdminShellProps) {
               <Menu className="size-5" />
             </Button>
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">ویکی اکانت</p>
+              <p className="text-xs text-muted-foreground">جیمی اکانت</p>
               <h1 className="truncate text-lg font-bold">{pageTitle}</h1>
             </div>
           </div>
@@ -385,14 +385,14 @@ export function AdminShell({ children }: AdminShellProps) {
           >
             <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4">
               <Image
-                alt="ویکی اکانت"
+                alt="جیمی اکانت"
                 className="size-9 rounded-md object-contain"
                 height={36}
-                src="/wiki-high-resolution-logo-transparent.png"
+                src="/gimi-high-resolution-logo-transparent.png"
                 width={36}
               />
               <div className="min-w-0 flex-1">
-                <p className="font-bold">ویکی اکانت</p>
+                <p className="font-bold">جیمی اکانت</p>
                 <p className="text-xs text-muted-foreground">پنل ادمین</p>
               </div>
               <Button

@@ -67,14 +67,14 @@ export function PanelShell({ children }: PanelShellProps) {
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 border-l border-border bg-card lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-3 border-b border-border px-5">
           <Image
-            alt="ویکی اکانت"
+            alt="جیمی اکانت"
             className="size-9 rounded-md object-contain"
             height={36}
-            src="/wiki-high-resolution-logo-transparent.png"
+            src="/gimi-high-resolution-logo-transparent.png"
             width={36}
           />
           <div>
-            <p className="font-bold">ویکی اکانت</p>
+            <p className="font-bold">جیمی اکانت</p>
             <p className="text-xs text-muted-foreground">پنل کاربری</p>
           </div>
         </div>
@@ -122,7 +122,7 @@ export function PanelShell({ children }: PanelShellProps) {
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur lg:mr-64">
         <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <div>
-            <p className="text-xs text-muted-foreground">ویکی اکانت</p>
+            <p className="text-xs text-muted-foreground">جیمی اکانت</p>
             <h1 className="text-lg font-bold">{pageTitle}</h1>
           </div>
           <div className="flex items-center gap-2">

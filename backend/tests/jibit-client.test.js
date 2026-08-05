@@ -30,7 +30,7 @@ describe("Jibit PPG v3 client", () => {
           elements: [
             {
               amount: 1250,
-              clientReferenceNumber: "WKA-test",
+              clientReferenceNumber: "GMA-test",
               purchaseId: 123456,
               status: "SUCCESSFUL",
             },
@@ -47,8 +47,8 @@ describe("Jibit PPG v3 client", () => {
     await expect(
       client.createPurchase({
         amount: 1250,
-        callbackUrl: "https://wikiacc.ir/api/v1/payments/jibit/callback",
-        clientReferenceNumber: "WKA-test",
+        callbackUrl: "https://gimiacc.com/api/v1/payments/jibit/callback",
+        clientReferenceNumber: "GMA-test",
         currency: "IRR",
         userIdentifier: "09120000000",
       }),
@@ -61,7 +61,7 @@ describe("Jibit PPG v3 client", () => {
     });
     await expect(client.getPurchase("123456")).resolves.toMatchObject({
       amount: 1250,
-      clientReferenceNumber: "WKA-test",
+      clientReferenceNumber: "GMA-test",
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(4);

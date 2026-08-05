@@ -23,7 +23,7 @@ function orderTitle(order: Order) {
 }
 
 function orderCode(order: Order) {
-  return `WKA-${order.id.slice(-6).toUpperCase()}`;
+  return `GMA-${order.id.slice(-6).toUpperCase()}`;
 }
 
 function getErrorMessage(error: unknown) {

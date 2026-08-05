@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = process.env.ADMIN_SEED_EMAIL ?? "admin@wikiacc.local";
+  const adminEmail = process.env.ADMIN_SEED_EMAIL ?? "admin@gimiacc.local";
   const adminPassword = process.env.ADMIN_SEED_PASSWORD ?? "admin123456";
 
   const admin = await prisma.user.upsert({
@@ -14,7 +14,7 @@ async function main() {
     update: { role: "ADMIN" },
     create: {
       email: adminEmail,
-      name: "WikiAcc Admin",
+      name: "GimiAcc Admin",
       passwordHash: await bcrypt.hash(adminPassword, 12),
       role: "ADMIN",
       wallet: { create: { balance: 0 } },

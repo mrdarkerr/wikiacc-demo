@@ -15,7 +15,7 @@ import type { ApiMeta, Order } from "@/types/api";
 const PER_PAGE = 8;
 
 function orderCode(order: Order) {
-  return `WKA-${order.id.slice(-6).toUpperCase()}`;
+  return `GMA-${order.id.slice(-6).toUpperCase()}`;
 }
 
 function orderTitle(order: Order) {

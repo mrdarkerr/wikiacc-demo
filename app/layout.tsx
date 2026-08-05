@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ویکی اکانت | اشتراک‌های دیجیتال",
+  title: "جیمی اکانت | اشتراک‌های دیجیتال",
   description:
     "فروشگاه اشتراک‌های هوش مصنوعی و موسیقی شامل Gemini، ChatGPT، Claude، Grok و Spotify.",
 };

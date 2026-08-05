@@ -34,7 +34,7 @@ function formatCurrency(amount: number) {
 }
 
 function orderCode(order: Order) {
-  return `WKA-${order.id.slice(-6).toUpperCase()}`;
+  return `GMA-${order.id.slice(-6).toUpperCase()}`;
 }
 
 function deliveryMessages(order: Order) {
@@ -271,13 +271,13 @@ export function StorefrontClient() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <Link className="inline-flex items-center gap-3" href="/">
             <Image
-              alt="ویکی اکانت"
+              alt="جیمی اکانت"
               className="size-9 rounded-md object-contain"
               height={36}
-              src="/wiki-high-resolution-logo-transparent.png"
+              src="/gimi-high-resolution-logo-transparent.png"
               width={36}
             />
-            <span className="font-bold">ویکی اکانت</span>
+            <span className="font-bold">جیمی اکانت</span>
           </Link>
           <div className="flex items-center gap-2">
             <Button asChild size="sm" variant="outline">
