@@ -268,7 +268,7 @@ export default function AdminOrderDetailPage() {
                           <dt className="text-xs text-muted-foreground">
                             {field.labelSnapshot}
                           </dt>
-                          <dd className="mt-1 whitespace-pre-wrap text-sm font-medium">
+                          <dd className="mt-1 whitespace-pre-wrap break-words text-sm font-medium [overflow-wrap:anywhere]">
                             {field.value}
                           </dd>
                         </div>
@@ -287,7 +287,7 @@ export default function AdminOrderDetailPage() {
                     <div className="mt-3 space-y-2">
                       {item.deliveries.map((delivery) => (
                         <code
-                          className="block whitespace-pre-wrap rounded-md bg-muted px-3 py-2 text-xs"
+                          className="block max-w-full whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2 text-xs [overflow-wrap:anywhere]"
                           key={delivery.id}
                         >
                           {delivery.contentSnapshot}
@@ -305,7 +305,7 @@ export default function AdminOrderDetailPage() {
 
             <div className="rounded-md border border-border p-4">
               <p className="text-sm text-muted-foreground">یادداشت کاربر</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm">
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">
                 {order.note || "یادداشتی ثبت نشده است."}
               </p>
             </div>

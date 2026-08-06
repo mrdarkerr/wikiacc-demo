@@ -692,7 +692,7 @@ function OrderResult({
     <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
       <div className="flex items-start gap-2">
         <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-medium">
             سفارش {orderCode(order)} ثبت و پرداخت شد.
           </p>
@@ -700,7 +700,7 @@ function OrderResult({
             <div className="mt-3 space-y-2">
               {deliveries.map((delivery, index) => (
                 <code
-                  className="block whitespace-pre-wrap rounded-md bg-background/80 px-3 py-2 text-xs text-foreground"
+                  className="block max-w-full whitespace-pre-wrap break-words rounded-md bg-background/80 px-3 py-2 text-xs text-foreground [overflow-wrap:anywhere]"
                   key={`${delivery}-${index}`}
                 >
                   {delivery}

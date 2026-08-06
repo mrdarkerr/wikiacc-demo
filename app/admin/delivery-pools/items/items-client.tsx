@@ -281,11 +281,11 @@ export function DeliveryItemsClient() {
                 </div>
               ) : null}
             </div>
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3">
               <label className="block text-sm font-medium">
                 هر آیتم در یک خط
                 <textarea
-                  className="mt-2 min-h-44 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                  className="mt-2 min-h-44 w-full max-w-full break-words rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition [overflow-wrap:anywhere] focus-visible:ring-2 focus-visible:ring-ring"
                   dir="ltr"
                   required
                   value={itemsText}

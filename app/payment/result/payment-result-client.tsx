@@ -130,7 +130,7 @@ export function PaymentResultClient() {
                 </p>
                 {deliveries.map((delivery, index) => (
                   <code
-                    className="block whitespace-pre-wrap rounded-md bg-background px-3 py-2 text-xs"
+                    className="block max-w-full whitespace-pre-wrap break-words rounded-md bg-background px-3 py-2 text-xs [overflow-wrap:anywhere]"
                     key={`${delivery}-${index}`}
                   >
                     {delivery}
