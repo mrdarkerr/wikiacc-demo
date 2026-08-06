@@ -6,7 +6,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Boxes, PackageOpen, Plus, Search, Trash2 } from "lucide-react";
 
-import { formatDate, shortId } from "@/components/admin/admin-formatters";
+import {
+  formatDate,
+  formatTime,
+  shortId,
+} from "@/components/admin/admin-formatters";
 import { DeliveryAdminNav } from "@/components/admin/delivery-admin-nav";
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
@@ -36,6 +40,30 @@ function splitItems(text: string) {
     .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function newestItemFirst(
+  firstItem: AdminDeliveryItem,
+  secondItem: AdminDeliveryItem,
+) {
+  const createdAtDifference =
+    new Date(secondItem.createdAt).getTime() -
+    new Date(firstItem.createdAt).getTime();
+
+  return createdAtDifference || secondItem.id.localeCompare(firstItem.id);
+}
+
+function ItemDateTime({ value }: { value?: string | null }) {
+  return (
+    <span className="inline-flex flex-col whitespace-nowrap leading-tight">
+      <span>{formatDate(value)}</span>
+      {value ? (
+        <span className="mt-1 text-[10px] font-normal text-muted-foreground">
+          {formatTime(value)}
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 export function DeliveryItemsClient() {
@@ -179,16 +207,18 @@ export function DeliveryItemsClient() {
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return items.filter((item) => {
-      const matchesQuery = normalizedQuery
-        ? item.content.toLowerCase().includes(normalizedQuery) ||
-          item.id.toLowerCase().includes(normalizedQuery)
-        : true;
-      const matchesStatus =
-        statusFilter === "ALL" ? true : item.status === statusFilter;
+    return items
+      .filter((item) => {
+        const matchesQuery = normalizedQuery
+          ? item.content.toLowerCase().includes(normalizedQuery) ||
+            item.id.toLowerCase().includes(normalizedQuery)
+          : true;
+        const matchesStatus =
+          statusFilter === "ALL" ? true : item.status === statusFilter;
 
-      return matchesQuery && matchesStatus;
-    });
+        return matchesQuery && matchesStatus;
+      })
+      .sort(newestItemFirst);
   }, [items, query, statusFilter]);
 
   const availableCount = items.filter((item) => item.status === "AVAILABLE").length;
@@ -368,8 +398,14 @@ export function DeliveryItemsClient() {
                     {item.content}
                   </code>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline">ثبت {formatDate(item.createdAt)}</Badge>
-                    <Badge variant="outline">تحویل {formatDate(item.deliveredAt)}</Badge>
+                    <Badge className="items-start gap-1.5 py-1" variant="outline">
+                      <span>ثبت</span>
+                      <ItemDateTime value={item.createdAt} />
+                    </Badge>
+                    <Badge className="items-start gap-1.5 py-1" variant="outline">
+                      <span>تحویل</span>
+                      <ItemDateTime value={item.deliveredAt} />
+                    </Badge>
                   </div>
                   {item.status === "AVAILABLE" ? (
                     <Button
@@ -415,10 +451,10 @@ export function DeliveryItemsClient() {
                         <AdminStatusBadge type="delivery" value={item.status} />
                       </td>
                       <td className="py-3 text-muted-foreground">
-                        {formatDate(item.deliveredAt)}
+                        <ItemDateTime value={item.deliveredAt} />
                       </td>
                       <td className="py-3 text-muted-foreground">
-                        {formatDate(item.createdAt)}
+                        <ItemDateTime value={item.createdAt} />
                       </td>
                       <td className="py-3">
                         {item.status === "AVAILABLE" ? (

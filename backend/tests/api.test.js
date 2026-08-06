@@ -586,6 +586,60 @@ describe("wikiacc backend api", () => {
     ).toBe(2);
   });
 
+  it("lists delivery pool items from newest to oldest", async () => {
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        email: "admin@test.local",
+        password: "password123",
+      },
+    });
+    const testAdminCookie = getCookie(login);
+    const pool = await app.prisma.deliveryPool.create({
+      data: {
+        slug: "sorted-delivery-items-pool",
+        title: "Sorted delivery items pool",
+      },
+    });
+
+    await app.prisma.deliveryItem.createMany({
+      data: [
+        {
+          content: "OLDEST",
+          createdAt: new Date("2026-01-01T08:00:00.000Z"),
+          poolId: pool.id,
+          status: "AVAILABLE",
+        },
+        {
+          content: "MIDDLE",
+          createdAt: new Date("2026-02-01T08:00:00.000Z"),
+          poolId: pool.id,
+          status: "DELIVERED",
+        },
+        {
+          content: "NEWEST",
+          createdAt: new Date("2026-03-01T08:00:00.000Z"),
+          poolId: pool.id,
+          status: "DISABLED",
+        },
+      ],
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/v1/admin/delivery-pools/${pool.id}/items`,
+      headers: { cookie: testAdminCookie },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.items.map((item) => item.content)).toEqual([
+      "NEWEST",
+      "MIDDLE",
+      "OLDEST",
+    ]);
+  });
+
   it("lets admins configure SMS credentials and sender lines without exposing secrets", async () => {
     const anonymousResponse = await app.inject({
       method: "GET",

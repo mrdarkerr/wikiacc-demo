@@ -20,6 +20,16 @@ export function formatDate(value?: string | null) {
   }).format(new Date(value));
 }
 
+export function formatTime(value?: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("fa-IR", {
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 export function shortId(id?: string | null, length = 8) {
   if (!id) return "-";
   return id.slice(-length).toUpperCase();

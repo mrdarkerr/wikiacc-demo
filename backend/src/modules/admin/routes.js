@@ -415,7 +415,7 @@ export async function adminRoutes(app) {
     const params = parse(idParamsSchema, request.params);
     const items = await app.prisma.deliveryItem.findMany({
       where: { poolId: params.id },
-      orderBy: [{ status: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 500,
     });
     return ok(reply, { items });
