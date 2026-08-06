@@ -361,6 +361,11 @@ export const api = {
             method: "POST",
           },
         ),
+      removeItem: (poolId: string, itemId: string) =>
+        apiFetch<{ itemId: string }>(
+          `/admin/delivery-pools/${poolId}/items/${itemId}`,
+          { method: "DELETE" },
+        ),
     },
     sms: {
       getSettings: () =>

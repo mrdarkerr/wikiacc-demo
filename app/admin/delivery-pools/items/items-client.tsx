@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Boxes, PackageOpen, Plus, Search } from "lucide-react";
+import { Boxes, PackageOpen, Plus, Search, Trash2 } from "lucide-react";
 
 import { formatDate, shortId } from "@/components/admin/admin-formatters";
 import { DeliveryAdminNav } from "@/components/admin/delivery-admin-nav";
@@ -48,6 +48,7 @@ export function DeliveryItemsClient() {
   const [loading, setLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -145,6 +146,31 @@ export function DeliveryItemsClient() {
       setMessage("");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function removeItem(item: AdminDeliveryItem) {
+    if (item.status !== "AVAILABLE") return;
+
+    const confirmed = window.confirm(
+      "این آیتم آماده برای همیشه از استخر تحویل حذف شود؟",
+    );
+    if (!confirmed) return;
+
+    setDeletingItemId(item.id);
+    try {
+      await api.admin.deliveryPools.removeItem(item.poolId, item.id);
+      setItems((current) =>
+        current.filter((currentItem) => currentItem.id !== item.id),
+      );
+      await loadPools();
+      setMessage("آیتم از استخر تحویل حذف شد.");
+      setError("");
+    } catch (removeError) {
+      setError(errorMessage(removeError));
+      setMessage("");
+    } finally {
+      setDeletingItemId("");
     }
   }
 
@@ -345,12 +371,25 @@ export function DeliveryItemsClient() {
                     <Badge variant="outline">ثبت {formatDate(item.createdAt)}</Badge>
                     <Badge variant="outline">تحویل {formatDate(item.deliveredAt)}</Badge>
                   </div>
+                  {item.status === "AVAILABLE" ? (
+                    <Button
+                      className="mt-3 text-rose-600 hover:text-rose-600"
+                      disabled={Boolean(deletingItemId)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={() => removeItem(item)}
+                    >
+                      <Trash2 className="size-4" />
+                      {deletingItemId === item.id ? "در حال حذف..." : "حذف"}
+                    </Button>
+                  ) : null}
                 </article>
               ))}
             </div>
 
             <div className="hidden w-full max-w-full overflow-x-auto overscroll-x-contain md:block">
-              <table className="w-full min-w-[900px] text-right text-sm">
+              <table className="w-full min-w-[980px] text-right text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border">
                     <th className="py-3 font-medium">شناسه</th>
@@ -358,6 +397,7 @@ export function DeliveryItemsClient() {
                     <th className="py-3 font-medium">وضعیت</th>
                     <th className="py-3 font-medium">تحویل</th>
                     <th className="py-3 font-medium">ثبت</th>
+                    <th className="py-3 font-medium">عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -379,6 +419,25 @@ export function DeliveryItemsClient() {
                       </td>
                       <td className="py-3 text-muted-foreground">
                         {formatDate(item.createdAt)}
+                      </td>
+                      <td className="py-3">
+                        {item.status === "AVAILABLE" ? (
+                          <Button
+                            className="text-rose-600 hover:text-rose-600"
+                            disabled={Boolean(deletingItemId)}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            onClick={() => removeItem(item)}
+                          >
+                            <Trash2 className="size-4" />
+                            {deletingItemId === item.id
+                              ? "در حال حذف..."
+                              : "حذف"}
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

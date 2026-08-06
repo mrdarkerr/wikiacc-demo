@@ -519,6 +519,73 @@ describe("wikiacc backend api", () => {
     expect(response.json().data.wallet.balance).toBe(1000);
   });
 
+  it("lets admins delete available delivery items but protects claimed items", async () => {
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        email: "admin@test.local",
+        password: "password123",
+      },
+    });
+    const testAdminCookie = getCookie(login);
+
+    const pool = await app.prisma.deliveryPool.create({
+      data: {
+        slug: "admin-delete-items-pool",
+        title: "Admin delete items pool",
+        items: {
+          create: [
+            { content: "DELETE-ME" },
+            { content: "KEEP-RESERVED", status: "RESERVED" },
+            { content: "KEEP-DELIVERED", status: "DELIVERED" },
+          ],
+        },
+      },
+      include: { items: true },
+    });
+    const availableItem = pool.items.find(
+      (item) => item.status === "AVAILABLE",
+    );
+    const reservedItem = pool.items.find((item) => item.status === "RESERVED");
+    const deliveredItem = pool.items.find((item) => item.status === "DELIVERED");
+
+    const anonymousResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/delivery-pools/${pool.id}/items/${availableItem.id}`,
+    });
+    expect(anonymousResponse.statusCode).toBe(401);
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/delivery-pools/${pool.id}/items/${availableItem.id}`,
+      headers: { cookie: testAdminCookie },
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(deleteResponse.json().data.itemId).toBe(availableItem.id);
+    expect(
+      await app.prisma.deliveryItem.findUnique({
+        where: { id: availableItem.id },
+      }),
+    ).toBeNull();
+
+    for (const item of [reservedItem, deliveredItem]) {
+      const protectedResponse = await app.inject({
+        method: "DELETE",
+        url: `/api/v1/admin/delivery-pools/${pool.id}/items/${item.id}`,
+        headers: { cookie: testAdminCookie },
+      });
+      expect(protectedResponse.statusCode).toBe(409);
+      expect(protectedResponse.json().error.code).toBe(
+        "DELIVERY_ITEM_NOT_AVAILABLE",
+      );
+    }
+
+    expect(
+      await app.prisma.deliveryItem.count({ where: { poolId: pool.id } }),
+    ).toBe(2);
+  });
+
   it("lets admins configure SMS credentials and sender lines without exposing secrets", async () => {
     const anonymousResponse = await app.inject({
       method: "GET",

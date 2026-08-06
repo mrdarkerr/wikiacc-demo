@@ -12,7 +12,11 @@ import {
   addDeliveryItemsSchema,
   createDeliveryPoolSchema,
 } from "../delivery/schemas.js";
-import { addDeliveryItems, createDeliveryPool } from "../delivery/service.js";
+import {
+  addDeliveryItems,
+  createDeliveryPool,
+  removeAvailableDeliveryItem,
+} from "../delivery/service.js";
 import { enqueueOrderCompletedNotification } from "../sms/notifications.js";
 import { createTicketMessageSchema, updateTicketStatusSchema } from "../tickets/schemas.js";
 import { addTicketMessage } from "../tickets/service.js";
@@ -22,6 +26,7 @@ import {
   refundOrderByAdmin,
 } from "../wallet/service.js";
 import {
+  deliveryItemParamsSchema,
   idParamsSchema,
   refundOrderSchema,
   setActiveSchema,
@@ -421,6 +426,16 @@ export async function adminRoutes(app) {
     const input = parse(addDeliveryItemsSchema, request.body);
     const pool = await addDeliveryItems(app.prisma, params.id, input);
     return created(reply, { pool });
+  });
+
+  app.delete("/delivery-pools/:id/items/:itemId", async (request, reply) => {
+    const params = parse(deliveryItemParamsSchema, request.params);
+    const result = await removeAvailableDeliveryItem(
+      app.prisma,
+      params.id,
+      params.itemId,
+    );
+    return ok(reply, result);
   });
 
   app.post("/wallet/users/:userId/credit", async (request, reply) => {
