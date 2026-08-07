@@ -3,9 +3,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "جیمی اکانت | اشتراک‌های دیجیتال",
+  title: "11012710",
   description:
     "فروشگاه اشتراک‌های هوش مصنوعی و موسیقی شامل Gemini، ChatGPT، Claude، Grok و Spotify.",
+  other: {
+    enamad: "11012710",
+  },
 };
 
 export default function RootLayout({
