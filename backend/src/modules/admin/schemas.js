@@ -4,6 +4,11 @@ export const idParamsSchema = z.object({
   id: z.string().min(1),
 });
 
+export const deliveryItemParamsSchema = z.object({
+  id: z.string().min(1),
+  itemId: z.string().min(1),
+});
+
 export const userIdParamsSchema = z.object({
   userId: z.string().min(1),
 });

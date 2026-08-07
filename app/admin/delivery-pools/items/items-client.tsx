@@ -4,9 +4,13 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Boxes, PackageOpen, Plus, Search } from "lucide-react";
+import { Boxes, PackageOpen, Plus, Search, Trash2 } from "lucide-react";
 
-import { formatDate, shortId } from "@/components/admin/admin-formatters";
+import {
+  formatDate,
+  formatTime,
+  shortId,
+} from "@/components/admin/admin-formatters";
 import { DeliveryAdminNav } from "@/components/admin/delivery-admin-nav";
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
@@ -38,6 +42,30 @@ function splitItems(text: string) {
     .filter(Boolean);
 }
 
+function newestItemFirst(
+  firstItem: AdminDeliveryItem,
+  secondItem: AdminDeliveryItem,
+) {
+  const createdAtDifference =
+    new Date(secondItem.createdAt).getTime() -
+    new Date(firstItem.createdAt).getTime();
+
+  return createdAtDifference || secondItem.id.localeCompare(firstItem.id);
+}
+
+function ItemDateTime({ value }: { value?: string | null }) {
+  return (
+    <span className="inline-flex flex-col whitespace-nowrap leading-tight">
+      <span>{formatDate(value)}</span>
+      {value ? (
+        <span className="mt-1 text-[10px] font-normal text-muted-foreground">
+          {formatTime(value)}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function DeliveryItemsClient() {
   const searchParams = useSearchParams();
   const initialPoolId = searchParams.get("pool") ?? "";
@@ -48,6 +76,7 @@ export function DeliveryItemsClient() {
   const [loading, setLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -148,21 +177,48 @@ export function DeliveryItemsClient() {
     }
   }
 
+  async function removeItem(item: AdminDeliveryItem) {
+    if (item.status !== "AVAILABLE") return;
+
+    const confirmed = window.confirm(
+      "این آیتم آماده برای همیشه از استخر تحویل حذف شود؟",
+    );
+    if (!confirmed) return;
+
+    setDeletingItemId(item.id);
+    try {
+      await api.admin.deliveryPools.removeItem(item.poolId, item.id);
+      setItems((current) =>
+        current.filter((currentItem) => currentItem.id !== item.id),
+      );
+      await loadPools();
+      setMessage("آیتم از استخر تحویل حذف شد.");
+      setError("");
+    } catch (removeError) {
+      setError(errorMessage(removeError));
+      setMessage("");
+    } finally {
+      setDeletingItemId("");
+    }
+  }
+
   const selectedPool = pools.find((pool) => pool.id === selectedPoolId) ?? null;
   const preparedItems = splitItems(itemsText);
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return items.filter((item) => {
-      const matchesQuery = normalizedQuery
-        ? item.content.toLowerCase().includes(normalizedQuery) ||
-          item.id.toLowerCase().includes(normalizedQuery)
-        : true;
-      const matchesStatus =
-        statusFilter === "ALL" ? true : item.status === statusFilter;
+    return items
+      .filter((item) => {
+        const matchesQuery = normalizedQuery
+          ? item.content.toLowerCase().includes(normalizedQuery) ||
+            item.id.toLowerCase().includes(normalizedQuery)
+          : true;
+        const matchesStatus =
+          statusFilter === "ALL" ? true : item.status === statusFilter;
 
-      return matchesQuery && matchesStatus;
-    });
+        return matchesQuery && matchesStatus;
+      })
+      .sort(newestItemFirst);
   }, [items, query, statusFilter]);
 
   const availableCount = items.filter((item) => item.status === "AVAILABLE").length;
@@ -255,11 +311,11 @@ export function DeliveryItemsClient() {
                 </div>
               ) : null}
             </div>
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3">
               <label className="block text-sm font-medium">
                 هر آیتم در یک خط
                 <textarea
-                  className="mt-2 min-h-44 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                  className="mt-2 min-h-44 w-full max-w-full break-words rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition [overflow-wrap:anywhere] focus-visible:ring-2 focus-visible:ring-ring"
                   dir="ltr"
                   required
                   value={itemsText}
@@ -342,15 +398,34 @@ export function DeliveryItemsClient() {
                     {item.content}
                   </code>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline">ثبت {formatDate(item.createdAt)}</Badge>
-                    <Badge variant="outline">تحویل {formatDate(item.deliveredAt)}</Badge>
+                    <Badge className="items-start gap-1.5 py-1" variant="outline">
+                      <span>ثبت</span>
+                      <ItemDateTime value={item.createdAt} />
+                    </Badge>
+                    <Badge className="items-start gap-1.5 py-1" variant="outline">
+                      <span>تحویل</span>
+                      <ItemDateTime value={item.deliveredAt} />
+                    </Badge>
                   </div>
+                  {item.status === "AVAILABLE" ? (
+                    <Button
+                      className="mt-3 text-rose-600 hover:text-rose-600"
+                      disabled={Boolean(deletingItemId)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={() => removeItem(item)}
+                    >
+                      <Trash2 className="size-4" />
+                      {deletingItemId === item.id ? "در حال حذف..." : "حذف"}
+                    </Button>
+                  ) : null}
                 </article>
               ))}
             </div>
 
             <div className="hidden w-full max-w-full overflow-x-auto overscroll-x-contain md:block">
-              <table className="w-full min-w-[900px] text-right text-sm">
+              <table className="w-full min-w-[980px] text-right text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b border-border">
                     <th className="py-3 font-medium">شناسه</th>
@@ -358,6 +433,7 @@ export function DeliveryItemsClient() {
                     <th className="py-3 font-medium">وضعیت</th>
                     <th className="py-3 font-medium">تحویل</th>
                     <th className="py-3 font-medium">ثبت</th>
+                    <th className="py-3 font-medium">عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -375,10 +451,29 @@ export function DeliveryItemsClient() {
                         <AdminStatusBadge type="delivery" value={item.status} />
                       </td>
                       <td className="py-3 text-muted-foreground">
-                        {formatDate(item.deliveredAt)}
+                        <ItemDateTime value={item.deliveredAt} />
                       </td>
                       <td className="py-3 text-muted-foreground">
-                        {formatDate(item.createdAt)}
+                        <ItemDateTime value={item.createdAt} />
+                      </td>
+                      <td className="py-3">
+                        {item.status === "AVAILABLE" ? (
+                          <Button
+                            className="text-rose-600 hover:text-rose-600"
+                            disabled={Boolean(deletingItemId)}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            onClick={() => removeItem(item)}
+                          >
+                            <Trash2 className="size-4" />
+                            {deletingItemId === item.id
+                              ? "در حال حذف..."
+                              : "حذف"}
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

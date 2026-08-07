@@ -53,6 +53,7 @@ const navItems = [
 export function PanelShell({ children }: PanelShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const isTicketConversation = /^\/tickets\/[^/]+\/?$/.test(pathname);
   const pageTitle =
     navItems.find((item) => pathname.startsWith(item.href))?.label ?? "پنل";
 
@@ -63,7 +64,13 @@ export function PanelShell({ children }: PanelShellProps) {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-muted/30 text-foreground" dir="rtl">
+    <div
+      className={cn(
+        "min-h-dvh overflow-x-hidden bg-muted/30 text-foreground",
+        isTicketConversation && "h-dvh min-h-0 overflow-hidden",
+      )}
+      dir="rtl"
+    >
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 border-l border-border bg-card lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-3 border-b border-border px-5">
           <Image
@@ -145,13 +152,29 @@ export function PanelShell({ children }: PanelShellProps) {
         </div>
       </header>
 
-      <main className="pb-20 lg:mr-64 lg:pb-8">
-        <div className="mx-auto w-full max-w-6xl min-w-0 px-4 py-6 sm:px-6 lg:px-8">
+      <main
+        className={cn(
+          "pb-20 lg:mr-64 lg:pb-8",
+          isTicketConversation &&
+            "h-[calc(100dvh-4rem)] overflow-hidden pb-0 lg:pb-0",
+        )}
+      >
+        <div
+          className={cn(
+            "mx-auto w-full max-w-6xl min-w-0 px-4 py-6 sm:px-6 lg:px-8",
+            isTicketConversation && "h-full max-w-none p-0 lg:max-w-6xl lg:px-8 lg:py-6",
+          )}
+        >
           {children}
         </div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card lg:hidden">
+      <nav
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card lg:hidden",
+          isTicketConversation && "hidden",
+        )}
+      >
         {navItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;

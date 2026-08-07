@@ -1,4 +1,4 @@
-import { notFound } from "../../shared/errors.js";
+import { conflict, notFound } from "../../shared/errors.js";
 
 export async function createDeliveryPool(prisma, input) {
   return prisma.deliveryPool.create({ data: input });
@@ -25,4 +25,33 @@ export async function addDeliveryItems(prisma, poolId, input) {
       },
     },
   });
+}
+
+export async function removeAvailableDeliveryItem(prisma, poolId, itemId) {
+  const result = await prisma.deliveryItem.deleteMany({
+    where: {
+      id: itemId,
+      poolId,
+      status: "AVAILABLE",
+    },
+  });
+
+  if (result.count === 1) {
+    return { itemId };
+  }
+
+  const item = await prisma.deliveryItem.findUnique({
+    where: { id: itemId },
+    select: { poolId: true, status: true },
+  });
+
+  if (!item || item.poolId !== poolId) {
+    throw notFound("DELIVERY_ITEM_NOT_FOUND", "Delivery item was not found");
+  }
+
+  throw conflict(
+    "DELIVERY_ITEM_NOT_AVAILABLE",
+    "Only available delivery items can be deleted",
+    { status: item.status },
+  );
 }
