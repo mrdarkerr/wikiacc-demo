@@ -870,7 +870,27 @@ function Footer({
           </ul>
         </div>
 
-        <div aria-hidden="true" />
+        <div className="flex items-start lg:justify-end">
+          <a
+            referrerPolicy="origin"
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://trustseal.enamad.ir/?id=7213812&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
+            aria-label="مشاهده نماد اعتماد الکترونیکی جیمی اکانت"
+            className="inline-flex rounded-2xl border border-gray-200/70 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-gray-800/70 dark:bg-gray-900"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              referrerPolicy="origin"
+              src="https://trustseal.enamad.ir/logo.aspx?id=7213812&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
+              alt="نماد اعتماد الکترونیکی جیمی اکانت"
+              className="h-24 w-24 object-contain"
+              width="96"
+              height="96"
+              style={{ cursor: "pointer" }}
+            />
+          </a>
+        </div>
       </div>
 
       <div className="mx-auto mt-10 max-w-7xl px-4 text-center opacity-60 sm:px-6 lg:px-8">
