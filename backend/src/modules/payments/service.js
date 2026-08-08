@@ -179,6 +179,22 @@ export async function initiateJibitPayment(
       },
     };
   } catch (error) {
+    logger?.warn?.(
+      {
+        attemptId,
+        errorCode:
+          typeof error?.code === "string" ? error.code : "JIBIT_INIT_FAILED",
+        providerCode:
+          typeof error?.details?.providerCode === "string"
+            ? error.details.providerCode
+            : undefined,
+        providerStatus:
+          Number.isInteger(error?.details?.providerStatus)
+            ? error.details.providerStatus
+            : undefined,
+      },
+      "Jibit purchase initiation failed",
+    );
     await failPendingJibitOrder(
       prisma,
       attemptId,
