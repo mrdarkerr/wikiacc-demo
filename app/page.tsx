@@ -875,14 +875,14 @@ function Footer({
             referrerPolicy="origin"
             target="_blank"
             rel="noopener noreferrer"
-            href="https://trustseal.enamad.ir/?id=7213812&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
+            href="https://trustseal.enamad.ir/?id=770440&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
             aria-label="مشاهده نماد اعتماد الکترونیکی جیمی اکانت"
             className="inline-flex rounded-2xl border border-gray-200/70 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-gray-800/70 dark:bg-gray-900"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               referrerPolicy="origin"
-              src="https://trustseal.enamad.ir/logo.aspx?id=7213812&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
+              src="https://trustseal.enamad.ir/logo.aspx?id=770440&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
               alt="نماد اعتماد الکترونیکی جیمی اکانت"
               className="h-24 w-24 object-contain"
               width="96"
