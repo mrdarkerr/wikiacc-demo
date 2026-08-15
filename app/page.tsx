@@ -874,7 +874,6 @@ function Footer({
           <a
             referrerPolicy="origin"
             target="_blank"
-            rel="noopener noreferrer"
             href="https://trustseal.enamad.ir/?id=770440&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
             aria-label="مشاهده نماد اعتماد الکترونیکی جیمی اکانت"
             className="inline-flex rounded-2xl border border-gray-200/70 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-gray-800/70 dark:bg-gray-900"
@@ -883,7 +882,8 @@ function Footer({
             <img
               referrerPolicy="origin"
               src="https://trustseal.enamad.ir/logo.aspx?id=770440&Code=ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
-              alt="نماد اعتماد الکترونیکی جیمی اکانت"
+              alt=""
+              data-code="ioB7D5RstKJ5vq2wCehmoHj9V25soLE0"
               className="h-24 w-24 object-contain"
               width="96"
               height="96"
