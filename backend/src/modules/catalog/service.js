@@ -42,4 +42,32 @@ export function validateProductInput(input) {
       "Instant delivery products cannot define custom form fields",
     );
   }
+
+  if (input.type === "SHAREBOX" && !input.shareboxCategoryId) {
+    throw badRequest(
+      "SHAREBOX_CATEGORY_REQUIRED",
+      "ShareBox products must be connected to a ShareBox category",
+    );
+  }
+
+  if (input.type === "SHAREBOX" && input.deliveryPoolId) {
+    throw badRequest(
+      "SHAREBOX_PRODUCT_CANNOT_USE_DELIVERY_POOL",
+      "ShareBox products cannot use a delivery pool",
+    );
+  }
+
+  if (input.type !== "SHAREBOX" && input.shareboxCategoryId) {
+    throw badRequest(
+      "SHAREBOX_CATEGORY_NOT_ALLOWED",
+      "Only ShareBox products can select a ShareBox category",
+    );
+  }
+
+  if (input.type === "SHAREBOX" && input.fields?.length) {
+    throw badRequest(
+      "SHAREBOX_PRODUCT_CANNOT_USE_FORM_FIELDS",
+      "ShareBox products cannot define custom form fields",
+    );
+  }
 }

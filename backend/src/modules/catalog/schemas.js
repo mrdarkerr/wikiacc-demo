@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const productTypeSchema = z.enum(["CUSTOM_FORM", "INSTANT_DELIVERY"]);
+export const productTypeSchema = z.enum(["CUSTOM_FORM", "INSTANT_DELIVERY", "SHAREBOX"]);
 export const fieldTypeSchema = z.enum(["TEXT", "EMAIL", "PHONE", "TEXTAREA", "SELECT"]);
 
 export const productFieldInputSchema = z.object({
@@ -24,7 +24,8 @@ export const createProductSchema = z.object({
   type: productTypeSchema,
   price: z.number().int().nonnegative(),
   categoryId: z.string().optional(),
-  deliveryPoolId: z.string().optional(),
+  deliveryPoolId: z.string().nullable().optional(),
+  shareboxCategoryId: z.string().uuid().nullable().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
   features: z.array(productFeatureInputSchema).max(12).default([]),

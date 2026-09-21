@@ -122,7 +122,13 @@ export async function initiateJibitPayment(
   prisma,
   userId,
   input,
-  { callbackBaseUrl, client, logger, reconcileMinutes = 20 },
+  {
+    callbackBaseUrl,
+    client,
+    logger,
+    reconcileMinutes = 20,
+    shareboxBaseUrl,
+  },
 ) {
   if (!client || !callbackBaseUrl) {
     throw serviceUnavailable(
@@ -148,7 +154,7 @@ export async function initiateJibitPayment(
     attemptId,
     clientReferenceNumber,
     reconcileAfter,
-  });
+  }, { shareboxBaseUrl });
 
   try {
     const purchase = await client.createPurchase({
@@ -277,6 +283,8 @@ async function markSuccessful(prisma, attempt, purchase) {
       if (item.productTypeSnapshot === "INSTANT_DELIVERY") {
         await fulfillReservedDeliveryItems(tx, item.id, item.quantity);
         orderStatus = "DELIVERED";
+      } else if (item.productTypeSnapshot === "SHAREBOX") {
+        orderStatus = "READY";
       } else {
         const suppliedKeys = new Set(item.fieldValues.map((field) => field.keySnapshot));
         const hasMissingField = item.product.fields.some(

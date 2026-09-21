@@ -20,6 +20,9 @@ import { ticketRoutes } from "./modules/tickets/routes.js";
 import { walletRoutes } from "./modules/wallet/routes.js";
 import { adminSmsRoutes } from "./modules/sms/admin-routes.js";
 import { startSmsQueueWorker } from "./modules/sms/queue.js";
+import { adminShareboxRoutes } from "./modules/sharebox/admin-routes.js";
+import { createShareboxClient } from "./modules/sharebox/client.js";
+import { startShareboxFulfillmentWorker } from "./modules/sharebox/fulfillment.js";
 import { authPlugin } from "./plugins/auth.js";
 import { corsPlugin } from "./plugins/cors.js";
 import { errorsPlugin } from "./plugins/errors.js";
@@ -82,6 +85,17 @@ export async function buildApp(options = {}) {
         })
       : null);
 
+  const shareboxBaseUrl = options.shareboxBaseUrl ?? env.SHAREBOX_BASE_URL;
+  const shareboxClient =
+    options.shareboxClient ??
+    createShareboxClient({
+      baseUrl: shareboxBaseUrl,
+      fetchImpl: options.shareboxFetch,
+      nodeEnv: env.NODE_ENV,
+      timeoutMs:
+        options.shareboxRequestTimeoutMs ?? env.SHAREBOX_REQUEST_TIMEOUT_MS,
+    });
+
   app.get("/health", async () => ({
     ok: true,
     service: "wikiacc-backend",
@@ -100,6 +114,7 @@ export async function buildApp(options = {}) {
     jibitClient,
     jibitReconcileMinutes:
       options.jibitReconcileMinutes ?? env.JIBIT_RECONCILE_MINUTES,
+    shareboxBaseUrl: shareboxClient.origin,
   });
   await app.register(paymentRoutes, {
     prefix: "/api/v1/payments",
@@ -110,7 +125,14 @@ export async function buildApp(options = {}) {
   });
   await app.register(walletRoutes, { prefix: "/api/v1/wallet" });
   await app.register(ticketRoutes, { prefix: "/api/v1/tickets" });
-  await app.register(adminRoutes, { prefix: "/api/v1/admin" });
+  await app.register(adminRoutes, {
+    prefix: "/api/v1/admin",
+    shareboxClient,
+  });
+  await app.register(adminShareboxRoutes, {
+    prefix: "/api/v1/admin/sharebox",
+    client: shareboxClient,
+  });
   await app.register(adminSmsRoutes, { prefix: "/api/v1/admin/sms" });
   await app.register(adminSiteContentRoutes, {
     prefix: "/api/v1/admin/site-content",
@@ -135,6 +157,27 @@ export async function buildApp(options = {}) {
     });
     app.addHook("onClose", async () => {
       await smsQueueWorker.stop();
+    });
+  }
+
+  const shareboxWorkerOptions = options.shareboxWorkerOptions ?? {};
+  const shareboxWorkerEnabled =
+    shareboxWorkerOptions.enabled ?? env.NODE_ENV !== "test";
+  if (shareboxWorkerEnabled) {
+    const shareboxWorker = startShareboxFulfillmentWorker(
+      app.prisma,
+      shareboxClient,
+      {
+        ...shareboxWorkerOptions,
+        intervalMs:
+          shareboxWorkerOptions.intervalMs ??
+          env.SHAREBOX_WORKER_INTERVAL_SECONDS * 1_000,
+        logger: shareboxWorkerOptions.logger ?? app.log,
+      },
+    );
+    app.decorate("shareboxWorker", shareboxWorker);
+    app.addHook("onClose", async () => {
+      await shareboxWorker.stop();
     });
   }
 

@@ -9,6 +9,7 @@
     "test": "vitest run",
     "prisma:generate": "prisma generate",
     "db:apply": "node scripts/apply-schema.js",
+    "db:migrate:sharebox": "node scripts/apply-sharebox-migration.js",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js"
   },

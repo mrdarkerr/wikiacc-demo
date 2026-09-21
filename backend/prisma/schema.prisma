@@ -20,6 +20,15 @@ enum AuthOtpPurpose {
 enum ProductType {
   CUSTOM_FORM
   INSTANT_DELIVERY
+  SHAREBOX
+}
+
+enum ShareboxFulfillmentStatus {
+  PENDING
+  PROCESSING
+  RETRY
+  REVIEW_REQUIRED
+  DELIVERED
 }
 
 enum FieldType {
@@ -142,6 +151,8 @@ model Product {
   title          String
   description    String?
   type           ProductType
+  shareboxCategoryId   String?
+  shareboxCategoryName String?
   price          Int
   isActive       Boolean          @default(true)
   archivedAt     DateTime?
@@ -239,6 +250,7 @@ model OrderItem {
   product             Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
   fieldValues         OrderFieldValue[]
   deliveries          OrderDelivery[]
+  shareboxFulfillments ShareboxFulfillment[]
   titleSnapshot       String
   priceSnapshot       Int
   productTypeSnapshot ProductType
@@ -288,12 +300,56 @@ model OrderDelivery {
   id              String       @id @default(cuid())
   orderItemId     String
   orderItem       OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  deliveryItemId  String
-  deliveryItem    DeliveryItem @relation(fields: [deliveryItemId], references: [id], onDelete: Restrict)
+  deliveryItemId  String?
+  deliveryItem    DeliveryItem? @relation(fields: [deliveryItemId], references: [id], onDelete: Restrict)
+  shareboxFulfillmentId String? @unique
+  shareboxFulfillment ShareboxFulfillment? @relation(fields: [shareboxFulfillmentId], references: [id], onDelete: Restrict)
   contentSnapshot String
   deliveredAt     DateTime     @default(now())
 
   @@unique([deliveryItemId])
+}
+
+model ShareboxSettings {
+  id                String   @id
+  enabled           Boolean  @default(false)
+  apiKeyEncrypted   String?
+  apiKeyHint        String?
+  apiKeyFingerprint String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ShareboxFulfillment {
+  id                    String                    @id @default(cuid())
+  orderItemId           String
+  orderItem             OrderItem                 @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  delivery              OrderDelivery?
+  unitIndex              Int
+  status                 ShareboxFulfillmentStatus @default(PENDING)
+  attempts               Int                       @default(0)
+  externalId             String
+  categoryId             String
+  categoryName           String
+  reference              String
+  customerName           String
+  customerPhone          String
+  apiKeyFingerprint      String
+  apiOrigin              String
+  lastErrorCode          String?
+  nextAttemptAt          DateTime                  @default(now())
+  leaseToken             String?
+  leaseExpiresAt         DateTime?
+  receiptLicenseId       String?
+  receiptIssuedAt        DateTime?
+  receiptExpiresAt       DateTime?
+  deliveredAt            DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  @@unique([orderItemId, unitIndex])
+  @@unique([apiKeyFingerprint, externalId])
+  @@index([status, nextAttemptAt, leaseExpiresAt])
 }
 
 model Wallet {

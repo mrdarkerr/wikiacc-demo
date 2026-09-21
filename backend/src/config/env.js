@@ -15,6 +15,9 @@ const envSchema = z.object({
   WEB_APP_URL: z.string().url().default("http://localhost:3000"),
   JWT_SECRET: z.string().min(16).default("change-this-dev-secret"),
   SMS_CONFIG_ENCRYPTION_KEY: z.string().min(16).optional(),
+  SHAREBOX_BASE_URL: z.string().url().default("https://sharebox.wikiacc.ir"),
+  SHAREBOX_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
+  SHAREBOX_WORKER_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(3600).default(10),
   SESSION_COOKIE_NAME: z.string().min(1).default("wikiacc_session"),
   COOKIE_SECURE: booleanFromString.default(false),
   JIBIT_ENABLED: booleanFromString.default(false),
@@ -43,6 +46,19 @@ export const env = {
   SMS_CONFIG_ENCRYPTION_KEY:
     parsedEnv.SMS_CONFIG_ENCRYPTION_KEY ?? parsedEnv.JWT_SECRET,
 };
+
+const shareboxUrl = new URL(env.SHAREBOX_BASE_URL);
+const shareboxIsLoopback = ["localhost", "127.0.0.1", "::1"].includes(
+  shareboxUrl.hostname,
+);
+if (
+  shareboxUrl.protocol !== "https:" &&
+  !(env.NODE_ENV === "test" && shareboxUrl.protocol === "http:" && shareboxIsLoopback)
+) {
+  throw new Error(
+    "SHAREBOX_BASE_URL must use HTTPS (HTTP loopback is allowed only in NODE_ENV=test)",
+  );
+}
 
 if (
   env.JIBIT_ENABLED &&

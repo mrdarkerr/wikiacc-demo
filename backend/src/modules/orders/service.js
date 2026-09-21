@@ -12,6 +12,12 @@ import {
   paymentRequired,
 } from "../../shared/errors.js";
 import { enqueueOrderNotifications } from "../sms/notifications.js";
+import { env } from "../../config/env.js";
+import {
+  createShareboxFulfillmentSnapshots,
+  validateShareboxCheckout,
+} from "../sharebox/fulfillment.js";
+import { getShareboxSettings } from "../sharebox/settings.js";
 import { countUserOrders, getUserOrder, listUserOrders } from "./repository.js";
 
 function withoutAdminFields(order) {
@@ -60,24 +66,37 @@ export async function createPendingJibitOrder(
     clientReferenceNumber,
     reconcileAfter,
   },
+  { shareboxBaseUrl = env.SHAREBOX_BASE_URL } = {},
 ) {
-  const product = await findProductForOrder(prisma, input.productId);
-  if (!product) {
+  const initialProduct = await findProductForOrder(prisma, input.productId);
+  if (!initialProduct) {
     throw notFound("PRODUCT_NOT_FOUND", "Product was not found or is inactive");
   }
-  if (product.type === "INSTANT_DELIVERY" && !product.deliveryPoolId) {
+  if (initialProduct.type === "INSTANT_DELIVERY" && !initialProduct.deliveryPoolId) {
     throw badRequest("DELIVERY_POOL_MISSING", "Product has no delivery pool");
   }
 
-  const quantity = input.quantity ?? 1;
-  const totalAmount = product.price * quantity;
-  const providerAmountRial = totalAmount * 10;
-  if (!Number.isSafeInteger(providerAmountRial) || providerAmountRial <= 0) {
-    throw badRequest("PAYMENT_AMOUNT_INVALID", "Payment amount is invalid");
-  }
-  const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
-
-  const orderId = await prisma.$transaction(async (tx) => {
+  const transactionResult = await prisma.$transaction(async (tx) => {
+    const product = await findProductForOrder(tx, input.productId);
+    if (!product) {
+      throw notFound("PRODUCT_NOT_FOUND", "Product was not found or is inactive");
+    }
+    const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+    const settings =
+      product.type === "SHAREBOX" ? await getShareboxSettings(tx) : null;
+    const shareboxSnapshot = validateShareboxCheckout(
+      product,
+      user,
+      settings,
+      shareboxBaseUrl,
+    );
+    const quantity = input.quantity ?? 1;
+    const totalAmount = product.price * quantity;
+    const providerAmountRial = totalAmount * 10;
+    if (!Number.isSafeInteger(providerAmountRial) || providerAmountRial <= 0) {
+      throw badRequest("PAYMENT_AMOUNT_INVALID", "Payment amount is invalid");
+    }
+    const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
     const activePayments = await tx.paymentAttempt.count({
       where: {
         provider: "JIBIT",
@@ -134,6 +153,12 @@ export async function createPendingJibitOrder(
     if (product.type === "INSTANT_DELIVERY") {
       await reserveDeliveryItems(tx, product.deliveryPoolId, orderItem.id, quantity);
     }
+    await createShareboxFulfillmentSnapshots(tx, {
+      order,
+      orderItem,
+      quantity,
+      snapshot: shareboxSnapshot,
+    });
 
     await tx.paymentAttempt.create({
       data: {
@@ -146,13 +171,15 @@ export async function createPendingJibitOrder(
         reconcileAfter,
       },
     });
-    return order.id;
+    return { fieldState, orderId: order.id };
   });
 
   return {
-    order: withoutAdminFields(await getUserOrder(prisma, userId, orderId)),
+    order: withoutAdminFields(
+      await getUserOrder(prisma, userId, transactionResult.orderId),
+    ),
     attempt: await prisma.paymentAttempt.findUnique({ where: { id: attemptId } }),
-    fieldState,
+    fieldState: transactionResult.fieldState,
   };
 }
 
@@ -184,25 +211,40 @@ export async function failPendingJibitOrder(prisma, attemptId, errorCode) {
   });
 }
 
-export async function createOrder(prisma, userId, input) {
-  const product = await findProductForOrder(prisma, input.productId);
-  if (!product) {
+export async function createOrder(
+  prisma,
+  userId,
+  input,
+  { shareboxBaseUrl = env.SHAREBOX_BASE_URL } = {},
+) {
+  const initialProduct = await findProductForOrder(prisma, input.productId);
+  if (!initialProduct) {
     throw notFound("PRODUCT_NOT_FOUND", "Product was not found or is inactive");
   }
 
-  if (product.type === "INSTANT_DELIVERY" && !product.deliveryPoolId) {
+  if (initialProduct.type === "INSTANT_DELIVERY" && !initialProduct.deliveryPoolId) {
     throw badRequest("DELIVERY_POOL_MISSING", "Product has no delivery pool");
   }
-
-  const quantity = input.quantity ?? 1;
-  const totalAmount = product.price * quantity;
-  const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
 
   const orderId = await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { phone: true },
     });
+    const product = await findProductForOrder(tx, input.productId);
+    if (!product) {
+      throw notFound("PRODUCT_NOT_FOUND", "Product was not found or is inactive");
+    }
+    const settings =
+      product.type === "SHAREBOX" ? await getShareboxSettings(tx) : null;
+    const shareboxSnapshot = validateShareboxCheckout(
+      product,
+      user,
+      settings,
+      shareboxBaseUrl,
+    );
+    const quantity = input.quantity ?? 1;
+    const totalAmount = product.price * quantity;
+    const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
 
     if (product.type === "INSTANT_DELIVERY") {
       const availableItems = await getPoolAvailability(tx, product.deliveryPoolId);
@@ -230,9 +272,11 @@ export async function createOrder(prisma, userId, input) {
     const initialStatus =
       product.type === "INSTANT_DELIVERY"
         ? "DELIVERED"
-        : fieldState.complete
-          ? "AWAITING_ADMIN"
-          : "PENDING_INFO";
+        : product.type === "SHAREBOX"
+          ? "READY"
+          : fieldState.complete
+            ? "AWAITING_ADMIN"
+            : "PENDING_INFO";
 
     const order = await tx.order.create({
       data: {
@@ -288,6 +332,12 @@ export async function createOrder(prisma, userId, input) {
     if (product.type === "INSTANT_DELIVERY") {
       await allocateDeliveryItems(tx, product.deliveryPoolId, orderItem.id, quantity);
     }
+    await createShareboxFulfillmentSnapshots(tx, {
+      order,
+      orderItem,
+      quantity,
+      snapshot: shareboxSnapshot,
+    });
 
     await enqueueOrderNotifications(tx, {
       completed: initialStatus === "DELIVERED",
