@@ -45,6 +45,10 @@ const labels: Record<string, string> = {
   REFUNDED: "مسترد",
   RESERVED: "رزرو شده",
   REVERSED: "برگشت خورده",
+  RETRY: "تلاش مجدد",
+  REVIEW_REQUIRED: "نیازمند بررسی",
+  SHAREBOX: "شیر‌باکس",
+  PROCESSING: "در حال پردازش",
   UNPAID: "پرداخت نشده",
   USER: "کاربر",
   false: "غیرفعال",
@@ -63,6 +67,7 @@ function statusTone(value: string) {
       "OPEN",
       "PAID",
       "READY",
+      "SHAREBOX",
       "true",
     ].includes(value)
   ) {
@@ -77,7 +82,9 @@ function statusTone(value: string) {
       "HIGH",
       "PENDING",
       "PENDING_INFO",
+      "PROCESSING",
       "RESERVED",
+      "RETRY",
       "UNPAID",
     ].includes(value)
   ) {
@@ -91,6 +98,7 @@ function statusTone(value: string) {
       "DISABLED",
       "FAILED",
       "REFUNDED",
+      "REVIEW_REQUIRED",
       "REVERSED",
       "false",
     ].includes(value)

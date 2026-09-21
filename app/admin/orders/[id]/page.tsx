@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, RotateCcw, Save } from "lucide-react";
 
+import { DeliveryContentList } from "@/components/order-delivery-content";
 import {
   formatCurrency,
   formatDate,
@@ -18,6 +19,10 @@ import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
+import {
+  shareBoxFulfillmentErrorLabel,
+  shareBoxFulfillmentLabels,
+} from "@/lib/sharebox";
 import type { AdminOrder, OrderStatus } from "@/types/api";
 
 const orderStatuses: OrderStatus[] = [
@@ -55,6 +60,20 @@ function errorMessage(error: unknown) {
     : "عملیات سفارش انجام نشد.";
 }
 
+function shareBoxRetryErrorMessage(error: unknown) {
+  if (!(error instanceof ApiError)) return "ثبت تلاش مجدد انجام نشد.";
+  const code = error.payload?.error?.code;
+  const labels: Record<string, string> = {
+    SHAREBOX_DISABLED: "اتصال شیر‌باکس غیرفعال است.",
+    SHAREBOX_CONFIGURATION_CHANGED:
+      "این سفارش با کلید یا نشانی قبلی ثبت شده و نیازمند تطبیق دستی است؛ بازپخش خودکار امن نیست.",
+    SHAREBOX_NOT_CONFIGURED: "اتصال شیر‌باکس کامل پیکربندی نشده است.",
+    SHAREBOX_ORDER_NOT_ELIGIBLE: "این سفارش شرایط تلاش مجدد خودکار را ندارد.",
+    SHAREBOX_UNAVAILABLE: "شیر‌باکس موقتاً در دسترس نیست.",
+  };
+  return (code && labels[code]) || error.message;
+}
+
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const orderId = params.id;
@@ -65,6 +84,10 @@ export default function AdminOrderDetailPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [retryingShareBox, setRetryingShareBox] = useState(false);
+  const [shareBoxRetryMessage, setShareBoxRetryMessage] = useState("");
+  const [shareBoxRetryError, setShareBoxRetryError] = useState("");
+  const [shareBoxRefreshError, setShareBoxRefreshError] = useState("");
 
   async function loadOrder() {
     const result = await api.admin.orders.get(orderId);
@@ -107,6 +130,16 @@ export default function AdminOrderDetailPage() {
     [order],
   );
   const latestPaymentAttempt = order?.paymentAttempts[0];
+  const hasShareBoxItems = Boolean(
+    order?.items.some((item) => item.productTypeSnapshot === "SHAREBOX"),
+  );
+  const hasRetryableShareBoxFulfillments = Boolean(
+    order?.items.some((item) =>
+      item.shareboxFulfillments?.some((fulfillment) =>
+        ["RETRY", "REVIEW_REQUIRED"].includes(fulfillment.status),
+      ),
+    ),
+  );
   const directStatusLocked = Boolean(
     order?.paymentMethod === "JIBIT" &&
       order.paymentStatus === "UNPAID" &&
@@ -156,6 +189,35 @@ export default function AdminOrderDetailPage() {
     }
   }
 
+  async function retryShareBox() {
+    if (!order) return;
+
+    setRetryingShareBox(true);
+    setShareBoxRetryError("");
+    setShareBoxRefreshError("");
+    try {
+      const result = await api.admin.orders.retryShareBox(order.id);
+      setShareBoxRetryMessage(
+        result.queued > 0
+          ? `${result.queued.toLocaleString("fa-IR")} واحد برای تلاش مجدد در صف پذیرفته شد؛ این پیام به معنی تحویل لایسنس نیست.`
+          : "درخواست پذیرفته شد، اما واحد قابل صف‌بندی پیدا نشد. وضعیت فعلی را بررسی کنید.",
+      );
+
+      try {
+        await loadOrder();
+      } catch {
+        setShareBoxRefreshError(
+          "درخواست تلاش مجدد ثبت شد، اما دریافت وضعیت تازه سفارش انجام نشد.",
+        );
+      }
+    } catch (retryError) {
+      setShareBoxRetryMessage("");
+      setShareBoxRetryError(shareBoxRetryErrorMessage(retryError));
+    } finally {
+      setRetryingShareBox(false);
+    }
+  }
+
   if (loading) {
     return <AdminState>در حال دریافت سفارش...</AdminState>;
   }
@@ -196,6 +258,15 @@ export default function AdminOrderDetailPage() {
 
       {message ? <AdminState tone="success">{message}</AdminState> : null}
       {error ? <AdminState tone="danger">{error}</AdminState> : null}
+      {shareBoxRetryMessage ? (
+        <AdminState tone="success">{shareBoxRetryMessage}</AdminState>
+      ) : null}
+      {shareBoxRetryError ? (
+        <AdminState tone="danger">{shareBoxRetryError}</AdminState>
+      ) : null}
+      {shareBoxRefreshError ? (
+        <AdminState tone="danger">{shareBoxRefreshError}</AdminState>
+      ) : null}
       {latestPaymentAttempt?.status === "REVIEW_REQUIRED" ? (
         <AdminState tone="danger">
           پرداخت جیبیت به‌دلیل عدم تطبیق اطلاعات نیازمند بررسی دستی است. تا پیش از
@@ -284,22 +355,62 @@ export default function AdminOrderDetailPage() {
                 <div className="mt-4">
                   <h4 className="text-sm font-semibold">اطلاعات تحویل</h4>
                   {item.deliveries.length ? (
-                    <div className="mt-3 space-y-2">
-                      {item.deliveries.map((delivery) => (
-                        <code
-                          className="block max-w-full whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2 text-xs [overflow-wrap:anywhere]"
-                          key={delivery.id}
-                        >
-                          {delivery.contentSnapshot}
-                        </code>
-                      ))}
-                    </div>
+                    <DeliveryContentList
+                      className="mt-3"
+                      deliveries={item.deliveries}
+                    />
                   ) : (
                     <p className="mt-2 text-sm text-muted-foreground">
                       تحویلی برای این آیتم ثبت نشده است.
                     </p>
                   )}
                 </div>
+
+                {item.productTypeSnapshot === "SHAREBOX" ? (
+                  <div className="mt-4 border-t border-border pt-4">
+                    <h4 className="text-sm font-semibold">وضعیت صدور شیر‌باکس</h4>
+                    {item.shareboxFulfillments?.length ? (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {item.shareboxFulfillments.map((fulfillment) => {
+                          const safeError = shareBoxFulfillmentErrorLabel(
+                            fulfillment.lastErrorCode,
+                          );
+                          return (
+                            <div
+                              className="rounded-md bg-muted/50 p-3 text-xs"
+                              key={fulfillment.id}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">
+                                  واحد {fulfillment.unitIndex.toLocaleString("fa-IR")}
+                                </span>
+                                <AdminStatusBadge value={fulfillment.status} />
+                              </div>
+                              <p className="mt-2 text-muted-foreground">
+                                {shareBoxFulfillmentLabels[fulfillment.status]} · تلاش‌ها: {fulfillment.attempts.toLocaleString("fa-IR")}
+                              </p>
+                              {safeError ? (
+                                <p className="mt-2 leading-6 text-rose-600 dark:text-rose-300">
+                                  {safeError}
+                                </p>
+                              ) : null}
+                              {fulfillment.nextAttemptAt &&
+                              fulfillment.status === "RETRY" ? (
+                                <p className="mt-2 text-muted-foreground">
+                                  تلاش بعدی: {formatDate(fulfillment.nextAttemptAt)}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        هنوز رکورد صدوری برای این آیتم ثبت نشده است.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </article>
             ))}
 
@@ -394,6 +505,24 @@ export default function AdminOrderDetailPage() {
             </Button>
           </form>
 
+          {hasShareBoxItems ? (
+            <div className="mt-5 border-t border-border pt-5">
+              <p className="mb-3 text-xs leading-6 text-muted-foreground">
+                تلاش مجدد فقط واحدهای قابل صف‌بندی را می‌پذیرد و تأیید صف به معنی تحویل نیست.
+              </p>
+              <Button
+                className="w-full"
+                disabled={retryingShareBox || !hasRetryableShareBoxFulfillments}
+                type="button"
+                variant="outline"
+                onClick={() => void retryShareBox()}
+              >
+                <RotateCcw className={retryingShareBox ? "animate-spin" : ""} />
+                {retryingShareBox ? "در حال ثبت درخواست..." : "تلاش مجدد صدور شیر‌باکس"}
+              </Button>
+            </div>
+          ) : null}
+
           <div className="mt-5 border-t border-border pt-5">
             <Button
               className="w-full"
@@ -416,7 +545,7 @@ export default function AdminOrderDetailPage() {
         </AdminSection>
       </div>
 
-      {!deliveries.length && !fieldValues.length ? (
+      {!deliveries.length && !fieldValues.length && !hasShareBoxItems ? (
         <AdminState>این سفارش هنوز اطلاعات فرم یا تحویل ثبت‌شده ندارد.</AdminState>
       ) : null}
     </div>

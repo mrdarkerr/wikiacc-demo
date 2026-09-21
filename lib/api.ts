@@ -3,6 +3,7 @@ import type {
   AdminDeliveryItem,
   AdminDeliveryPool,
   AdminOrder,
+  AdminShareBoxSettings,
   AdminSmsSender,
   AdminSmsSettings,
   AdminTicket,
@@ -32,6 +33,7 @@ import type {
   RefundAdminOrderRequest,
   SetPasswordRequest,
   SetAdminProductActiveRequest,
+  ShareBoxCategory,
   AdminSiteContentState,
   PublicSiteContent,
   SaveAdminSiteContentRequest,
@@ -39,6 +41,7 @@ import type {
   Ticket,
   TicketMessage,
   UpdateAdminOrderStatusRequest,
+  UpdateAdminShareBoxSettingsRequest,
   UpdateAdminCategoryRequest,
   UpdateAdminProductRequest,
   UpdateAdminSmsSettingsRequest,
@@ -300,6 +303,10 @@ export const api = {
           wallet: Wallet;
           transaction: WalletTransaction;
         }>(`/admin/orders/${id}/refund`, { body, method: "POST" }),
+      retryShareBox: (id: string) =>
+        apiFetch<{ queued: number }>(`/admin/orders/${id}/sharebox/retry`, {
+          method: "POST",
+        }),
     },
     categories: {
       list: () => apiFetch<{ categories: ProductCategory[] }>("/admin/categories"),
@@ -384,6 +391,22 @@ export const api = {
         apiFetch<{ senderId: string }>(`/admin/sms/senders/${id}`, {
           method: "DELETE",
         }),
+    },
+    sharebox: {
+      getSettings: () =>
+        apiFetch<{ settings: AdminShareBoxSettings }>(
+          "/admin/sharebox/settings",
+        ),
+      updateSettings: (body: UpdateAdminShareBoxSettingsRequest) =>
+        apiFetch<{ settings: AdminShareBoxSettings }>(
+          "/admin/sharebox/settings",
+          { body, method: "PATCH" },
+        ),
+      categories: (query?: { page?: number; perPage?: number }) =>
+        apiFetchWithMeta<{ categories: ShareBoxCategory[] }>(
+          "/admin/sharebox/categories",
+          { query },
+        ),
     },
     wallet: {
       summary: () =>

@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   MessageSquareText,
+  KeyRound,
   PackagePlus,
   PanelsTopLeft,
   Tags,
@@ -53,6 +54,11 @@ const navItems = [
     href: "/admin/sms",
     icon: MessageSquareText,
     label: "پیامک",
+  },
+  {
+    href: "/admin/sharebox",
+    icon: KeyRound,
+    label: "شیر‌باکس",
   },
   {
     href: "/admin/orders",

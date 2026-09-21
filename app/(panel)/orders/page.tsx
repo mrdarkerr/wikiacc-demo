@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Eye, Plus, X } from "lucide-react";
+import { Eye, Plus, RefreshCw, X } from "lucide-react";
 
+import { DeliveryContentList } from "@/components/order-delivery-content";
 import { formatCurrency, formatDate } from "@/components/panel/formatters";
 import { PanelSection } from "@/components/panel/panel-section";
 import { StatusBadge } from "@/components/panel/status-badge";
 import { Button } from "@/components/ui/button";
 import { DialogOverlay } from "@/components/ui/dialog";
 import { api, ApiError } from "@/lib/api";
+import {
+  orderNeedsShareBoxPolling,
+  shareBoxItemNeedsPolling,
+} from "@/lib/sharebox";
 import type { ApiMeta, Order } from "@/types/api";
 
 const PER_PAGE = 8;
@@ -134,8 +139,12 @@ export default function OrdersPage() {
                         <p className="text-xs text-muted-foreground">تحویل</p>
                         <p className="mt-1 font-medium">
                           {deliveries.length
-                            ? `${deliveries.length} مورد آماده`
-                            : "هنوز محتوایی ثبت نشده است"}
+                            ? orderNeedsShareBoxPolling(order)
+                              ? `${deliveries.length} مورد آماده · در حال صدور لایسنس`
+                              : `${deliveries.length} مورد آماده`
+                            : orderNeedsShareBoxPolling(order)
+                              ? "در حال صدور لایسنس"
+                              : "هنوز محتوایی ثبت نشده است"}
                         </p>
                       </div>
                     </div>
@@ -190,6 +199,13 @@ export default function OrdersPage() {
                           {deliveries.length ? (
                             <span className="font-medium">
                               {deliveries.length} مورد
+                              {orderNeedsShareBoxPolling(order)
+                                ? " · در حال صدور"
+                                : ""}
+                            </span>
+                          ) : orderNeedsShareBoxPolling(order) ? (
+                            <span className="text-amber-600 dark:text-amber-300">
+                              در حال صدور لایسنس
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -231,6 +247,7 @@ export default function OrdersPage() {
         <OrderDialog
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
+          onOrderChange={setSelectedOrder}
         />
       ) : null}
     </div>
@@ -279,12 +296,61 @@ function Pagination({
 
 function OrderDialog({
   onClose,
+  onOrderChange,
   order,
 }: {
   onClose: () => void;
+  onOrderChange: (order: Order) => void;
   order: Order;
 }) {
   const deliveries = deliveredContent(order);
+  const waitingForShareBox = orderNeedsShareBoxPolling(order);
+  const [pollCount, setPollCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+
+  useEffect(() => {
+    if (!waitingForShareBox || pollCount >= 12) return;
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      api.orders
+        .get(order.id)
+        .then((result) => {
+          if (!active) return;
+          onOrderChange(result.order);
+          setRefreshError("");
+        })
+        .catch(() => {
+          if (active) {
+            setRefreshError(
+              "تازه‌سازی خودکار وضعیت صدور انجام نشد. سفارش ثبت شده است.",
+            );
+          }
+        })
+        .finally(() => {
+          if (active) setPollCount((count) => count + 1);
+        });
+    }, 5000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [onOrderChange, order.id, pollCount, waitingForShareBox]);
+
+  async function refreshOrder() {
+    setRefreshing(true);
+    try {
+      const result = await api.orders.get(order.id);
+      onOrderChange(result.order);
+      setRefreshError("");
+    } catch {
+      setRefreshError("دریافت وضعیت تازه سفارش انجام نشد.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   return (
     <DialogOverlay
@@ -298,9 +364,23 @@ function OrderDialog({
               {orderCode(order)}
             </h3>
           </div>
-          <Button aria-label="بستن" size="icon" type="button" variant="ghost" onClick={onClose}>
-            <X className="size-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {waitingForShareBox ? (
+              <Button
+                disabled={refreshing}
+                size="sm"
+                type="button"
+                variant="outline"
+                onClick={() => void refreshOrder()}
+              >
+                <RefreshCw className={refreshing ? "animate-spin" : ""} />
+                تازه‌سازی
+              </Button>
+            ) : null}
+            <Button aria-label="بستن" size="icon" type="button" variant="ghost" onClick={onClose}>
+              <X className="size-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -358,21 +438,20 @@ function OrderDialog({
               <div className="mt-4">
                 <p className="text-sm font-semibold">محتوای تحویل</p>
                 {item.deliveries.length ? (
-                  <div className="mt-3 space-y-2">
-                    {item.deliveries.map((delivery) => (
-                      <code
-                        className="block max-w-full whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2 text-xs [overflow-wrap:anywhere]"
-                        key={delivery.id}
-                      >
-                        {delivery.contentSnapshot}
-                      </code>
-                    ))}
-                  </div>
-                ) : (
+                  <DeliveryContentList
+                    className="mt-3"
+                    deliveries={item.deliveries}
+                  />
+                ) : shareBoxItemNeedsPolling(item) ? null : (
                   <p className="mt-2 text-sm text-muted-foreground">
                     هنوز محتوایی برای تحویل ثبت نشده است.
                   </p>
                 )}
+                {shareBoxItemNeedsPolling(item) ? (
+                  <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">
+                    در حال صدور لایسنس
+                  </p>
+                ) : null}
               </div>
             </article>
           ))}
@@ -390,6 +469,11 @@ function OrderDialog({
             {deliveries.length} محتوای آماده برای این سفارش ثبت شده است.
           </p>
         )}
+        {refreshError ? (
+          <p className="mt-4 text-xs text-rose-600 dark:text-rose-300">
+            {refreshError}
+          </p>
+        ) : null}
     </DialogOverlay>
   );
 }

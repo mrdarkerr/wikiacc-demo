@@ -566,6 +566,12 @@ function productInitials(title: string) {
     : title.slice(0, 2).toUpperCase();
 }
 
+function productTypeLabel(product: Product) {
+  if (product.type === "SHAREBOX") return "لایسنس شیر‌باکس";
+  if (product.type === "INSTANT_DELIVERY") return "تحویل فوری";
+  return "سفارش اختصاصی";
+}
+
 function ServiceCard({ product, index }: { product: Product; index: number }) {
   return (
     <article
@@ -574,7 +580,12 @@ function ServiceCard({ product, index }: { product: Product; index: number }) {
     >
       <div className="mb-4 flex items-start justify-between">
         <div className="min-w-0">
-          <h3 className="text-base font-bold">{product.title}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-bold">{product.title}</h3>
+            <span className="rounded-full border border-indigo-500/20 px-2 py-0.5 text-[11px] text-indigo-600 dark:text-fuchsia-300">
+              {productTypeLabel(product)}
+            </span>
+          </div>
           {product.description ? (
             <p className="mt-1 line-clamp-2 text-xs/5 opacity-70">
               {product.description}

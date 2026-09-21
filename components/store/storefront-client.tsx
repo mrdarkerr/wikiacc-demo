@@ -23,9 +23,17 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { OtpAuthForm } from "@/components/auth/otp-auth-form";
+import { DeliveryContentList } from "@/components/order-delivery-content";
 import { api, ApiError } from "@/lib/api";
+import { orderNeedsShareBoxPolling } from "@/lib/sharebox";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
-import type { Order, PaymentMethod, Product, ProductField } from "@/types/api";
+import type {
+  Order,
+  OrderDelivery,
+  PaymentMethod,
+  Product,
+  ProductField,
+} from "@/types/api";
 
 type FieldValues = Record<string, string>;
 
@@ -38,9 +46,13 @@ function orderCode(order: Order) {
 }
 
 function deliveryMessages(order: Order) {
-  return order.items
-    .flatMap((item) => item.deliveries)
-    .map((delivery) => delivery.contentSnapshot);
+  return order.items.flatMap((item) => item.deliveries);
+}
+
+function productTypeLabel(product: Product) {
+  if (product.type === "SHAREBOX") return "لایسنس شیر‌باکس";
+  if (product.type === "INSTANT_DELIVERY") return "تحویل فوری";
+  return "سفارش اختصاصی";
 }
 
 function fieldInputType(type: ProductField["type"]) {
@@ -117,6 +129,20 @@ function apiErrorMessage(error: unknown) {
     return "این محصول دیگر فعال نیست.";
   }
 
+  if (
+    code === "SHAREBOX_CATEGORY_MISSING" ||
+    code === "SHAREBOX_DISABLED" ||
+    code === "SHAREBOX_NOT_CONFIGURED" ||
+    code === "SHAREBOX_UNAVAILABLE" ||
+    code === "SHAREBOX_REQUEST_FAILED"
+  ) {
+    return "صدور لایسنس شیر‌باکس موقتاً در دسترس نیست. کمی بعد دوباره تلاش کنید.";
+  }
+
+  if (code === "SHAREBOX_CUSTOMER_DETAILS_REQUIRED") {
+    return "برای صدور لایسنس، نام و شماره موبایل حساب کاربری باید کامل باشد.";
+  }
+
   if (code === "TOO_MANY_PENDING_PAYMENTS") {
     return "چند پرداخت مستقیم شما هنوز تعیین تکلیف نشده است؛ ابتدا وضعیت سفارش‌های قبلی را بررسی کنید.";
   }
@@ -147,6 +173,8 @@ export function StorefrontClient() {
   const [loadError, setLoadError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [fulfillmentPollCount, setFulfillmentPollCount] = useState(0);
+  const [fulfillmentRefreshError, setFulfillmentRefreshError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -190,10 +218,49 @@ export function StorefrontClient() {
     [createdOrder],
   );
 
+  useEffect(() => {
+    if (
+      !createdOrder ||
+      !orderNeedsShareBoxPolling(createdOrder) ||
+      fulfillmentPollCount >= 12
+    ) {
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      api.orders
+        .get(createdOrder.id)
+        .then((result) => {
+          if (!active) return;
+          setCreatedOrder(result.order);
+          setFulfillmentRefreshError("");
+        })
+        .catch(() => {
+          if (active) {
+            setFulfillmentRefreshError(
+              "تازه‌سازی خودکار وضعیت صدور کامل نشد؛ سفارش شما ثبت شده است.",
+            );
+          }
+        })
+        .finally(() => {
+          if (active) setFulfillmentPollCount((count) => count + 1);
+        });
+    }, 5000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [createdOrder, fulfillmentPollCount]);
+
   const availableDeliveryItems = selectedProduct?.deliveryPool?._count?.items;
   const isUnavailable =
-    Boolean(selectedProduct?.deliveryPool) && availableDeliveryItems === 0;
+    selectedProduct?.type === "INSTANT_DELIVERY" &&
+    Boolean(selectedProduct.deliveryPool) &&
+    availableDeliveryItems === 0;
   const hasInsufficientDeliveryStock =
+    selectedProduct?.type === "INSTANT_DELIVERY" &&
     typeof availableDeliveryItems === "number" &&
     availableDeliveryItems > 0 &&
     quantity > availableDeliveryItems;
@@ -243,6 +310,8 @@ export function StorefrontClient() {
     setSubmitting(true);
     setSubmitError("");
     setCreatedOrder(null);
+    setFulfillmentPollCount(0);
+    setFulfillmentRefreshError("");
 
     try {
       const result = await api.orders.create({
@@ -350,6 +419,9 @@ export function StorefrontClient() {
                   <p className="text-xs font-medium text-muted-foreground">محصول انتخاب‌شده</p>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-bold">{selectedProduct.title}</h2>
+                    <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                      {productTypeLabel(selectedProduct)}
+                    </span>
                     {isUnavailable ? (
                       <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700 dark:bg-rose-950/50 dark:text-rose-200">
                         ناموجود
@@ -591,7 +663,11 @@ export function StorefrontClient() {
                   ) : null}
 
                   {createdOrder ? (
-                    <OrderResult order={createdOrder} deliveries={orderDeliveries} />
+                    <OrderResult
+                      deliveries={orderDeliveries}
+                      order={createdOrder}
+                      refreshError={fulfillmentRefreshError}
+                    />
                   ) : null}
 
                   <Button
@@ -684,10 +760,14 @@ function ProductFieldInput({
 function OrderResult({
   order,
   deliveries,
+  refreshError,
 }: {
   order: Order;
-  deliveries: string[];
+  deliveries: OrderDelivery[];
+  refreshError: string;
 }) {
+  const waitingForShareBox = orderNeedsShareBoxPolling(order);
+
   return (
     <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
       <div className="flex items-start gap-2">
@@ -697,21 +777,26 @@ function OrderResult({
             سفارش {orderCode(order)} ثبت و پرداخت شد.
           </p>
           {deliveries.length ? (
-            <div className="mt-3 space-y-2">
-              {deliveries.map((delivery, index) => (
-                <code
-                  className="block max-w-full whitespace-pre-wrap break-words rounded-md bg-background/80 px-3 py-2 text-xs text-foreground [overflow-wrap:anywhere]"
-                  key={`${delivery}-${index}`}
-                >
-                  {delivery}
-                </code>
-              ))}
-            </div>
+            <DeliveryContentList className="mt-3 text-foreground" deliveries={deliveries} />
+          ) : waitingForShareBox ? (
+            <p className="mt-1 text-emerald-700 dark:text-emerald-200">
+              در حال صدور لایسنس؛ وضعیت به‌صورت خودکار تازه می‌شود.
+            </p>
           ) : (
             <p className="mt-1 text-emerald-700 dark:text-emerald-200">
               سفارش برای بررسی ادمین ارسال شد.
             </p>
           )}
+          {deliveries.length && waitingForShareBox ? (
+            <p className="mt-2 text-emerald-700 dark:text-emerald-200">
+              صدور باقی لایسنس‌ها ادامه دارد و وضعیت خودکار تازه می‌شود.
+            </p>
+          ) : null}
+          {refreshError ? (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-200">
+              {refreshError}
+            </p>
+          ) : null}
           <Button asChild className="mt-3" size="sm" variant="outline">
             <Link href="/orders">مشاهده سفارش‌ها</Link>
           </Button>

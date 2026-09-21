@@ -10,11 +10,14 @@ import {
   Clock3,
   Loader2,
   ReceiptText,
+  RefreshCw,
 } from "lucide-react";
 
+import { DeliveryContentList } from "@/components/order-delivery-content";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
+import { orderNeedsShareBoxPolling } from "@/lib/sharebox";
 import type { DirectPaymentResult, Order } from "@/types/api";
 
 type ResultStatus = DirectPaymentResult["status"];
@@ -44,6 +47,9 @@ export function PaymentResultClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
+  const [fulfillmentPollCount, setFulfillmentPollCount] = useState(0);
+  const [fulfillmentRefreshing, setFulfillmentRefreshing] = useState(false);
+  const [fulfillmentRefreshError, setFulfillmentRefreshError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -62,6 +68,8 @@ export function PaymentResultClient() {
       if (active) {
         setStatus(resolvedStatus);
         setOrder(result.order);
+        setFulfillmentPollCount(0);
+        setFulfillmentRefreshError("");
       }
     }
 
@@ -82,13 +90,58 @@ export function PaymentResultClient() {
 
   const deliveries = useMemo(
     () =>
-      order?.items.flatMap((item) =>
-        item.deliveries.map((delivery) => delivery.contentSnapshot),
-      ) ?? [],
+      order?.items.flatMap((item) => item.deliveries) ?? [],
     [order],
   );
 
   const successful = status === "successful" && order?.paymentStatus === "PAID";
+  const waitingForShareBox = Boolean(
+    successful && order && orderNeedsShareBoxPolling(order),
+  );
+
+  useEffect(() => {
+    if (!order || !waitingForShareBox || fulfillmentPollCount >= 12) return;
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      api.orders
+        .get(order.id)
+        .then((result) => {
+          if (!active) return;
+          setOrder(result.order);
+          setFulfillmentRefreshError("");
+        })
+        .catch(() => {
+          if (active) {
+            setFulfillmentRefreshError(
+              "تازه‌سازی خودکار وضعیت صدور انجام نشد. پرداخت شما تأیید شده است.",
+            );
+          }
+        })
+        .finally(() => {
+          if (active) setFulfillmentPollCount((count) => count + 1);
+        });
+    }, 5000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [fulfillmentPollCount, order, waitingForShareBox]);
+
+  async function refreshFulfillment() {
+    if (!order) return;
+    setFulfillmentRefreshing(true);
+    try {
+      const result = await api.orders.get(order.id);
+      setOrder(result.order);
+      setFulfillmentRefreshError("");
+    } catch {
+      setFulfillmentRefreshError("دریافت وضعیت تازه صدور انجام نشد.");
+    } finally {
+      setFulfillmentRefreshing(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-muted/30 px-4 py-12" dir="rtl">
@@ -128,20 +181,43 @@ export function PaymentResultClient() {
                 <p className="text-sm font-bold text-emerald-800 dark:text-emerald-100">
                   اطلاعات تحویل
                 </p>
-                {deliveries.map((delivery, index) => (
-                  <code
-                    className="block max-w-full whitespace-pre-wrap break-words rounded-md bg-background px-3 py-2 text-xs [overflow-wrap:anywhere]"
-                    key={`${delivery}-${index}`}
-                  >
-                    {delivery}
-                  </code>
-                ))}
+                <DeliveryContentList deliveries={deliveries} />
+                {waitingForShareBox ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-200">
+                    صدور باقی لایسنس‌ها ادامه دارد و وضعیت خودکار تازه می‌شود.
+                  </p>
+                ) : null}
+              </div>
+            ) : waitingForShareBox ? (
+              <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="font-medium">در حال صدور لایسنس</p>
+                <p className="mt-1 text-xs leading-6">
+                  پرداخت تأیید شده و وضعیت صدور به‌صورت خودکار تازه می‌شود.
+                </p>
+                <Button
+                  className="mt-3"
+                  disabled={fulfillmentRefreshing}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={() => void refreshFulfillment()}
+                >
+                  <RefreshCw
+                    className={fulfillmentRefreshing ? "animate-spin" : ""}
+                  />
+                  تازه‌سازی وضعیت
+                </Button>
               </div>
             ) : (
               <p className="mt-5 rounded-md bg-muted p-4 text-sm text-muted-foreground">
                 سفارش برای انجام و بررسی ادمین ثبت شد.
               </p>
             )}
+            {fulfillmentRefreshError ? (
+              <p className="mt-3 text-xs text-rose-600 dark:text-rose-300">
+                {fulfillmentRefreshError}
+              </p>
+            ) : null}
           </>
         ) : status === "failed" ? (
           <ResultMessage

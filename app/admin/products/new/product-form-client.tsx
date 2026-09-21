@@ -1,14 +1,16 @@
 "use client";
 
 import type { FormEvent, KeyboardEvent } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
   FileText,
+  KeyRound,
   Plus,
+  RefreshCw,
   Save,
   Trash2,
   X,
@@ -25,11 +27,13 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type {
   AdminDeliveryPool,
+  CreateAdminProductRequest,
   FieldType,
   Product,
   ProductCategory,
   ProductField,
   ProductType,
+  ShareBoxCategory,
 } from "@/types/api";
 
 const fieldTypes: FieldType[] = ["TEXT", "EMAIL", "PHONE", "TEXTAREA", "SELECT"];
@@ -50,6 +54,7 @@ type ProductForm = {
   price: string;
   categoryId: string;
   deliveryPoolId: string;
+  shareboxCategoryId: string;
   isActive: boolean;
   sortOrder: string;
 };
@@ -72,6 +77,7 @@ type FeatureDraft = {
 const initialProductForm: ProductForm = {
   categoryId: "",
   deliveryPoolId: "",
+  shareboxCategoryId: "",
   description: "",
   isActive: true,
   price: "",
@@ -145,9 +151,55 @@ function normalizedFieldKey(key: string, index: number, usedKeys: Set<string>) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof ApiError
-    ? error.message
-    : "عملیات محصول انجام نشد.";
+  if (!(error instanceof ApiError)) return "عملیات محصول انجام نشد.";
+  const code = error.payload?.error?.code;
+  const messages: Record<string, string> = {
+    SHAREBOX_CATEGORY_NOT_FOUND: "دسته انتخاب‌شده دیگر در شیر‌باکس وجود ندارد.",
+    SHAREBOX_CATEGORY_REQUIRED: "برای محصول شیر‌باکس یک دسته انتخاب کنید.",
+    SHAREBOX_CREDENTIAL_REJECTED: "کلید ثبت‌شده شیر‌باکس پذیرفته نشد.",
+    SHAREBOX_NOT_CONFIGURED: "اتصال شیر‌باکس کامل پیکربندی نشده است.",
+    SHAREBOX_UPSTREAM_ERROR: "ارتباط با شیر‌باکس کامل نشد. دوباره تلاش کنید.",
+  };
+  return (code && messages[code]) || error.message;
+}
+
+type ShareBoxCategoriesState =
+  | "loading"
+  | "ready"
+  | "empty"
+  | "unavailable"
+  | "error";
+
+function shareBoxCategoryError(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return {
+      message: "دریافت دسته‌های شیر‌باکس انجام نشد.",
+      state: "error" as const,
+    };
+  }
+
+  const code = error.payload?.error?.code;
+  if (
+    code === "SHAREBOX_DISABLED" ||
+    code === "SHAREBOX_CREDENTIAL_REJECTED" ||
+    code === "SHAREBOX_NOT_CONFIGURED" ||
+    code === "SHAREBOX_API_KEY_REQUIRED"
+  ) {
+    return {
+      message: "اتصال شیر‌باکس فعال و آماده استفاده نیست.",
+      state: "unavailable" as const,
+    };
+  }
+
+  return {
+    message:
+      code === "SHAREBOX_UNAVAILABLE" ||
+      code === "SHAREBOX_REQUEST_FAILED" ||
+      code === "SHAREBOX_UPSTREAM_ERROR"
+        ? "شیر‌باکس موقتاً در دسترس نیست. دوباره تلاش کنید."
+        : error.message,
+    state: "error" as const,
+  };
 }
 
 export function AdminProductFormClient() {
@@ -156,6 +208,14 @@ export function AdminProductFormClient() {
   const editProductId = searchParams.get("edit") ?? "";
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [pools, setPools] = useState<AdminDeliveryPool[]>([]);
+  const [shareBoxCategories, setShareBoxCategories] = useState<ShareBoxCategory[]>([]);
+  const [shareBoxCategoriesState, setShareBoxCategoriesState] =
+    useState<ShareBoxCategoriesState>("loading");
+  const [shareBoxCategoriesError, setShareBoxCategoriesError] = useState("");
+  const [savedShareBoxCategory, setSavedShareBoxCategory] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [productForm, setProductForm] =
     useState<ProductForm>(initialProductForm);
   const [fieldDrafts, setFieldDrafts] = useState<FieldDraft[]>([
@@ -176,6 +236,7 @@ export function AdminProductFormClient() {
     setFieldDrafts([createFieldDraft()]);
     setFeatureDrafts([createFeatureDraft()]);
     setEditingProductId("");
+    setSavedShareBoxCategory(null);
   }
 
   function populateProduct(product: Product) {
@@ -183,6 +244,7 @@ export function AdminProductFormClient() {
     setProductForm({
       categoryId: product.category?.id ?? "",
       deliveryPoolId: product.deliveryPool?.id ?? "",
+      shareboxCategoryId: product.shareboxCategoryId ?? "",
       description: product.description ?? "",
       isActive: product.isActive,
       price: String(product.price),
@@ -191,6 +253,14 @@ export function AdminProductFormClient() {
       title: product.title,
       type: product.type,
     });
+    setSavedShareBoxCategory(
+      product.shareboxCategoryId
+        ? {
+            id: product.shareboxCategoryId,
+            name: product.shareboxCategoryName ?? "دسته ذخیره‌شده",
+          }
+        : null,
+    );
     setFieldDrafts(
       product.fields.length
         ? product.fields.map(createFieldDraft)
@@ -202,6 +272,44 @@ export function AdminProductFormClient() {
         : [createFeatureDraft()],
     );
   }
+
+  const loadShareBoxCategories = useCallback(async () => {
+    setShareBoxCategoriesState("loading");
+    setShareBoxCategoriesError("");
+
+    try {
+      const collected = new Map<string, ShareBoxCategory>();
+      let page = 1;
+      let totalPages = 1;
+
+      do {
+        const result = await api.admin.sharebox.categories({ page, perPage: 100 });
+        result.data.categories.forEach((category) =>
+          collected.set(category.id, category),
+        );
+
+        totalPages =
+          result.meta?.totalPages ??
+          (result.data.categories.length === 100 ? page + 1 : page);
+        page += 1;
+      } while (page <= totalPages);
+
+      const nextCategories = Array.from(collected.values());
+      setShareBoxCategories(nextCategories);
+      setShareBoxCategoriesState(nextCategories.length ? "ready" : "empty");
+    } catch (loadError) {
+      const resolved = shareBoxCategoryError(loadError);
+      setShareBoxCategoriesState(resolved.state);
+      setShareBoxCategoriesError(resolved.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadShareBoxCategories();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadShareBoxCategories]);
 
   useEffect(() => {
     let active = true;
@@ -339,6 +447,18 @@ export function AdminProductFormClient() {
       return;
     }
 
+    const shareboxCategoryId =
+      productForm.type === "SHAREBOX"
+        ? optionalText(productForm.shareboxCategoryId)
+        : undefined;
+
+    if (productForm.type === "SHAREBOX" && !shareboxCategoryId) {
+      setSaving(false);
+      setError("برای محصول شیر‌باکس، دسته لایسنس را انتخاب کنید.");
+      setMessage("");
+      return;
+    }
+
     const usedKeys = new Set<string>();
     const features = featureDrafts
       .map((featureDraft) => featureDraft.title.trim())
@@ -357,21 +477,25 @@ export function AdminProductFormClient() {
             sortOrder: index,
             type: fieldDraft.type,
           }))
-        : [];
+        : undefined;
 
     try {
-      const body = {
+      const body: CreateAdminProductRequest = {
         categoryId: optionalText(productForm.categoryId),
-        deliveryPoolId,
         description: optionalText(productForm.description),
         features,
-        fields,
         isActive: productForm.isActive,
         price: Number(productForm.price),
         slug: productForm.slug.trim(),
         sortOrder: Number(productForm.sortOrder || 0),
         title: productForm.title.trim(),
         type: productForm.type,
+        ...(deliveryPoolId ? { deliveryPoolId } : {}),
+        ...(shareboxCategoryId &&
+        (!editingProductId || shareboxCategoryId !== savedShareBoxCategory?.id)
+          ? { shareboxCategoryId }
+          : {}),
+        ...(fields ? { fields } : {}),
       };
 
       if (editingProductId) {
@@ -392,7 +516,18 @@ export function AdminProductFormClient() {
     }
   }
 
+  const isCustomForm = productForm.type === "CUSTOM_FORM";
   const isInstantDelivery = productForm.type === "INSTANT_DELIVERY";
+  const isShareBox = productForm.type === "SHAREBOX";
+  const selectedShareBoxCategory =
+    shareBoxCategories.find(
+      (category) => category.id === productForm.shareboxCategoryId,
+    ) ?? null;
+  const showSavedShareBoxCategory =
+    savedShareBoxCategory &&
+    !shareBoxCategories.some(
+      (category) => category.id === savedShareBoxCategory.id,
+    );
 
   return (
     <div className="space-y-6">
@@ -534,11 +669,16 @@ export function AdminProductFormClient() {
         </AdminSection>
 
         <AdminSection title="نوع محصول">
-          <div className="grid gap-3 md:grid-cols-2">
-            {(["CUSTOM_FORM", "INSTANT_DELIVERY"] as ProductType[]).map(
+          <div className="grid gap-3 md:grid-cols-3">
+            {(["CUSTOM_FORM", "INSTANT_DELIVERY", "SHAREBOX"] as ProductType[]).map(
               (type) => {
                 const active = productForm.type === type;
-                const Icon = type === "CUSTOM_FORM" ? FileText : Zap;
+                const Icon =
+                  type === "CUSTOM_FORM"
+                    ? FileText
+                    : type === "INSTANT_DELIVERY"
+                      ? Zap
+                      : KeyRound;
 
                 return (
                   <button
@@ -551,7 +691,6 @@ export function AdminProductFormClient() {
                     onClick={() =>
                       setProductForm((current) => ({
                         ...current,
-                        deliveryPoolId: type === "CUSTOM_FORM" ? "" : current.deliveryPoolId,
                         type,
                       }))
                     }
@@ -572,7 +711,9 @@ export function AdminProductFormClient() {
                       <span className="mt-2 block text-sm text-muted-foreground">
                         {type === "CUSTOM_FORM"
                           ? "دریافت اطلاعات سفارش با فیلدهای قابل تنظیم"
-                          : "تحویل خودکار محتوای آماده بعد از خرید"}
+                          : type === "INSTANT_DELIVERY"
+                            ? "تحویل خودکار محتوای آماده بعد از خرید"
+                            : "صدور خودکار لایسنس از دسته انتخابی شیر‌باکس"}
                       </span>
                     </span>
                   </button>
@@ -613,6 +754,100 @@ export function AdminProductFormClient() {
                 برای ثبت محصول تحویل فوری، ابتدا در بخش تحویل فوری یک استخر تحویل بسازید.
               </div>
             )
+          ) : null}
+          {isShareBox ? (
+            <div className="mt-4 rounded-lg border border-border bg-background p-4">
+              {shareBoxCategories.length || savedShareBoxCategory ? (
+                <label className="block text-sm font-medium">
+                  دسته لایسنس شیر‌باکس
+                  <Select
+                    className="mt-2"
+                    required
+                    value={productForm.shareboxCategoryId}
+                    onChange={(event) =>
+                      setProductForm((current) => ({
+                        ...current,
+                        shareboxCategoryId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">انتخاب دسته شیر‌باکس</option>
+                    {showSavedShareBoxCategory ? (
+                      <option value={savedShareBoxCategory.id}>
+                        {savedShareBoxCategory.name} (انتخاب ذخیره‌شده)
+                      </option>
+                    ) : null}
+                    {shareBoxCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name} — {category.validity_days.toLocaleString("fa-IR")} روز
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              ) : null}
+
+              {selectedShareBoxCategory ? (
+                <div className="mt-3 rounded-md bg-muted/50 p-3 text-xs leading-6 text-muted-foreground">
+                  <p>
+                    اعتبار لایسنس: {selectedShareBoxCategory.validity_days.toLocaleString("fa-IR")} روز
+                  </p>
+                  {selectedShareBoxCategory.description ? (
+                    <p>{selectedShareBoxCategory.description}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {shareBoxCategoriesState === "loading" ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  در حال دریافت همه دسته‌های شیر‌باکس...
+                </p>
+              ) : null}
+              {shareBoxCategoriesState === "empty" ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  هیچ دسته قابل انتخابی در شیر‌باکس وجود ندارد.
+                </p>
+              ) : null}
+              {shareBoxCategoriesState === "unavailable" ||
+              shareBoxCategoriesState === "error" ? (
+                <div
+                  className={cn(
+                    "mt-3 rounded-md border p-3 text-xs",
+                    shareBoxCategoriesState === "unavailable"
+                      ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+                      : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200",
+                  )}
+                >
+                  <p>{shareBoxCategoriesError}</p>
+                  {savedShareBoxCategory ? (
+                    <p className="mt-1">
+                      انتخاب ذخیره‌شده محصول حفظ شده است؛ تا دریافت موفق دسته‌ها آن را تغییر ندهید.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  disabled={shareBoxCategoriesState === "loading"}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={() => void loadShareBoxCategories()}
+                >
+                  <RefreshCw
+                    className={
+                      shareBoxCategoriesState === "loading" ? "animate-spin" : ""
+                    }
+                  />
+                  دریافت دوباره دسته‌ها
+                </Button>
+                {shareBoxCategoriesState === "unavailable" ? (
+                  <Button asChild size="sm" type="button" variant="outline">
+                    <Link href="/admin/sharebox">تنظیم اتصال شیر‌باکس</Link>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           ) : null}
         </AdminSection>
 
@@ -676,7 +911,7 @@ export function AdminProductFormClient() {
           </div>
         </AdminSection>
 
-        {!isInstantDelivery ? (
+        {isCustomForm ? (
           <AdminSection
             action={
               <Button
