@@ -267,6 +267,8 @@ export type OrderDelivery = {
   id: string;
   contentSnapshot: string;
   deliveredAt: string;
+  shareboxFulfillmentId?: string | null;
+  sharebox?: { licenseKey: string; expiresAt: string; validityDays: number | null };
 };
 
 export type ShareBoxFulfillmentStatus =
@@ -283,6 +285,8 @@ export type ShareBoxFulfillment = {
   attempts: number;
   lastErrorCode: string | null;
   nextAttemptAt: string | null;
+  receiptIssuedAt?: string | null;
+  receiptExpiresAt?: string | null;
 };
 
 export type OrderItem = {

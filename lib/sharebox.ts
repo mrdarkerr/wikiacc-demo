@@ -1,6 +1,7 @@
 import type {
   Order,
   OrderItem,
+  OrderDelivery,
   ShareBoxFulfillmentStatus,
 } from "@/types/api";
 
@@ -75,6 +76,29 @@ export function orderNeedsShareBoxPolling(order: Order) {
   }
 
   return order.items.some(shareBoxItemNeedsPolling);
+}
+
+// Interpret only the immutable ShareBox product type, never arbitrary delivery text.
+export function itemDeliveryContents(item: OrderItem): OrderDelivery[] {
+  if (!isShareBoxItem(item)) return item.deliveries;
+  return item.deliveries.map((delivery) => {
+    const match = /^ShareBox license: ([^\r\n]+)\r?\nExpires at: ([^\r\n]+)$/.exec(delivery.contentSnapshot);
+    if (!match || !Number.isFinite(Date.parse(match[2]))) return delivery;
+    const receipt = item.shareboxFulfillments?.find(
+      (job) => job.id === delivery.shareboxFulfillmentId,
+    );
+    const issuedAt = receipt?.receiptIssuedAt ? Date.parse(receipt.receiptIssuedAt) : NaN;
+    const expiresAt = receipt?.receiptExpiresAt ?? match[2];
+    const days = (Date.parse(expiresAt) - issuedAt) / 86_400_000;
+    return {
+      ...delivery,
+      sharebox: {
+        licenseKey: match[1],
+        expiresAt,
+        validityDays: Number.isFinite(days) && days > 0 ? Math.round(days) : null,
+      },
+    };
+  });
 }
 
 export function orderHasShareBoxItems(order: Order) {

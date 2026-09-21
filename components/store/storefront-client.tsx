@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { OtpAuthForm } from "@/components/auth/otp-auth-form";
 import { DeliveryContentList } from "@/components/order-delivery-content";
+import { itemDeliveryContents } from "@/lib/sharebox";
 import { api, ApiError } from "@/lib/api";
 import { orderNeedsShareBoxPolling } from "@/lib/sharebox";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
@@ -46,7 +47,7 @@ function orderCode(order: Order) {
 }
 
 function deliveryMessages(order: Order) {
-  return order.items.flatMap((item) => item.deliveries);
+  return order.items.flatMap(itemDeliveryContents);
 }
 
 function productTypeLabel(product: Product) {

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../lib/sharebox.ts',import.meta.url),'utf8');
+const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}});
+const {itemDeliveryContents}=await import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'));
+const content='ShareBox license: synthetic-license-copy-only\nExpires at: 2026-10-21T12:00:00.000Z';
+const delivery={id:'delivery',shareboxFulfillmentId:'job',contentSnapshot:content,deliveredAt:'2026-09-22T12:00:00Z'};
+const item={productTypeSnapshot:'SHAREBOX',deliveries:[delivery],shareboxFulfillments:[{id:'job',receiptIssuedAt:'2026-09-21T12:00:00.000Z',receiptExpiresAt:'2026-10-21T12:00:00.000Z'}]};
+assert.deepEqual(itemDeliveryContents(item)[0].sharebox,{licenseKey:'synthetic-license-copy-only',expiresAt:'2026-10-21T12:00:00.000Z',validityDays:30});
+assert.strictEqual(itemDeliveryContents({...item,productTypeSnapshot:'READY'}),item.deliveries);
+assert.strictEqual(itemDeliveryContents({...item,deliveries:[{...delivery,contentSnapshot:'unstructured content'}]})[0].contentSnapshot,'unstructured content');
+assert.equal(itemDeliveryContents({...item,shareboxFulfillments:[]})[0].sharebox.validityDays,null);
+assert.equal(itemDeliveryContents({...item,deliveries:[{...delivery,contentSnapshot:'ShareBox license: test\nExpires at: invalid'}]})[0].sharebox,undefined);
+assert.equal(itemDeliveryContents({...item,deliveries:[delivery,{...delivery,id:'second',shareboxFulfillmentId:'other'}]})[1].sharebox.validityDays,null);
+console.log('PASS delivery presentation: exact key, receipt-based 30-day validity, unrelated product unchanged, malformed/legacy fallback and per-unit receipt matching');

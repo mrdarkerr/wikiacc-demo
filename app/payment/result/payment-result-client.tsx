@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { DeliveryContentList } from "@/components/order-delivery-content";
+import { itemDeliveryContents } from "@/lib/sharebox";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
@@ -90,7 +91,7 @@ export function PaymentResultClient() {
 
   const deliveries = useMemo(
     () =>
-      order?.items.flatMap((item) => item.deliveries) ?? [],
+      order?.items.flatMap(itemDeliveryContents) ?? [],
     [order],
   );
 

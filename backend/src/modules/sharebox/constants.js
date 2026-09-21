@@ -8,4 +8,6 @@ export const SHAREBOX_FULFILLMENT_SELECT = Object.freeze({
   attempts: true,
   lastErrorCode: true,
   nextAttemptAt: true,
+  receiptIssuedAt: true,
+  receiptExpiresAt: true,
 });

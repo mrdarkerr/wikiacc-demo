@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, RotateCcw, Save } from "lucide-react";
 
 import { DeliveryContentList } from "@/components/order-delivery-content";
+import { itemDeliveryContents } from "@/lib/sharebox";
 import {
   formatCurrency,
   formatDate,
@@ -126,7 +127,7 @@ export default function AdminOrderDetailPage() {
   );
 
   const deliveries = useMemo(
-    () => order?.items.flatMap((item) => item.deliveries) ?? [],
+    () => order?.items.flatMap(itemDeliveryContents) ?? [],
     [order],
   );
   const latestPaymentAttempt = order?.paymentAttempts[0];
@@ -357,7 +358,7 @@ export default function AdminOrderDetailPage() {
                   {item.deliveries.length ? (
                     <DeliveryContentList
                       className="mt-3"
-                      deliveries={item.deliveries}
+                      deliveries={itemDeliveryContents(item)}
                     />
                   ) : (
                     <p className="mt-2 text-sm text-muted-foreground">

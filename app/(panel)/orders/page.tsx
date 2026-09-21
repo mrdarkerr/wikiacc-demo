@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Eye, Plus, RefreshCw, X } from "lucide-react";
 
 import { DeliveryContentList } from "@/components/order-delivery-content";
+import { itemDeliveryContents } from "@/lib/sharebox";
 import { formatCurrency, formatDate } from "@/components/panel/formatters";
 import { PanelSection } from "@/components/panel/panel-section";
 import { StatusBadge } from "@/components/panel/status-badge";
@@ -29,7 +30,7 @@ function orderTitle(order: Order) {
 
 function deliveredContent(order: Order) {
   return order.items
-    .flatMap((item) => item.deliveries)
+    .flatMap(itemDeliveryContents)
     .map((delivery) => delivery.contentSnapshot);
 }
 
@@ -440,7 +441,7 @@ function OrderDialog({
                 {item.deliveries.length ? (
                   <DeliveryContentList
                     className="mt-3"
-                    deliveries={item.deliveries}
+                    deliveries={itemDeliveryContents(item)}
                   />
                 ) : shareBoxItemNeedsPolling(item) ? null : (
                   <p className="mt-2 text-sm text-muted-foreground">

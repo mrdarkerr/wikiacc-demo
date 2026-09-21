@@ -323,6 +323,20 @@ describe.sequential("ShareBox integration", () => {
     expect(stored.items[0].shareboxFulfillments.every((job) => job.status === "DELIVERED")).toBe(true);
     expect(stored.items[0].deliveries[0].deliveryItemId).toBeNull();
     expect(stored.items[0].deliveries[0].contentSnapshot).toContain("ShareBox license:");
+    const publicResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/orders/${order.id}`,
+      headers: { cookie: user.cookie },
+    });
+    expect(publicResponse.statusCode).toBe(200);
+    const publicItem = publicResponse.json().data.order.items[0];
+    for (const delivery of publicItem.deliveries) {
+      const receipt = publicItem.shareboxFulfillments.find((job) => job.id === delivery.shareboxFulfillmentId);
+      expect(receipt.receiptIssuedAt).toEqual(expect.any(String));
+      expect(receipt.receiptExpiresAt).toEqual(expect.any(String));
+      expect(Date.parse(receipt.receiptExpiresAt)).toBeGreaterThan(Date.parse(receipt.receiptIssuedAt));
+      expect(receipt).not.toHaveProperty("apiKeyFingerprint");
+    }
     expect(
       await app.prisma.smsQueueJob.count({
         where: { dedupeKey: `ORDER_COMPLETED:USER:${order.id}` },
