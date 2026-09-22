@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, KeyRound } from "lucide-react";
+import { Check, Copy, KeyRound, Monitor, Smartphone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { OrderDelivery } from "@/types/api";
@@ -11,6 +11,11 @@ type DeliveryContentListProps = {
   deliveries: Delivery[];
   className?: string;
 };
+
+const androidDownloadUrl = process.env.NEXT_PUBLIC_SHAREBOX_ANDROID_DOWNLOAD_URL?.trim()
+  || "https://wikiacc.ir/dl/sharebox-android-v0.7.7-release.apk";
+const windowsDownloadUrl = process.env.NEXT_PUBLIC_SHAREBOX_WINDOWS_DOWNLOAD_URL?.trim()
+  || "https://wikiacc.ir/dl/ShareBox-0.2.4-x64-Setup.exe";
 
 const expiryFormatter = new Intl.DateTimeFormat("fa-IR", {
   dateStyle: "medium",
@@ -84,6 +89,22 @@ export function DeliveryContentList({
                   <dd className="font-medium">{expiryFormatter.format(new Date(license.expiresAt))}</dd>
                 </div>
               </dl>
+            ) : null}
+            {license ? (
+              <div className="mt-3 flex flex-col gap-2 border-t pt-3">
+                <Button asChild variant="outline" className="w-full">
+                  <a href={androidDownloadUrl} download>
+                    <Smartphone aria-hidden="true" />
+                    اپلیکیشن اندروید
+                  </a>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <a href={windowsDownloadUrl} download>
+                    <Monitor aria-hidden="true" />
+                    اپلیکیشن ویندوز
+                  </a>
+                </Button>
+              </div>
             ) : null}
             {copyErrorId === delivery.id ? (
               <p className="mt-2 text-xs text-rose-600" role="status">کپی خودکار انجام نشد؛ متن را انتخاب و کپی کنید.</p>

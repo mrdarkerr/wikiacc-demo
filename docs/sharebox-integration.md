@@ -46,6 +46,19 @@ Production deployment, schema upgrade, real key creation and enabling the integr
 - Disabling the connection prevents new purchases and future issuance attempts once the worker observes it; an in-flight request may still finish. Configuration failures before any external request do not count as issuance attempts and do not permanently block an otherwise valid refund. Existing jobs retain their original credential fingerprint and target; changing the key is blocked until active outstanding orders are resolved.
 - Refund/cancellation is blocked once issuance has been attempted, including ambiguous timeouts. Reconcile and, where necessary, revoke the remote license through authorized ShareBox administration before operational resolution. There is no automatic ShareBox revoke/refund API in this feature.
 
+## ShareBox client downloads
+
+ShareBox license cards show stacked Android and Windows download buttons in wallet checkout, the payment result and order details. Other product deliveries do not show these links.
+
+Set these **public, build-time** variables in the frontend `.env.production` (not `backend/.env`) to override the default download URLs:
+
+```dotenv
+NEXT_PUBLIC_SHAREBOX_ANDROID_DOWNLOAD_URL=https://wikiacc.ir/dl/sharebox-android-v0.7.7-release.apk
+NEXT_PUBLIC_SHAREBOX_WINDOWS_DOWNLOAD_URL=https://wikiacc.ir/dl/ShareBox-0.2.4-x64-Setup.exe
+```
+
+Unset or blank values use the URLs above. After changing them, rebuild the frontend with `npm run build` and restart it; a restart alone does not update Next.js public environment values. Use public HTTPS download URLs without credentials; these values are visible to customers. The download server must serve attachments (the default Wikiacc URLs do); browsers may ignore the `download` attribute for cross-origin URLs.
+
 ## Verification commands
 
 From the repository root:
