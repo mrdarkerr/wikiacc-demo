@@ -154,7 +154,7 @@ export default function AdminShareBoxPage() {
             تازه‌سازی
           </Button>
         }
-        description="اتصال واحد ویکی‌اکانت به سرویس صدور لایسنس شیر‌باکس"
+        description="اتصال واحد جیمی اکانت به سرویس صدور لایسنس شیر‌باکس"
         title="اتصال شیر‌باکس"
       >
         {!settings ? (
@@ -169,7 +169,7 @@ export default function AdminShareBoxPage() {
                       <KeyRound className="size-5" />
                     </span>
                     <div>
-                      <p className="text-sm font-bold">کلید نام‌دار ویکی‌اکانت</p>
+                      <p className="text-sm font-bold">کلید نام‌دار جیمی اکانت</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {settings.hasApiKey
                           ? `کلید ثبت شده ••••${settings.apiKeyHint ?? ""}`

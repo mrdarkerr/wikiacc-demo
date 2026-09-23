@@ -25,7 +25,7 @@ export async function adminTelegramRoutes(app, options) {
         if (bot?.is_bot !== true || !Number.isSafeInteger(bot.id)) throw new Error("Invalid bot response");
         return ok(reply, { connected: true });
       }
-      const result = await sendTelegramMessage({ ...credentials, text: "✅ پیام آزمایشی ویکی‌اکانت\nارتباط با مقصد تلگرام برقرار است. این پیام خرید یا تیکت واقعی نیست." }, options.clientOptions);
+      const result = await sendTelegramMessage({ ...credentials, text: "✅ پیام آزمایشی جیمی اکانت\nارتباط با مقصد تلگرام برقرار است. این پیام خرید یا تیکت واقعی نیست." }, options.clientOptions);
       return ok(reply, { messageId: result.messageId });
     } catch (error) {
       throw badGateway(safeTelegramErrorCode(error), "Telegram test failed; check token, endpoint and bot permissions");
