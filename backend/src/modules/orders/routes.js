@@ -42,11 +42,14 @@ export async function orderRoutes(app, options) {
           client: options.jibitClient,
           logger: app.log,
           reconcileMinutes: options.jibitReconcileMinutes,
+          shareboxBaseUrl: options.shareboxBaseUrl,
         },
       );
       return created(reply, result);
     }
-    const order = await createOrder(app.prisma, request.user.id, input);
+    const order = await createOrder(app.prisma, request.user.id, input, {
+      shareboxBaseUrl: options.shareboxBaseUrl,
+    });
     return created(reply, { order });
   });
 

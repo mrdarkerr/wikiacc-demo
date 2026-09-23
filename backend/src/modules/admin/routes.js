@@ -1,3 +1,5 @@
+import { notifyOrder } from "../telegram/events.js";
+import { TELEGRAM_EVENTS } from "../telegram/constants.js";
 import { badRequest, conflict, notFound } from "../../shared/errors.js";
 import { created, ok } from "../../shared/http/reply.js";
 import { parse } from "../../shared/validation/parse.js";
@@ -18,6 +20,12 @@ import {
   removeAvailableDeliveryItem,
 } from "../delivery/service.js";
 import { enqueueOrderCompletedNotification } from "../sms/notifications.js";
+import { SHAREBOX_FULFILLMENT_SELECT } from "../sharebox/constants.js";
+import {
+  assertShareboxStatusChangeAllowed,
+  retryShareboxOrder,
+} from "../sharebox/fulfillment.js";
+import { resolveShareboxCategory } from "../sharebox/admin-routes.js";
 import { createTicketMessageSchema, updateTicketStatusSchema } from "../tickets/schemas.js";
 import { addTicketMessage } from "../tickets/service.js";
 import { walletAdjustmentSchema } from "../wallet/schemas.js";
@@ -71,6 +79,10 @@ const adminOrderInclude = {
     include: {
       product: true,
       deliveries: true,
+      shareboxFulfillments: {
+        select: SHAREBOX_FULFILLMENT_SELECT,
+        orderBy: { unitIndex: "asc" },
+      },
       fieldValues: { orderBy: { createdAt: "asc" } },
     },
   },
@@ -85,7 +97,7 @@ const adminTicketInclude = {
   },
 };
 
-export async function adminRoutes(app) {
+export async function adminRoutes(app, options) {
   app.addHook("preHandler", app.requireAdmin);
 
   app.get("/users", async (request, reply) => {
@@ -156,6 +168,12 @@ export async function adminRoutes(app) {
           "Direct payment status cannot change before payment reconciliation",
         );
       }
+      await assertShareboxStatusChangeAllowed(
+        tx,
+        current.id,
+        current.status,
+        input.status,
+      );
 
       const updated = await tx.order.update({
         where: { id: params.id },
@@ -174,6 +192,7 @@ export async function adminRoutes(app) {
         });
       }
 
+      await notifyOrder(tx, updated.id, TELEGRAM_EVENTS.ORDER_STATUS_CHANGED, current.status);
       return updated;
     });
     return ok(reply, { order });
@@ -192,6 +211,17 @@ export async function adminRoutes(app) {
       throw badRequest("ORDER_NOT_REFUNDABLE", "Order is not refundable");
     }
     return ok(reply, result);
+  });
+
+  app.post("/orders/:id/sharebox/retry", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const params = parse(idParamsSchema, request.params);
+    const queued = await retryShareboxOrder(
+      app.prisma,
+      params.id,
+      options.shareboxClient.origin,
+    );
+    return ok(reply, { queued });
   });
 
   app.post("/categories", async (request, reply) => {
@@ -258,6 +288,14 @@ export async function adminRoutes(app) {
   app.post("/products", async (request, reply) => {
     const input = parse(createProductSchema, request.body);
     validateProductInput(input);
+    const shareboxCategory =
+      input.type === "SHAREBOX"
+        ? await resolveShareboxCategory(
+            app.prisma,
+            options.shareboxClient,
+            input.shareboxCategoryId,
+          )
+        : null;
 
     const product = await app.prisma.product.create({
       data: {
@@ -265,6 +303,8 @@ export async function adminRoutes(app) {
         title: input.title,
         description: input.description,
         type: input.type,
+        shareboxCategoryId: shareboxCategory?.id,
+        shareboxCategoryName: shareboxCategory?.name,
         price: input.price,
         categoryId: input.categoryId,
         deliveryPoolId: input.deliveryPoolId,
@@ -308,8 +348,23 @@ export async function adminRoutes(app) {
           ? current.deliveryPoolId
           : input.deliveryPoolId,
       fields: input.fields ?? [],
+      shareboxCategoryId:
+        input.shareboxCategoryId === undefined
+          ? current.shareboxCategoryId
+          : input.shareboxCategoryId,
     };
     validateProductInput(merged);
+    const shareboxCategory =
+      merged.type === "SHAREBOX" &&
+      (input.shareboxCategoryId !== undefined ||
+        current.type !== "SHAREBOX" ||
+        !current.shareboxCategoryName)
+        ? await resolveShareboxCategory(
+            app.prisma,
+            options.shareboxClient,
+            merged.shareboxCategoryId,
+          )
+        : null;
 
     const product = await app.prisma.$transaction(async (tx) => {
       if (input.fields) {
@@ -327,6 +382,17 @@ export async function adminRoutes(app) {
           title: input.title,
           description: input.description,
           type: input.type,
+          ...(merged.type === "SHAREBOX"
+            ? shareboxCategory
+              ? {
+                  shareboxCategoryId: shareboxCategory.id,
+                  shareboxCategoryName: shareboxCategory.name,
+                }
+              : {}
+            : {
+                shareboxCategoryId: null,
+                shareboxCategoryName: null,
+              }),
           price: input.price,
           categoryId: input.categoryId,
           deliveryPoolId: input.deliveryPoolId,

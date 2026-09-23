@@ -48,5 +48,7 @@ export function userLabel(
 }
 
 export function productTypeLabel(type: ProductType) {
-  return type === "INSTANT_DELIVERY" ? "تحویل فوری" : "فرم اختصاصی";
+  if (type === "INSTANT_DELIVERY") return "تحویل فوری";
+  if (type === "SHAREBOX") return "شیر‌باکس";
+  return "فرم اختصاصی";
 }

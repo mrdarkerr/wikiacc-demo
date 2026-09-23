@@ -3,6 +3,10 @@ import type {
   AdminDeliveryItem,
   AdminDeliveryPool,
   AdminOrder,
+  AdminShareBoxSettings,
+  AdminTelegramSettings,
+  UpdateAdminTelegramSettings,
+  AdminTelegramJobs,
   AdminSmsSender,
   AdminSmsSettings,
   AdminTicket,
@@ -32,6 +36,7 @@ import type {
   RefundAdminOrderRequest,
   SetPasswordRequest,
   SetAdminProductActiveRequest,
+  ShareBoxCategory,
   AdminSiteContentState,
   PublicSiteContent,
   SaveAdminSiteContentRequest,
@@ -39,6 +44,7 @@ import type {
   Ticket,
   TicketMessage,
   UpdateAdminOrderStatusRequest,
+  UpdateAdminShareBoxSettingsRequest,
   UpdateAdminCategoryRequest,
   UpdateAdminProductRequest,
   UpdateAdminSmsSettingsRequest,
@@ -300,6 +306,10 @@ export const api = {
           wallet: Wallet;
           transaction: WalletTransaction;
         }>(`/admin/orders/${id}/refund`, { body, method: "POST" }),
+      retryShareBox: (id: string) =>
+        apiFetch<{ queued: number }>(`/admin/orders/${id}/sharebox/retry`, {
+          method: "POST",
+        }),
     },
     categories: {
       list: () => apiFetch<{ categories: ProductCategory[] }>("/admin/categories"),
@@ -384,6 +394,33 @@ export const api = {
         apiFetch<{ senderId: string }>(`/admin/sms/senders/${id}`, {
           method: "DELETE",
         }),
+    },
+    telegram: {
+      getSettings: () => apiFetch<{ settings: AdminTelegramSettings }>("/admin/telegram/settings"),
+      updateSettings: (body: UpdateAdminTelegramSettings) =>
+        apiFetch<{ settings: AdminTelegramSettings }>("/admin/telegram/settings", { body, method: "PATCH" }),
+      test: (mode: "connection" | "message") =>
+        apiFetch<{ connected?: boolean; messageId?: string }>("/admin/telegram/test", { body: { mode }, method: "POST" }),
+      jobs: () => apiFetch<AdminTelegramJobs>("/admin/telegram/jobs"),
+      retry: (id: string) => apiFetch<{ queued: boolean }>(`/admin/telegram/jobs/${id}/retry`, {
+        body: { useCurrentConfiguration: true }, method: "POST",
+      }),
+    },
+    sharebox: {
+      getSettings: () =>
+        apiFetch<{ settings: AdminShareBoxSettings }>(
+          "/admin/sharebox/settings",
+        ),
+      updateSettings: (body: UpdateAdminShareBoxSettingsRequest) =>
+        apiFetch<{ settings: AdminShareBoxSettings }>(
+          "/admin/sharebox/settings",
+          { body, method: "PATCH" },
+        ),
+      categories: (query?: { page?: number; perPage?: number }) =>
+        apiFetchWithMeta<{ categories: ShareBoxCategory[] }>(
+          "/admin/sharebox/categories",
+          { query },
+        ),
     },
     wallet: {
       summary: () =>

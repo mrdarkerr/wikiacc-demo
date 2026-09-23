@@ -4,6 +4,7 @@ import {
   getWalletByUserId,
   listWalletTransactions,
 } from "./repository.js";
+import { assertShareboxRefundAllowed } from "../sharebox/fulfillment.js";
 
 export async function getWalletSummary(prisma, userId, pagination) {
   const wallet = await getWalletByUserId(prisma, userId);
@@ -67,6 +68,7 @@ export async function refundOrderByAdmin(prisma, adminId, orderId, note) {
         "Direct payments must be refunded through the payment provider",
       );
     }
+    await assertShareboxRefundAllowed(tx, order.id);
 
     const updatedWallet = await tx.wallet.update({
       where: { userId: order.userId },

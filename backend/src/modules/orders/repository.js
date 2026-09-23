@@ -1,3 +1,5 @@
+import { SHAREBOX_FULFILLMENT_SELECT } from "../sharebox/constants.js";
+
 export function listUserOrders(prisma, userId, { page = 1, perPage = 20 } = {}) {
   return prisma.order.findMany({
     where: { userId },
@@ -6,6 +8,10 @@ export function listUserOrders(prisma, userId, { page = 1, perPage = 20 } = {}) 
         include: {
           product: true,
           deliveries: true,
+          shareboxFulfillments: {
+            select: SHAREBOX_FULFILLMENT_SELECT,
+            orderBy: { unitIndex: "asc" },
+          },
           fieldValues: true,
         },
       },
@@ -28,6 +34,10 @@ export function getUserOrder(prisma, userId, orderId) {
         include: {
           product: { include: { fields: { orderBy: { sortOrder: "asc" } } } },
           deliveries: true,
+          shareboxFulfillments: {
+            select: SHAREBOX_FULFILLMENT_SELECT,
+            orderBy: { unitIndex: "asc" },
+          },
           fieldValues: true,
         },
       },

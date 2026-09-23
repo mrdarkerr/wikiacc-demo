@@ -165,7 +165,12 @@ export default function AdminProductsPage() {
 
     return currentProducts.filter((product) => {
       const matchesQuery = normalizedQuery
-        ? [product.title, product.slug, product.category?.title]
+        ? [
+            product.title,
+            product.slug,
+            product.category?.title,
+            product.shareboxCategoryName,
+          ]
             .filter(Boolean)
             .some((value) => value!.toLowerCase().includes(normalizedQuery))
         : true;
@@ -197,6 +202,9 @@ export default function AdminProductsPage() {
   const instantDeliveryCount = currentProducts.filter(
     (product) => product.type === "INSTANT_DELIVERY",
   ).length;
+  const shareBoxCount = currentProducts.filter(
+    (product) => product.type === "SHAREBOX",
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -205,7 +213,7 @@ export default function AdminProductsPage() {
       {message ? <AdminState tone="success">{message}</AdminState> : null}
       {error ? <AdminState tone="danger">{error}</AdminState> : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <p className="text-sm text-muted-foreground">محصولات فعال</p>
           <p className="mt-2 text-2xl font-bold">{activeCount}</p>
@@ -217,6 +225,10 @@ export default function AdminProductsPage() {
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <p className="text-sm text-muted-foreground">تحویل فوری</p>
           <p className="mt-2 text-2xl font-bold">{instantDeliveryCount}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="text-sm text-muted-foreground">شیر‌باکس</p>
+          <p className="mt-2 text-2xl font-bold">{shareBoxCount}</p>
         </div>
       </div>
 
@@ -269,6 +281,7 @@ export default function AdminProductsPage() {
             <option value="ALL">همه نوع ها</option>
             <option value="CUSTOM_FORM">فرم اختصاصی</option>
             <option value="INSTANT_DELIVERY">تحویل فوری</option>
+            <option value="SHAREBOX">شیر‌باکس</option>
           </Select>
           <Select
             aria-label="فیلتر دسته بندی"
@@ -312,7 +325,11 @@ export default function AdminProductsPage() {
                     <Badge variant="outline">
                       {product.category?.title ?? "بدون دسته بندی"}
                     </Badge>
-                    <Badge variant="outline">{product.fields.length} فیلد</Badge>
+                    <Badge variant="outline">
+                      {product.type === "SHAREBOX"
+                        ? product.shareboxCategoryName ?? "دسته شیر‌باکس نامشخص"
+                        : `${product.fields.length} فیلد`}
+                    </Badge>
                     <Badge variant="outline">
                       {product._count?.orderItems ?? 0} خرید
                     </Badge>
@@ -368,7 +385,7 @@ export default function AdminProductsPage() {
                     <th className="py-3 font-medium">نوع</th>
                     <th className="py-3 font-medium">قیمت</th>
                     <th className="py-3 font-medium">دسته</th>
-                    <th className="py-3 font-medium">فیلد</th>
+                    <th className="py-3 font-medium">جزئیات نوع</th>
                     <th className="py-3 font-medium">وضعیت</th>
                     <th className="py-3 font-medium">عملیات</th>
                   </tr>
@@ -389,7 +406,13 @@ export default function AdminProductsPage() {
                       <td className="py-3">{productTypeLabel(product.type)}</td>
                       <td className="py-3">{formatCurrency(product.price)}</td>
                       <td className="py-3">{product.category?.title ?? "-"}</td>
-                      <td className="py-3">{product.fields.length}</td>
+                      <td className="py-3">
+                        {product.type === "SHAREBOX"
+                          ? product.shareboxCategoryName ?? "-"
+                          : product.type === "INSTANT_DELIVERY"
+                            ? product.deliveryPool?.title ?? "-"
+                            : `${product.fields.length} فیلد`}
+                      </td>
                       <td className="py-3">
                         <AdminStatusBadge type="boolean" value={product.isActive} />
                       </td>

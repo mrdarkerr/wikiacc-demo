@@ -1,3 +1,35 @@
+export type AdminTelegramSettings = {
+  enabled: boolean;
+  baseUrl: string;
+  destinationChatId: string | null;
+  hasBotToken: boolean;
+  botTokenHint: string | null;
+  orderEventsEnabled: boolean;
+  ticketEventsEnabled: boolean;
+  paymentEventsEnabled: boolean;
+  fulfillmentEventsEnabled: boolean;
+  updatedAt: string | null;
+};
+export type UpdateAdminTelegramSettings = Partial<Omit<AdminTelegramSettings, "hasBotToken" | "botTokenHint" | "updatedAt">> & { botToken?: string };
+export type AdminTelegramJob = {
+  id: string;
+  eventType: string;
+  status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+  attempts: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  lastErrorCode: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  availableAt: string;
+};
+export type AdminTelegramJobs = {
+  jobs: AdminTelegramJob[];
+  counts: Record<string, number>;
+  lastSentAt: string | null;
+  lastError: { lastErrorCode: string; updatedAt: string } | null;
+};
+
 export type ApiMeta = {
   page?: number;
   perPage?: number;
@@ -175,7 +207,7 @@ export type LoginResponse = {
   user: User;
 };
 
-export type ProductType = "CUSTOM_FORM" | "INSTANT_DELIVERY";
+export type ProductType = "CUSTOM_FORM" | "INSTANT_DELIVERY" | "SHAREBOX";
 export type FieldType = "TEXT" | "EMAIL" | "PHONE" | "TEXTAREA" | "SELECT";
 
 export type ProductField = {
@@ -227,6 +259,8 @@ export type Product = {
   sortOrder: number;
   category?: ProductCategory | null;
   deliveryPool?: DeliveryPoolSummary | null;
+  shareboxCategoryId: string | null;
+  shareboxCategoryName: string | null;
   features: ProductFeature[];
   fields: ProductField[];
   _count?: {
@@ -265,6 +299,26 @@ export type OrderDelivery = {
   id: string;
   contentSnapshot: string;
   deliveredAt: string;
+  shareboxFulfillmentId?: string | null;
+  sharebox?: { licenseKey: string; expiresAt: string; validityDays: number | null };
+};
+
+export type ShareBoxFulfillmentStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "RETRY"
+  | "REVIEW_REQUIRED"
+  | "DELIVERED";
+
+export type ShareBoxFulfillment = {
+  id: string;
+  unitIndex: number;
+  status: ShareBoxFulfillmentStatus;
+  attempts: number;
+  lastErrorCode: string | null;
+  nextAttemptAt: string | null;
+  receiptIssuedAt?: string | null;
+  receiptExpiresAt?: string | null;
 };
 
 export type OrderItem = {
@@ -275,6 +329,7 @@ export type OrderItem = {
   quantity: number;
   fieldValues: OrderFieldValue[];
   deliveries: OrderDelivery[];
+  shareboxFulfillments?: ShareBoxFulfillment[];
 };
 
 export type Order = {
@@ -493,6 +548,21 @@ export type AdminSmsSettings = {
   userNotificationsEnabled: boolean;
 };
 
+export type AdminShareBoxSettings = {
+  enabled: boolean;
+  hasApiKey: boolean;
+  apiKeyHint: string | null;
+  baseUrl: string;
+  updatedAt: string | null;
+};
+
+export type ShareBoxCategory = {
+  id: string;
+  name: string;
+  description: string | null;
+  validity_days: number;
+};
+
 export type AdminTicketMessage = TicketMessage & {
   sender?: Pick<User, "id" | "name" | "role"> | null;
 };
@@ -535,6 +605,7 @@ export type CreateAdminProductRequest = {
   price: number;
   categoryId?: string;
   deliveryPoolId?: string;
+  shareboxCategoryId?: string | null;
   isActive?: boolean;
   sortOrder?: number;
   features?: CreateAdminProductFeatureRequest[];
@@ -576,6 +647,11 @@ export type UpdateAdminSmsSettingsRequest = {
   ticketAnsweredPatternCode?: string;
   ticketCreatedPatternCode?: string;
   userNotificationsEnabled?: boolean;
+};
+
+export type UpdateAdminShareBoxSettingsRequest = {
+  enabled?: boolean;
+  apiKey?: string;
 };
 
 export type AdminWalletAdjustmentRequest = {

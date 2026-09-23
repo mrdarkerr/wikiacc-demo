@@ -1,3 +1,4 @@
+import { notifyTicket } from "../telegram/events.js";
 import { badRequest, notFound } from "../../shared/errors.js";
 import {
   enqueueTicketCreatedNotifications,
@@ -47,6 +48,7 @@ export async function createTicket(prisma, userId, input) {
       userPhone: user.phone,
     });
 
+    await notifyTicket(tx, ticket, ticket.messages[0].id, true);
     return ticket;
   });
 }
@@ -105,6 +107,7 @@ export async function addTicketMessage(prisma, userId, ticketId, input, isAdmin 
       userPhone: ticket.user.phone,
     });
 
+    if (!isAdmin) await notifyTicket(tx, ticket, message.id);
     return isAdmin
       ? tx.ticket.findUnique({
           where: { id: ticketId },
