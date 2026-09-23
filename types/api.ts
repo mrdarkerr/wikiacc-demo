@@ -1,3 +1,35 @@
+export type AdminTelegramSettings = {
+  enabled: boolean;
+  baseUrl: string;
+  destinationChatId: string | null;
+  hasBotToken: boolean;
+  botTokenHint: string | null;
+  orderEventsEnabled: boolean;
+  ticketEventsEnabled: boolean;
+  paymentEventsEnabled: boolean;
+  fulfillmentEventsEnabled: boolean;
+  updatedAt: string | null;
+};
+export type UpdateAdminTelegramSettings = Partial<Omit<AdminTelegramSettings, "hasBotToken" | "botTokenHint" | "updatedAt">> & { botToken?: string };
+export type AdminTelegramJob = {
+  id: string;
+  eventType: string;
+  status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+  attempts: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  lastErrorCode: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  availableAt: string;
+};
+export type AdminTelegramJobs = {
+  jobs: AdminTelegramJob[];
+  counts: Record<string, number>;
+  lastSentAt: string | null;
+  lastError: { lastErrorCode: string; updatedAt: string } | null;
+};
+
 export type ApiMeta = {
   page?: number;
   perPage?: number;

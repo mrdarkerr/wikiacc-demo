@@ -26,6 +26,10 @@ npm run dev
 
 API docs are available at `http://localhost:4001/docs`.
 
+## Telegram operational notifications
+
+The default-disabled integration is configured in `/admin/telegram`. See [Telegram notifications](docs/telegram-notifications.md) for architecture, event coverage, custom endpoints, migration, rollout and verification.
+
 ## Module pattern
 
 Each feature should keep the same shape:

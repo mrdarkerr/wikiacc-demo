@@ -56,6 +56,11 @@ const navItems = [
     label: "پیامک",
   },
   {
+    href: "/admin/telegram",
+    icon: MessageSquareText,
+    label: "اعلان‌های تلگرام",
+  },
+  {
     href: "/admin/sharebox",
     icon: KeyRound,
     label: "شیر‌باکس",

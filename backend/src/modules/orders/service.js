@@ -1,3 +1,5 @@
+import { notifyOrder } from "../telegram/events.js";
+import { TELEGRAM_EVENTS } from "../telegram/constants.js";
 import { findProductForOrder } from "../catalog/repository.js";
 import {
   allocateDeliveryItems,
@@ -345,6 +347,7 @@ export async function createOrder(
       userPhone: user.phone,
     });
 
+    await notifyOrder(tx, order.id);
     return order.id;
   });
 
@@ -402,6 +405,7 @@ export async function submitOrderFieldValues(prisma, userId, orderId, input) {
       },
     });
 
+    await notifyOrder(tx, orderId, TELEGRAM_EVENTS.ORDER_STATUS_CHANGED, order.status);
     return withoutAdminFields(await getUserOrder(tx, userId, orderId));
   });
 }

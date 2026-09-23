@@ -489,6 +489,49 @@ model SmsQueueJob {
   @@index([referenceType, referenceId])
 }
 
+model TelegramSettings {
+  id                         String   @id
+  enabled                    Boolean  @default(false)
+  baseUrl                    String   @default("https://api.telegram.org")
+  botTokenEncrypted          String?
+  botTokenHint               String?
+  botTokenFingerprint        String?
+  cooldownUntil              DateTime?
+  destinationChatId          String?
+  orderEventsEnabled         Boolean  @default(true)
+  ticketEventsEnabled        Boolean  @default(true)
+  paymentEventsEnabled       Boolean  @default(true)
+  fulfillmentEventsEnabled   Boolean  @default(true)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model TelegramQueueJob {
+  id                String    @id @default(cuid())
+  eventType         String
+  category          String
+  messageText       String
+  configFingerprint String
+  referenceType     String?
+  referenceId       String?
+  dedupeKey         String    @unique
+  status            String    @default("PENDING")
+  attempts          Int       @default(0)
+  maxAttempts       Int       @default(8)
+  availableAt       DateTime  @default(now())
+  leaseToken        String?
+  leaseExpiresAt    DateTime?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  providerMessageId String?
+  lastErrorCode     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, availableAt, createdAt])
+  @@index([referenceType, referenceId])
+}
+
 model AuthOtpChallenge {
   id                String         @id @default(cuid())
   phone             String

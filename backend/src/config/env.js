@@ -15,6 +15,9 @@ const envSchema = z.object({
   WEB_APP_URL: z.string().url().default("http://localhost:3000"),
   JWT_SECRET: z.string().min(16).default("change-this-dev-secret"),
   SMS_CONFIG_ENCRYPTION_KEY: z.string().min(16).optional(),
+  TELEGRAM_CONFIG_ENCRYPTION_KEY: z.string().min(16).optional(),
+  TELEGRAM_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
+  TELEGRAM_WORKER_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(3600).default(5),
   SHAREBOX_BASE_URL: z.string().url().default("https://sharebox.wikiacc.ir"),
   SHAREBOX_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
   SHAREBOX_WORKER_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(3600).default(10),
@@ -45,6 +48,10 @@ export const env = {
   ...parsedEnv,
   SMS_CONFIG_ENCRYPTION_KEY:
     parsedEnv.SMS_CONFIG_ENCRYPTION_KEY ?? parsedEnv.JWT_SECRET,
+  TELEGRAM_CONFIG_ENCRYPTION_KEY:
+    parsedEnv.TELEGRAM_CONFIG_ENCRYPTION_KEY ??
+    parsedEnv.SMS_CONFIG_ENCRYPTION_KEY ??
+    parsedEnv.JWT_SECRET,
 };
 
 const shareboxUrl = new URL(env.SHAREBOX_BASE_URL);

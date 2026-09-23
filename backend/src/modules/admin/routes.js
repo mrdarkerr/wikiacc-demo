@@ -1,3 +1,5 @@
+import { notifyOrder } from "../telegram/events.js";
+import { TELEGRAM_EVENTS } from "../telegram/constants.js";
 import { badRequest, conflict, notFound } from "../../shared/errors.js";
 import { created, ok } from "../../shared/http/reply.js";
 import { parse } from "../../shared/validation/parse.js";
@@ -190,6 +192,7 @@ export async function adminRoutes(app, options) {
         });
       }
 
+      await notifyOrder(tx, updated.id, TELEGRAM_EVENTS.ORDER_STATUS_CHANGED, current.status);
       return updated;
     });
     return ok(reply, { order });

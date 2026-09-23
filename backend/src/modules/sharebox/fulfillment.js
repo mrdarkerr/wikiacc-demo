@@ -1,3 +1,5 @@
+import { notifyOrder, notifyFulfillmentReview } from "../telegram/events.js";
+import { TELEGRAM_EVENTS } from "../telegram/constants.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -113,17 +115,13 @@ export async function createShareboxFulfillmentSnapshots(
 }
 
 async function updateClaimedJob(prisma, job, data) {
-  return prisma.shareboxFulfillment.updateMany({
-    where: {
-      id: job.id,
-      status: "PROCESSING",
-      leaseToken: job.leaseToken,
-    },
-    data: {
-      ...data,
-      leaseToken: null,
-      leaseExpiresAt: null,
-    },
+  return prisma.$transaction(async (tx) => {
+    const result = await tx.shareboxFulfillment.updateMany({
+      where: { id: job.id, status: "PROCESSING", leaseToken: job.leaseToken },
+      data: { ...data, leaseToken: null, leaseExpiresAt: null },
+    });
+    if (result.count && data.status === "REVIEW_REQUIRED") await notifyFulfillmentReview(tx, job);
+    return result;
   });
 }
 
@@ -198,6 +196,7 @@ async function persistReceipt(prisma, job, receipt, now) {
           leaseExpiresAt: null,
         },
       });
+      await notifyFulfillmentReview(tx, job);
       return false;
     }
 
@@ -242,6 +241,7 @@ async function persistReceipt(prisma, job, receipt, now) {
         data: { status: "DELIVERED" },
       });
       if (completed.count === 1) {
+        await notifyOrder(tx, order.id, TELEGRAM_EVENTS.ORDER_DELIVERED);
         await enqueueOrderCompletedNotification(tx, {
           orderId: order.id,
           userPhone: order.user.phone,

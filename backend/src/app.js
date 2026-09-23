@@ -18,6 +18,8 @@ import {
 } from "./modules/site-content/routes.js";
 import { ticketRoutes } from "./modules/tickets/routes.js";
 import { walletRoutes } from "./modules/wallet/routes.js";
+import { adminTelegramRoutes } from "./modules/telegram/admin-routes.js";
+import { startTelegramQueueWorker } from "./modules/telegram/queue.js";
 import { adminSmsRoutes } from "./modules/sms/admin-routes.js";
 import { startSmsQueueWorker } from "./modules/sms/queue.js";
 import { adminShareboxRoutes } from "./modules/sharebox/admin-routes.js";
@@ -134,6 +136,8 @@ export async function buildApp(options = {}) {
     client: shareboxClient,
   });
   await app.register(adminSmsRoutes, { prefix: "/api/v1/admin/sms" });
+  const telegramClientOptions = { fetchImpl: options.telegramFetch, timeoutMs: env.TELEGRAM_REQUEST_TIMEOUT_MS };
+  await app.register(adminTelegramRoutes, { prefix: "/api/v1/admin/telegram", clientOptions: telegramClientOptions });
   await app.register(adminSiteContentRoutes, {
     prefix: "/api/v1/admin/site-content",
   });
@@ -146,6 +150,15 @@ export async function buildApp(options = {}) {
     reconcileMinutes:
       options.jibitReconcileMinutes ?? env.JIBIT_RECONCILE_MINUTES,
   });
+
+  const telegramWorkerOptions = options.telegramWorkerOptions ?? {};
+  if (telegramWorkerOptions.enabled ?? env.NODE_ENV !== "test") {
+    const worker = startTelegramQueueWorker(app.prisma, {
+      ...telegramClientOptions, intervalMs: env.TELEGRAM_WORKER_INTERVAL_SECONDS * 1000,
+      webAppUrl: options.webAppUrl ?? env.WEB_APP_URL, ...telegramWorkerOptions, logger: app.log,
+    });
+    app.addHook("onClose", () => worker.stop());
+  }
 
   const smsQueueOptions = options.smsQueueOptions ?? {};
   const smsQueueEnabled =

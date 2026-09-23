@@ -4,6 +4,9 @@ import type {
   AdminDeliveryPool,
   AdminOrder,
   AdminShareBoxSettings,
+  AdminTelegramSettings,
+  UpdateAdminTelegramSettings,
+  AdminTelegramJobs,
   AdminSmsSender,
   AdminSmsSettings,
   AdminTicket,
@@ -391,6 +394,17 @@ export const api = {
         apiFetch<{ senderId: string }>(`/admin/sms/senders/${id}`, {
           method: "DELETE",
         }),
+    },
+    telegram: {
+      getSettings: () => apiFetch<{ settings: AdminTelegramSettings }>("/admin/telegram/settings"),
+      updateSettings: (body: UpdateAdminTelegramSettings) =>
+        apiFetch<{ settings: AdminTelegramSettings }>("/admin/telegram/settings", { body, method: "PATCH" }),
+      test: (mode: "connection" | "message") =>
+        apiFetch<{ connected?: boolean; messageId?: string }>("/admin/telegram/test", { body: { mode }, method: "POST" }),
+      jobs: () => apiFetch<AdminTelegramJobs>("/admin/telegram/jobs"),
+      retry: (id: string) => apiFetch<{ queued: boolean }>(`/admin/telegram/jobs/${id}/retry`, {
+        body: { useCurrentConfiguration: true }, method: "POST",
+      }),
     },
     sharebox: {
       getSettings: () =>

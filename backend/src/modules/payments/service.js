@@ -1,3 +1,5 @@
+import { notifyOrder, notifyPayment, notifyPaymentFailure } from "../telegram/events.js";
+import { TELEGRAM_EVENTS as TE } from "../telegram/constants.js";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -94,10 +96,11 @@ export async function reconcileStaleJibitPayments(
         attempt.id,
         "JIBIT_PURCHASE_ID_MISSING",
       );
+      await notifyPaymentFailure(prisma, attempt, TE.PAYMENT_RECONCILIATION_FAILED, "JIBIT_PURCHASE_ID_MISSING", logger);
       continue;
     }
     try {
-      await verifyJibitPayment(prisma, client, attempt, { reconcileMinutes });
+      await verifyJibitPayment(prisma, client, attempt, { reconcileMinutes, failureEvent: TE.PAYMENT_RECONCILIATION_FAILED, logger });
     } catch (error) {
       errors += 1;
       logger?.warn?.(
@@ -206,18 +209,18 @@ export async function initiateJibitPayment(
       attemptId,
       typeof error?.code === "string" ? error.code : "JIBIT_INIT_FAILED",
     );
+    await notifyPaymentFailure(prisma, pending.attempt, TE.PAYMENT_INITIATION_FAILED, error?.code, logger);
     throw error;
   }
 }
 
 async function markReviewRequired(prisma, attempt, providerStatus, code) {
-  await prisma.paymentAttempt.updateMany({
-    where: { id: attempt.id, status: { in: ACTIVE_ATTEMPT_STATUSES } },
-    data: {
-      status: "REVIEW_REQUIRED",
-      providerStatus,
-      lastErrorCode: code,
-    },
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.paymentAttempt.updateMany({
+      where: { id: attempt.id, status: { in: ACTIVE_ATTEMPT_STATUSES } },
+      data: { status: "REVIEW_REQUIRED", providerStatus, lastErrorCode: code },
+    });
+    if (updated.count) await notifyPayment(tx, attempt, TE.PAYMENT_REVIEW_REQUIRED, code);
   });
   return paymentResult("review", attempt.orderId);
 }
@@ -312,11 +315,20 @@ async function markSuccessful(prisma, attempt, purchase) {
         lastErrorCode: null,
       },
     });
+    await notifyOrder(tx, current.orderId);
     return paymentResult("successful", current.orderId);
   });
 }
 
-export async function verifyJibitPayment(
+export async function verifyJibitPayment(prisma, client, attempt, options = {}) {
+  try { return await verifyJibitPaymentState(prisma, client, attempt, options); }
+  catch (error) {
+    await notifyPaymentFailure(prisma, attempt, options.failureEvent ?? TE.PAYMENT_VERIFICATION_FAILED, error?.code, options.logger);
+    throw error;
+  }
+}
+
+async function verifyJibitPaymentState(
   prisma,
   client,
   attempt,
