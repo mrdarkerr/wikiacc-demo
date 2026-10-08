@@ -21,6 +21,8 @@ const envSchema = z.object({
   SHAREBOX_BASE_URL: z.string().url().default("https://sharebox.wikiacc.ir"),
   SHAREBOX_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
   SHAREBOX_WORKER_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(3600).default(10),
+  JOBS_ENABLED: booleanFromString.default(true),
+  WALLEX_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(8000),
   SESSION_COOKIE_NAME: z.string().min(1).default("wikiacc_session"),
   COOKIE_SECURE: booleanFromString.default(false),
   JIBIT_ENABLED: booleanFromString.default(false),

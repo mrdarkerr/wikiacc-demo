@@ -1,3 +1,6 @@
+import { MAX_TOMAN } from "../pricing/calculator.js";
+import { quoteProduct } from "../pricing/service.js";
+import { pricingSnapshot, publicOrder } from "../pricing/order-snapshot.js";
 import { notifyOrder } from "../telegram/events.js";
 import { TELEGRAM_EVENTS } from "../telegram/constants.js";
 import { findProductForOrder } from "../catalog/repository.js";
@@ -23,11 +26,7 @@ import { getShareboxSettings } from "../sharebox/settings.js";
 import { countUserOrders, getUserOrder, listUserOrders } from "./repository.js";
 
 function withoutAdminFields(order) {
-  if (!order) return order;
-
-  const publicOrder = { ...order };
-  delete publicOrder.adminNote;
-  return publicOrder;
+  return publicOrder(order);
 }
 
 function normalizeFieldValues(fields, values = {}) {
@@ -93,9 +92,10 @@ export async function createPendingJibitOrder(
       shareboxBaseUrl,
     );
     const quantity = input.quantity ?? 1;
-    const totalAmount = product.price * quantity;
+    const pricing = await quoteProduct(tx, product, quantity);
+    const totalAmount = pricing.totalAmount;
     const providerAmountRial = totalAmount * 10;
-    if (!Number.isSafeInteger(providerAmountRial) || providerAmountRial <= 0) {
+    if (!Number.isSafeInteger(providerAmountRial) || providerAmountRial <= 0 || providerAmountRial > MAX_TOMAN) {
       throw badRequest("PAYMENT_AMOUNT_INVALID", "Payment amount is invalid");
     }
     const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
@@ -138,7 +138,7 @@ export async function createPendingJibitOrder(
         orderId: order.id,
         productId: product.id,
         titleSnapshot: product.title,
-        priceSnapshot: product.price,
+        ...pricingSnapshot(pricing),
         productTypeSnapshot: product.type,
         quantity,
       },
@@ -245,7 +245,8 @@ export async function createOrder(
       shareboxBaseUrl,
     );
     const quantity = input.quantity ?? 1;
-    const totalAmount = product.price * quantity;
+    const pricing = await quoteProduct(tx, product, quantity);
+    const totalAmount = pricing.totalAmount;
     const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
 
     if (product.type === "INSTANT_DELIVERY") {
@@ -316,7 +317,7 @@ export async function createOrder(
         orderId: order.id,
         productId: product.id,
         titleSnapshot: product.title,
-        priceSnapshot: product.price,
+        ...pricingSnapshot(pricing),
         productTypeSnapshot: product.type,
         quantity,
       },

@@ -24,7 +24,11 @@ try {
   if (names.has("TelegramSettings") || names.has("TelegramQueueJob")) {
     if (!(names.has("TelegramSettings") && names.has("TelegramQueueJob"))) throw new Error("Partial Telegram schema; reconcile before retrying");
     // Validate against the generated client rather than treating two table names as proof of compatibility.
-    await prisma.telegramSettings.findFirst();
+    // Select this migration's fields only: future additive migrations may not be applied yet.
+    await prisma.telegramSettings.findFirst({ select: { id: true, enabled: true, baseUrl: true,
+      botTokenEncrypted: true, botTokenHint: true, botTokenFingerprint: true, cooldownUntil: true,
+      destinationChatId: true, orderEventsEnabled: true, ticketEventsEnabled: true,
+      paymentEventsEnabled: true, fulfillmentEventsEnabled: true, createdAt: true, updatedAt: true } });
     await prisma.telegramQueueJob.findFirst();
     const indexes = await prisma.$queryRawUnsafe('PRAGMA index_list("TelegramQueueJob")');
     const dedupe = indexes.find((index) => index.name === "TelegramQueueJob_dedupeKey_key");

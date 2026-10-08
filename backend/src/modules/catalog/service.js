@@ -1,3 +1,6 @@
+import { calculatePrice } from "../pricing/calculator.js";
+import { publicProduct } from "../pricing/service.js";
+import { getEffectiveRate } from "../exchange-rates/service.js";
 import { badRequest, notFound } from "../../shared/errors.js";
 import {
   findActiveProductBySlug,
@@ -10,7 +13,8 @@ export async function getCategories(prisma) {
 }
 
 export async function getProducts(prisma, filters) {
-  return listActiveProducts(prisma, filters);
+  const [products, rate] = await Promise.all([listActiveProducts(prisma, filters), getEffectiveRate(prisma)]);
+  return products.map((product) => publicProduct(product, calculatePrice(product, rate.rateToman).unitPrice));
 }
 
 export async function getProductBySlug(prisma, slug) {
@@ -18,7 +22,8 @@ export async function getProductBySlug(prisma, slug) {
   if (!product) {
     throw notFound("PRODUCT_NOT_FOUND", "Product was not found");
   }
-  return product;
+  const rate = await getEffectiveRate(prisma);
+  return publicProduct(product, calculatePrice(product, rate.rateToman).unitPrice);
 }
 
 export function validateProductInput(input) {

@@ -30,6 +30,7 @@ function paginationMeta(page, perPage, total) {
 }
 
 export async function orderRoutes(app, options) {
+  app.addHook("onSend", async (_request, reply, payload) => { reply.header("Cache-Control", "no-store"); return payload; });
   app.post("/", { preHandler: app.authenticate }, async (request, reply) => {
     const input = parse(createOrderSchema, request.body);
     if (input.paymentMethod === "JIBIT") {
