@@ -17,12 +17,15 @@ export const productFeatureInputSchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
-export const createProductSchema = z.object({
+const productInputSchema = z.object({
   slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/),
   title: z.string().trim().min(2).max(180),
   description: z.string().trim().max(2000).optional(),
   type: productTypeSchema,
-  price: z.number().int().nonnegative(),
+  price: z.number().int().nonnegative().max(2147483647).optional(),
+  priceCurrency: z.enum(["TOMAN", "USD"]).optional(),
+  basePrice: z.union([z.string().trim().min(1).max(24), z.number().nonnegative()]).optional(),
+  profit: z.union([z.string().trim().max(32), z.number().nonnegative()]).optional(),
   categoryId: z.string().optional(),
   deliveryPoolId: z.string().nullable().optional(),
   shareboxCategoryId: z.string().uuid().nullable().optional(),
@@ -32,7 +35,12 @@ export const createProductSchema = z.object({
   fields: z.array(productFieldInputSchema).default([]),
 });
 
-export const updateProductSchema = createProductSchema
+export const createProductSchema = productInputSchema.refine(
+  (input) => input.price !== undefined || input.basePrice !== undefined,
+  { message: "price or basePrice is required", path: ["basePrice"] },
+);
+
+export const updateProductSchema = productInputSchema
   .partial()
   .extend({
     features: z.array(productFeatureInputSchema).max(12).optional(),

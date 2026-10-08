@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   Boxes,
+  CircleDollarSign,
   ClipboardList,
   Headphones,
   LayoutDashboard,
@@ -64,6 +65,11 @@ const navItems = [
     href: "/admin/sharebox",
     icon: KeyRound,
     label: "شیر‌باکس",
+  },
+  {
+    href: "/admin/pricing",
+    icon: CircleDollarSign,
+    label: "قیمت‌گذاری و نرخ ارز",
   },
   {
     href: "/admin/orders",

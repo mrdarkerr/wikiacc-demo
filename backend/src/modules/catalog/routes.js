@@ -9,6 +9,7 @@ const productListQuerySchema = z.object({
 });
 
 export async function catalogRoutes(app) {
+  app.addHook("onSend", async (_request, reply, payload) => { reply.header("Cache-Control", "no-store"); return payload; });
   app.get("/categories", async (request, reply) => {
     const categories = await getCategories(app.prisma);
     return ok(reply, { categories });

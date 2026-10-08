@@ -1,3 +1,6 @@
+import { prepareProductPricing, adminProduct } from "../pricing/service.js";
+import { calculatePrice } from "../pricing/calculator.js";
+import { getEffectiveRate } from "../exchange-rates/service.js";
 import { notifyOrder } from "../telegram/events.js";
 import { TELEGRAM_EVENTS } from "../telegram/constants.js";
 import { badRequest, conflict, notFound } from "../../shared/errors.js";
@@ -282,12 +285,16 @@ export async function adminRoutes(app, options) {
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
-    return ok(reply, { products });
+    const rate = await getEffectiveRate(app.prisma);
+    return ok(reply, { products: products.map((product) => adminProduct(product, rate)) });
   });
 
   app.post("/products", async (request, reply) => {
     const input = parse(createProductSchema, request.body);
     validateProductInput(input);
+    const pricingData = prepareProductPricing(input);
+    const pricingRate = await getEffectiveRate(app.prisma);
+    calculatePrice(pricingData, pricingRate.rateToman);
     const shareboxCategory =
       input.type === "SHAREBOX"
         ? await resolveShareboxCategory(
@@ -305,7 +312,7 @@ export async function adminRoutes(app, options) {
         type: input.type,
         shareboxCategoryId: shareboxCategory?.id,
         shareboxCategoryName: shareboxCategory?.name,
-        price: input.price,
+        ...pricingData,
         categoryId: input.categoryId,
         deliveryPoolId: input.deliveryPoolId,
         isActive: input.isActive,
@@ -326,7 +333,7 @@ export async function adminRoutes(app, options) {
       },
     });
 
-    return created(reply, { product });
+    return created(reply, { product: adminProduct(product, pricingRate) });
   });
 
   app.patch("/products/:id", async (request, reply) => {
@@ -341,6 +348,9 @@ export async function adminRoutes(app, options) {
       );
     }
 
+    const pricingData = prepareProductPricing(input, current);
+    const pricingRate = await getEffectiveRate(app.prisma);
+    calculatePrice(pricingData, pricingRate.rateToman);
     const merged = {
       type: input.type ?? current.type,
       deliveryPoolId:
@@ -367,6 +377,9 @@ export async function adminRoutes(app, options) {
         : null;
 
     const product = await app.prisma.$transaction(async (tx) => {
+      const latestPricing = await findProductOrThrow(tx, params.id);
+      const pricingData = prepareProductPricing(input, latestPricing);
+      calculatePrice(pricingData, pricingRate.rateToman);
       if (input.fields) {
         await tx.productField.deleteMany({ where: { productId: params.id } });
       }
@@ -393,7 +406,7 @@ export async function adminRoutes(app, options) {
                 shareboxCategoryId: null,
                 shareboxCategoryName: null,
               }),
-          price: input.price,
+          ...pricingData,
           categoryId: input.categoryId,
           deliveryPoolId: input.deliveryPoolId,
           isActive: input.isActive,
@@ -416,7 +429,7 @@ export async function adminRoutes(app, options) {
       });
     });
 
-    return ok(reply, { product });
+    return ok(reply, { product: adminProduct(product, pricingRate) });
   });
 
   app.patch("/products/:id/active", async (request, reply) => {

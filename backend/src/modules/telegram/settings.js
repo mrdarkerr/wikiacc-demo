@@ -9,6 +9,7 @@ import { TELEGRAM_SETTINGS_ID } from "./constants.js";
 export const categoryFields = Object.freeze({
   ORDER: "orderEventsEnabled", TICKET: "ticketEventsEnabled",
   PAYMENT: "paymentEventsEnabled", FULFILLMENT: "fulfillmentEventsEnabled",
+  EXCHANGE_RATE: "exchangeRateEventsEnabled",
 });
 export const settingsSchema = z.object({
   enabled: z.boolean().optional(),
@@ -23,6 +24,7 @@ export const settingsSchema = z.object({
   ticketEventsEnabled: z.boolean().optional(),
   paymentEventsEnabled: z.boolean().optional(),
   fulfillmentEventsEnabled: z.boolean().optional(),
+  exchangeRateEventsEnabled: z.boolean().optional(),
 }).strict();
 
 export function getTelegramSettings(prisma) {

@@ -3,6 +3,12 @@ import formbody from "@fastify/formbody";
 import rateLimit from "@fastify/rate-limit";
 
 import { env } from "./config/env.js";
+import { createScheduler } from "./modules/jobs/scheduler.js";
+import { registerTicketAutoCloseJob } from "./modules/jobs/ticket-auto-close.js";
+import { createWallexClient, WallexError } from "./modules/exchange-rates/wallex-client.js";
+import { synchronizeRate } from "./modules/exchange-rates/service.js";
+import { checkRateHealth } from "./modules/exchange-rates/alerts.js";
+import { adminPricingRoutes } from "./modules/pricing/admin-routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { catalogRoutes } from "./modules/catalog/routes.js";
@@ -131,6 +137,7 @@ export async function buildApp(options = {}) {
     prefix: "/api/v1/admin",
     shareboxClient,
   });
+  await app.register(adminPricingRoutes, { prefix: "/api/v1/admin" });
   await app.register(adminShareboxRoutes, {
     prefix: "/api/v1/admin/sharebox",
     client: shareboxClient,
@@ -193,6 +200,31 @@ export async function buildApp(options = {}) {
       await shareboxWorker.stop();
     });
   }
+
+  const wallexClient = options.wallexClient ?? createWallexClient({
+    fetchImpl: options.wallexFetch, timeoutMs: env.WALLEX_REQUEST_TIMEOUT_MS,
+  });
+  const schedulerOptions = options.schedulerOptions ?? {};
+  const scheduler = createScheduler(app.prisma, { ...schedulerOptions, logger: app.log });
+  scheduler.register({ name: "wallex-usd-toman", intervalMs: 120000, timeoutMs: 70000,
+    handler: async ({ signal, withLease, now }) => {
+      const result = await synchronizeRate(app.prisma, wallexClient, { signal, now, transaction: withLease });
+      await withLease((tx) => checkRateHealth(tx, { now: now(), errorCode: result.errorCode }));
+      if (!result.ok) throw new WallexError(result.errorCode);
+    },
+  });
+  scheduler.register({ name: "exchange-rate-health", intervalMs: 60000,
+    handler: ({ withLease, now }) => withLease((tx) => checkRateHealth(tx, { now: now() })),
+  });
+  app.decorate("scheduler", scheduler);
+  registerTicketAutoCloseJob(scheduler, {
+    enabled: env.TICKET_AUTO_CLOSE_ENABLED,
+    inactivityHours: env.TICKET_AUTO_CLOSE_AFTER_HOURS,
+    intervalSeconds: env.TICKET_AUTO_CLOSE_INTERVAL_SECONDS,
+    logger: app.log,
+  });
+  app.addHook("onClose", () => scheduler.stop());
+  if (schedulerOptions.enabled ?? (env.JOBS_ENABLED && env.NODE_ENV !== "test")) scheduler.start();
 
   return app;
 }
