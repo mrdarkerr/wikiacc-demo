@@ -419,6 +419,8 @@ model TicketMessage {
   body      String
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
 }
 
 model SiteContent {
