@@ -7,6 +7,7 @@ import { createScheduler } from "./modules/jobs/scheduler.js";
 import { createWallexClient, WallexError } from "./modules/exchange-rates/wallex-client.js";
 import { synchronizeRate } from "./modules/exchange-rates/service.js";
 import { checkRateHealth } from "./modules/exchange-rates/alerts.js";
+import { adminPricingRoutes } from "./modules/pricing/admin-routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { catalogRoutes } from "./modules/catalog/routes.js";
@@ -135,6 +136,7 @@ export async function buildApp(options = {}) {
     prefix: "/api/v1/admin",
     shareboxClient,
   });
+  await app.register(adminPricingRoutes, { prefix: "/api/v1/admin" });
   await app.register(adminShareboxRoutes, {
     prefix: "/api/v1/admin/sharebox",
     client: shareboxClient,
