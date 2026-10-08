@@ -4,6 +4,7 @@ import rateLimit from "@fastify/rate-limit";
 
 import { env } from "./config/env.js";
 import { createScheduler } from "./modules/jobs/scheduler.js";
+import { registerTicketAutoCloseJob } from "./modules/jobs/ticket-auto-close.js";
 import { createWallexClient, WallexError } from "./modules/exchange-rates/wallex-client.js";
 import { synchronizeRate } from "./modules/exchange-rates/service.js";
 import { checkRateHealth } from "./modules/exchange-rates/alerts.js";
@@ -216,6 +217,12 @@ export async function buildApp(options = {}) {
     handler: ({ withLease, now }) => withLease((tx) => checkRateHealth(tx, { now: now() })),
   });
   app.decorate("scheduler", scheduler);
+  registerTicketAutoCloseJob(scheduler, {
+    enabled: env.TICKET_AUTO_CLOSE_ENABLED,
+    inactivityHours: env.TICKET_AUTO_CLOSE_AFTER_HOURS,
+    intervalSeconds: env.TICKET_AUTO_CLOSE_INTERVAL_SECONDS,
+    logger: app.log,
+  });
   app.addHook("onClose", () => scheduler.stop());
   if (schedulerOptions.enabled ?? (env.JOBS_ENABLED && env.NODE_ENV !== "test")) scheduler.start();
 
