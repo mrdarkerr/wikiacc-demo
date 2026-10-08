@@ -371,6 +371,9 @@ describe.sequential("Additive migration", () => {
     for (let count = 0; count < 2; count++) {
       execFileSync(process.execPath, args, { cwd: backendDir, env: { ...process.env, TELEGRAM_MIGRATION_OFFLINE_ACK: "1" } });
     }
+    // This fixture deliberately drops Telegram tables; apply the later pricing extension
+    // before exercising today's generated client against the recreated legacy schema.
+    await app.prisma.$executeRawUnsafe('ALTER TABLE "TelegramSettings" ADD COLUMN "exchangeRateEventsEnabled" BOOLEAN NOT NULL DEFAULT true');
     expect(await app.prisma.user.count()).toBe(userCount);
     expect(await app.prisma.order.count()).toBe(orderCount);
     expect(await getTelegramSettings(app.prisma)).toBeNull();

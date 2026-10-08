@@ -154,6 +154,10 @@ model Product {
   shareboxCategoryId   String?
   shareboxCategoryName String?
   price          Int
+  priceCurrency  String           @default("TOMAN")
+  basePrice      String?
+  profitType     String           @default("TOMAN")
+  profitValue    String           @default("0")
   isActive       Boolean          @default(true)
   archivedAt     DateTime?
   sortOrder      Int              @default(0)
@@ -253,6 +257,16 @@ model OrderItem {
   shareboxFulfillments ShareboxFulfillment[]
   titleSnapshot       String
   priceSnapshot       Int
+  priceCurrencySnapshot String?
+  basePriceSnapshot     String?
+  profitTypeSnapshot    String?
+  profitValueSnapshot   String?
+  exchangeRateSnapshot  Int?
+  rateSourceSnapshot    String?
+  rateFetchedAtSnapshot DateTime?
+  baseTomanSnapshot     Int?
+  profitTomanSnapshot   Int?
+  totalProfitSnapshot   Int?
   productTypeSnapshot ProductType
   quantity            Int               @default(1)
   createdAt           DateTime          @default(now())
@@ -502,6 +516,7 @@ model TelegramSettings {
   ticketEventsEnabled        Boolean  @default(true)
   paymentEventsEnabled       Boolean  @default(true)
   fulfillmentEventsEnabled   Boolean  @default(true)
+  exchangeRateEventsEnabled  Boolean  @default(true)
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 }
@@ -530,6 +545,51 @@ model TelegramQueueJob {
 
   @@index([status, availableAt, createdAt])
   @@index([referenceType, referenceId])
+}
+
+
+model PricingSettings {
+  id                String   @id @default("default")
+  fallbackRateToman  Int      @default(270000)
+  staleAfterSeconds Int      @default(300)
+  alertCooldownSeconds Int   @default(1800)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ExchangeRate {
+  id         String   @id @default(cuid())
+  source     String   @default("WALLEX")
+  symbol     String   @default("USDTTMN")
+  rateToman  Int
+  fetchedAt  DateTime @default(now())
+  @@index([fetchedAt])
+}
+
+model ExchangeRateSyncState {
+  id                String   @id @default("USD_TOMAN")
+  lastAttemptAt     DateTime?
+  lastSuccessAt     DateTime?
+  lastErrorCode     String?
+  incidentId        String?
+  incidentStartedAt DateTime?
+  lastAlertAt       DateTime?
+  updatedAt         DateTime @updatedAt
+}
+
+model ScheduledJob {
+  name           String   @id
+  nextRunAt      DateTime @default(now())
+  leaseToken     String?
+  leaseExpiresAt DateTime?
+  lastStartedAt  DateTime?
+  lastFinishedAt DateTime?
+  lastSuccessAt  DateTime?
+  lastErrorCode  String?
+  runCount       Int      @default(0)
+  failureCount   Int      @default(0)
+  updatedAt      DateTime @updatedAt
+  @@index([nextRunAt, leaseExpiresAt])
 }
 
 model AuthOtpChallenge {
