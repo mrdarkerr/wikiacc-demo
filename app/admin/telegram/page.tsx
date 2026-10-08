@@ -16,6 +16,7 @@ const categories = [
   ["ticketEventsEnabled", "تیکت جدید و پیام مشتری"],
   ["paymentEventsEnabled", "اختلال فنی و پرداخت نیازمند بررسی"],
   ["fulfillmentEventsEnabled", "تحویل ShareBox نیازمند بررسی"],
+  ["exchangeRateEventsEnabled", "اختلال، قدیمی شدن نرخ ارز و بازیابی والکس"],
 ] as const;
 const statuses: Record<string, string> = { PENDING: "در انتظار", PROCESSING: "در حال ارسال", SENT: "ارسال‌شده", FAILED: "ناموفق" };
 const eventLabels: Record<string, string> = {
@@ -24,6 +25,7 @@ const eventLabels: Record<string, string> = {
   PAYMENT_INITIATION_FAILED: "خطای شروع پرداخت", PAYMENT_VERIFICATION_FAILED: "خطای تأیید پرداخت",
   PAYMENT_RECONCILIATION_FAILED: "خطای پیگیری پرداخت", PAYMENT_REVIEW_REQUIRED: "پرداخت نیازمند بررسی",
   SHAREBOX_REVIEW_REQUIRED: "تحویل نیازمند بررسی",
+  EXCHANGE_RATE_STALE: "اختلال یا قدیمی شدن نرخ ارز", EXCHANGE_RATE_RECOVERED: "بازیابی دریافت نرخ ارز",
 };
 const errors: Record<string, string> = {
   TELEGRAM_CONFIG_REQUIRED: "توکن بات و آیدی عددی مقصد را وارد و ذخیره کنید.",

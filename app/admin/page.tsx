@@ -23,8 +23,9 @@ import {
 import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
+import { ExchangeRateCard } from "@/components/admin/exchange-rate-card";
 import { api, ApiError } from "@/lib/api";
-import type { AdminOrder, AdminTicket, AdminUser, Product } from "@/types/api";
+import type { AdminOrder, AdminTicket, AdminUser, AdminProduct as Product } from "@/types/api";
 
 type DashboardData = {
   orders: AdminOrder[];
@@ -255,6 +256,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <ExchangeRateCard dashboard />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {metrics.map((metric) => {
           const Icon = metric.icon;

@@ -1,6 +1,6 @@
 # Dynamic pricing backend
 
-Backend-only feature. Frontend forms/dashboard rendering are deliberately not changed.
+Backend contract for dynamic pricing. The separate frontend integration is documented in [frontend-dynamic-pricing.md](frontend-dynamic-pricing.md).
 
 ## Money contract
 
@@ -29,6 +29,10 @@ All paths are under `/api/v1/admin`; rate/pricing status responses are `Cache-Co
 - Telegram settings now accept `exchangeRateEventsEnabled` (default true). Global Telegram integration still defaults OFF and requires existing bot/recipient configuration.
 
 Public catalog and every customer order response use explicit serializers: no cost, margin definition or private financial snapshots. Embedded order products use the order's frozen final unit price, not today's product price. Public catalog reads have no network I/O and one shared DB rate per list response. The next frontend phase must also avoid stale Next.js/static caches and add customer handling for a price changing between browsing and purchase.
+
+### Checkout price consent
+
+`POST /api/v1/orders` additionally accepts optional `expectedUnitPrice` (integer TOMAN, 0..2147483647). Both wallet and Jibit compare it with the freshly calculated final unit price **inside the order transaction**, before any order/payment/wallet writes or provider call. A mismatch returns `409 PRICE_CHANGED` with only `{ unitPrice, totalAmount }` in `error.details`; the client must display the new price and obtain another explicit confirmation. Omitting the field preserves legacy clients. This guard requires no schema migration. Frontend refresh alone cannot provide this guarantee.
 
 ## Order snapshots
 

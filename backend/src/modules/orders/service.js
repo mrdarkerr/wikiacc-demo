@@ -93,6 +93,11 @@ export async function createPendingJibitOrder(
     );
     const quantity = input.quantity ?? 1;
     const pricing = await quoteProduct(tx, product, quantity);
+    if (input.expectedUnitPrice !== undefined && input.expectedUnitPrice !== pricing.unitPrice) {
+      throw conflict("PRICE_CHANGED", "Product price has changed; confirm the current price", {
+        unitPrice: pricing.unitPrice, totalAmount: pricing.totalAmount,
+      });
+    }
     const totalAmount = pricing.totalAmount;
     const providerAmountRial = totalAmount * 10;
     if (!Number.isSafeInteger(providerAmountRial) || providerAmountRial <= 0 || providerAmountRial > MAX_TOMAN) {
@@ -246,6 +251,11 @@ export async function createOrder(
     );
     const quantity = input.quantity ?? 1;
     const pricing = await quoteProduct(tx, product, quantity);
+    if (input.expectedUnitPrice !== undefined && input.expectedUnitPrice !== pricing.unitPrice) {
+      throw conflict("PRICE_CHANGED", "Product price has changed; confirm the current price", {
+        unitPrice: pricing.unitPrice, totalAmount: pricing.totalAmount,
+      });
+    }
     const totalAmount = pricing.totalAmount;
     const fieldState = normalizeFieldValues(product.fields, input.fieldValues);
 

@@ -20,6 +20,7 @@ import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
+import { OrderFinancialSnapshot } from "@/components/admin/order-financial-snapshot";
 import {
   shareBoxFulfillmentErrorLabel,
   shareBoxFulfillmentLabels,
@@ -306,6 +307,8 @@ export default function AdminOrderDetailPage() {
           <p className="mt-2 font-medium">{formatDate(order.createdAt)}</p>
         </div>
       </div>
+
+      <OrderFinancialSnapshot items={order.items} />
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         <AdminSection title="اطلاعات سفارش">

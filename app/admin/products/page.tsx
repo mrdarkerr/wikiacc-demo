@@ -29,7 +29,8 @@ import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
-import type { Product, ProductCategory, ProductType } from "@/types/api";
+import { profitInput } from "@/lib/pricing";
+import type { AdminProduct as Product, ProductCategory, ProductType } from "@/types/api";
 
 const PRODUCTS_PER_PAGE = 10;
 type ProductTypeFilter = ProductType | "ALL";
@@ -335,8 +336,9 @@ export default function AdminProductsPage() {
                     </Badge>
                   </div>
                   <p className="mt-3 text-sm font-semibold">
-                    {formatCurrency(product.price)}
+                    {product.pricing ? formatCurrency(product.pricing.unitPrice) : "قیمت فروش در دسترس نیست"}
                   </p>
+                  <p className="mt-2 text-xs text-muted-foreground">پایه: <bdi>{product.basePrice ?? product.price} {product.priceCurrency === "USD" ? "دلار" : "تومان"}</bdi> · سود: <bdi dir="ltr">{profitInput(product)}</bdi></p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/admin/products/new?edit=${product.id}`}>
@@ -404,7 +406,11 @@ export default function AdminProductsPage() {
                         {product.slug}
                       </td>
                       <td className="py-3">{productTypeLabel(product.type)}</td>
-                      <td className="py-3">{formatCurrency(product.price)}</td>
+                      <td className="py-3">
+                        <p className="font-semibold">{product.pricing ? formatCurrency(product.pricing.unitPrice) : "قیمت فروش در دسترس نیست"}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">پایه: <bdi>{product.basePrice ?? product.price} {product.priceCurrency === "USD" ? "دلار" : "تومان"}</bdi></p>
+                        <p className="mt-1 text-xs text-muted-foreground">سود: <bdi dir="ltr">{profitInput(product)}</bdi></p>
+                      </td>
                       <td className="py-3">{product.category?.title ?? "-"}</td>
                       <td className="py-3">
                         {product.type === "SHAREBOX"
