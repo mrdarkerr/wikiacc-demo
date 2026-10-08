@@ -30,4 +30,9 @@ describe("Wallex client", () => {
     const controller = new AbortController(); controller.abort();
     await expect(createWallexClient({ fetchImpl: () => new Promise(() => {}) }).fetchRate({ signal: controller.signal })).rejects.toMatchObject({ code: "WALLEX_ABORTED" });
   });
+  it("also bounds a stalled body after successful HTTP headers", async () => {
+    const { createWallexClient } = await import("../src/modules/exchange-rates/wallex-client.js");
+    const fetchImpl = async () => ({ ok: true, json: () => new Promise(() => {}) });
+    await expect(createWallexClient({ fetchImpl, timeoutMs: 10, attempts: 1 }).fetchRate()).rejects.toMatchObject({ code: "WALLEX_TIMEOUT" });
+  });
 });

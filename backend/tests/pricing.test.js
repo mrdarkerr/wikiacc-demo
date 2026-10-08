@@ -44,4 +44,10 @@ describe("exact pricing", () => {
     expect(() => calculatePrice({ price: 2147483647, profitValue: "1" }, null)).toThrow();
     expect(() => calculatePrice({ price: 2147483647 }, null, 2)).toThrow();
   });
+  it("accepts exact money and quantity boundaries", async () => {
+    const { calculatePrice } = await load();
+    expect(calculatePrice({ price: 2147483647 }, null).unitPrice).toBe(2147483647);
+    expect(calculatePrice({ price: 1 }, null, 10000).totalAmount).toBe(10000);
+    expect(() => calculatePrice({ basePrice: "2147483648" }, null)).toThrow();
+  });
 });

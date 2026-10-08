@@ -4,11 +4,12 @@ process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "pricing-jobs-test-secret-only";
 const db = createTestDatabase("pricing-jobs");
 let app;
+let clock = new Date("2026-10-08T08:00:00Z");
+const fetchRate = vi.fn(async () => ({ rateToman: 270000, source: "WALLEX", symbol: "USDTTMN" }));
 afterAll(async () => { await app?.close(); await db.close(); });
 it("registers the 120-second Wallex job and stores its result without requests starting test workers", async () => {
   const { buildApp } = await import("../src/app.js");
-  const fetchRate = vi.fn(async () => ({ rateToman: 270000, source: "WALLEX", symbol: "USDTTMN" }));
-  app = await buildApp({ prisma: db.prisma, logger: false, wallexClient: { fetchRate }, enableJibitReconciliation: false });
+  app = await buildApp({ prisma: db.prisma, logger: false, wallexClient: { fetchRate }, enableJibitReconciliation: false, schedulerOptions: { now: () => clock } });
   expect(fetchRate).not.toHaveBeenCalled();
   await app.scheduler.runDue();
   expect(fetchRate).toHaveBeenCalledTimes(1);
@@ -16,4 +17,31 @@ it("registers the 120-second Wallex job and stores its result without requests s
   const job = await db.prisma.scheduledJob.findUnique({ where: { name: "wallex-usd-toman" } });
   expect(job.nextRunAt.getTime() - job.lastStartedAt.getTime()).toBe(120000);
   expect(job.lastErrorCode).toBe(null);
+});
+
+it("serves and charges last-good rates through a failed cycle and recovers on the next two-minute cycle", async () => {
+  const { updateTelegramSettings } = await import("../src/modules/telegram/settings.js");
+  await updateTelegramSettings(db.prisma, { enabled: true, destinationChatId: "123456789", botToken: "123456789:pricing_job_fixture_only_abcdef" });
+  const product = await db.prisma.product.create({ data: { title: "Job priced product", slug: "job-priced-product", type: "CUSTOM_FORM", price: 0, priceCurrency: "USD", basePrice: "2", profitType: "TOMAN", profitValue: "10000" } });
+  const user = await db.prisma.user.create({ data: { name: "Job buyer", wallet: { create: { balance: 100000000 } } } });
+  const cookie = `wikiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
+  const currentPrice = async () => (await app.inject({ url: "/api/v1/products/job-priced-product" })).json().data.product.price;
+  expect(await currentPrice()).toBe(550000);
+  clock = new Date(clock.getTime() + 120000);
+  fetchRate.mockRejectedValueOnce(new Error("provider offline"));
+  await app.scheduler.runDue();
+  expect(await currentPrice()).toBe(550000);
+  expect(await db.prisma.telegramQueueJob.count()).toBe(1);
+  const response = await app.inject({ method: "POST", url: "/api/v1/orders/", headers: { cookie }, payload: { productId: product.id, quantity: 2 } });
+  expect(response.statusCode).toBe(201);
+  expect(response.json().data.order.totalAmount).toBe(1100000);
+  expect((await db.prisma.wallet.findUnique({ where: { userId: user.id } })).balance).toBe(100000000 - 1100000);
+  const snapshot = await db.prisma.orderItem.findFirst({ where: { orderId: response.json().data.order.id } });
+  expect(snapshot).toMatchObject({ exchangeRateSnapshot: 270000, rateSourceSnapshot: "WALLEX", profitTomanSnapshot: 10000, totalProfitSnapshot: 20000 });
+  clock = new Date(clock.getTime() + 120000);
+  fetchRate.mockResolvedValueOnce({ rateToman: 300000, source: "WALLEX", symbol: "USDTTMN" });
+  await app.scheduler.runDue();
+  expect(await currentPrice()).toBe(610000);
+  expect((await db.prisma.telegramQueueJob.findMany({ where: { category: "EXCHANGE_RATE" } })).map((j) => j.eventType).sort()).toEqual(["EXCHANGE_RATE_RECOVERED", "EXCHANGE_RATE_STALE"]);
+  expect((await db.prisma.orderItem.findUnique({ where: { id: snapshot.id } })).priceSnapshot).toBe(550000);
 });
