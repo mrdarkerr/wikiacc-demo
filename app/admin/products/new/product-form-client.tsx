@@ -24,12 +24,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/api";
+import { profitInput, pricingError } from "@/lib/pricing";
+import { usePricingPreview } from "@/lib/use-pricing";
+import { ProductPricingSection } from "@/components/admin/product-pricing-section";
 import { cn } from "@/lib/utils";
 import type {
   AdminDeliveryPool,
   CreateAdminProductRequest,
   FieldType,
-  Product,
+  AdminProduct as Product,
+  PriceCurrency,
   ProductCategory,
   ProductField,
   ProductType,
@@ -51,7 +55,9 @@ type ProductForm = {
   title: string;
   description: string;
   type: ProductType;
-  price: string;
+  priceCurrency: PriceCurrency;
+  basePrice: string;
+  profit: string;
   categoryId: string;
   deliveryPoolId: string;
   shareboxCategoryId: string;
@@ -80,7 +86,9 @@ const initialProductForm: ProductForm = {
   shareboxCategoryId: "",
   description: "",
   isActive: true,
-  price: "",
+  priceCurrency: "TOMAN",
+  basePrice: "",
+  profit: "0",
   slug: "",
   sortOrder: "0",
   title: "",
@@ -160,7 +168,7 @@ function errorMessage(error: unknown) {
     SHAREBOX_NOT_CONFIGURED: "اتصال شیر‌باکس کامل پیکربندی نشده است.",
     SHAREBOX_UPSTREAM_ERROR: "ارتباط با شیر‌باکس کامل نشد. دوباره تلاش کنید.",
   };
-  return (code && messages[code]) || error.message;
+  return (code && messages[code]) || pricingError(error);
 }
 
 type ShareBoxCategoriesState =
@@ -229,6 +237,7 @@ export function AdminProductFormClient() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const preview = usePricingPreview(productForm);
 
 
   function resetForm() {
@@ -247,7 +256,9 @@ export function AdminProductFormClient() {
       shareboxCategoryId: product.shareboxCategoryId ?? "",
       description: product.description ?? "",
       isActive: product.isActive,
-      price: String(product.price),
+      priceCurrency: product.priceCurrency,
+      basePrice: product.basePrice ?? (product.priceCurrency === "TOMAN" ? String(product.price) : ""),
+      profit: profitInput(product),
       slug: product.slug,
       sortOrder: String(product.sortOrder),
       title: product.title,
@@ -419,6 +430,11 @@ export function AdminProductFormClient() {
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
+    if (!preview.input || !preview.pricing || preview.pending || preview.error) {
+      setError(preview.error || "ابتدا پیش‌نمایش معتبر قیمت را دریافت کنید.");
+      return;
+    }
     setSaving(true);
 
     const visibleFieldDrafts = fieldDrafts.filter((fieldDraft) =>
@@ -485,7 +501,9 @@ export function AdminProductFormClient() {
         description: optionalText(productForm.description),
         features,
         isActive: productForm.isActive,
-        price: Number(productForm.price),
+        priceCurrency: preview.input.priceCurrency,
+        basePrice: preview.input.basePrice,
+        profit: preview.input.profit,
         slug: productForm.slug.trim(),
         sortOrder: Number(productForm.sortOrder || 0),
         title: productForm.title.trim(),
@@ -587,22 +605,7 @@ export function AdminProductFormClient() {
                   }
                 />
               </label>
-              <label className="block text-sm font-medium">
-                قیمت
-                <Input
-                  className="mt-2"
-                  min={0}
-                  required
-                  type="number"
-                  value={productForm.price}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      price: event.target.value,
-                    }))
-                  }
-                />
-              </label>
+
               <label className="block text-sm font-medium">
                 دسته بندی
                 <Select
@@ -667,6 +670,8 @@ export function AdminProductFormClient() {
             </div>
           )}
         </AdminSection>
+
+        {!loading ? <ProductPricingSection form={productForm} preview={preview} disabled={saving} onChange={(patch) => setProductForm((current) => ({ ...current, ...patch }))} /> : null}
 
         <AdminSection title="نوع محصول">
           <div className="grid gap-3 md:grid-cols-3">
@@ -1057,7 +1062,7 @@ export function AdminProductFormClient() {
           <Button asChild type="button" variant="outline">
             <Link href="/admin/products">انصراف</Link>
           </Button>
-          <Button disabled={saving || loading} type="submit">
+          <Button disabled={saving || loading || preview.pending || !preview.pricing || Boolean(preview.error)} type="submit">
             <Save className="size-4" />
             {editingProductId ? "ذخیره تغییرات" : "ایجاد محصول"}
           </Button>
