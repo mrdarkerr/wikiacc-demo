@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -26,6 +26,8 @@ import { OtpAuthForm } from "@/components/auth/otp-auth-form";
 import { DeliveryContentList } from "@/components/order-delivery-content";
 import { itemDeliveryContents } from "@/lib/sharebox";
 import { api, ApiError } from "@/lib/api";
+import { checkoutPriceChange, checkoutWalletBalance } from "@/lib/checkout";
+import { usePublicProducts } from "@/lib/use-public-products";
 import { orderNeedsShareBoxPolling } from "@/lib/sharebox";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
 import type {
@@ -113,6 +115,10 @@ function apiErrorMessage(error: unknown) {
   }
 
   const code = error.payload?.error?.code;
+  if (code === "PRICE_CHANGED") return "قیمت محصول تغییر کرده است؛ قیمت تازه را بررسی و خرید را دوباره تأیید کنید.";
+  if (code === "PRICING_AMOUNT_TOO_LARGE") return "مبلغ این خرید از محدودهٔ مجاز بیشتر است؛ تعداد را کاهش دهید.";
+  if (code === "PAYMENT_AMOUNT_INVALID") return "پرداخت مستقیم برای این مبلغ ممکن نیست؛ از کیف پول استفاده کنید یا با پشتیبانی تماس بگیرید.";
+  if (code === "VALIDATION_ERROR") return "تعداد و اطلاعات ضروری سفارش را بررسی کنید.";
 
   if (error.status === 401) {
     return "برای ثبت سفارش ابتدا وارد حساب کاربری شوید.";
@@ -163,55 +169,30 @@ export function StorefrontClient() {
   const searchParams = useSearchParams();
   const { loading: authLoading, refresh: refreshUser, user } = useCurrentUser();
   const requestedProduct = searchParams.get("product") ?? "";
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const { products, loading, error: loadError, replaceProduct } = usePublicProducts();
   const [fieldValues, setFieldValues] = useState<FieldValues>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("JIBIT");
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [priceNotice, setPriceNotice] = useState("");
+  const [walletStatus, setWalletStatus] = useState<{ loading: boolean; balance: number | null } | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [fulfillmentPollCount, setFulfillmentPollCount] = useState(0);
   const [fulfillmentRefreshError, setFulfillmentRefreshError] = useState("");
+  const submitLock = useRef(false);
+  const walletEpoch = useRef(0);
+  const mounted = useRef(true);
 
   useEffect(() => {
-    let active = true;
-
-    api.catalog
-      .products()
-      .then((result) => {
-        if (!active) {
-          return;
-        }
-
-        setProducts(result.products);
-        const product = result.products.find(
-          (item) => item.slug === requestedProduct || item.id === requestedProduct,
-        );
-        setSelectedProductId(product?.id ?? "");
-      })
-      .catch(() => {
-        if (active) {
-          setLoadError("دریافت محصولات انجام نشد.");
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [requestedProduct]);
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const selectedProduct = useMemo(
-    () => products.find((product) => product.id === selectedProductId) ?? null,
-    [products, selectedProductId],
+    () => products.find((product) => product.slug === requestedProduct || product.id === requestedProduct) ?? null,
+    [products, requestedProduct],
   );
 
   const orderDeliveries = useMemo(
@@ -274,7 +255,7 @@ export function StorefrontClient() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedProduct) {
+    if (!selectedProduct || submitLock.current) {
       return;
     }
 
@@ -308,6 +289,7 @@ export function StorefrontClient() {
       return;
     }
 
+    submitLock.current = true;
     setSubmitting(true);
     setSubmitError("");
     setCreatedOrder(null);
@@ -315,23 +297,52 @@ export function StorefrontClient() {
     setFulfillmentRefreshError("");
 
     try {
+      const latest = (await api.catalog.product(selectedProduct.slug)).product;
+      if (!mounted.current) return;
+      replaceProduct(latest);
+      if (latest.price !== selectedProduct.price) {
+        setPriceNotice(`قیمت واحد از ${formatCurrency(selectedProduct.price)} به ${formatCurrency(latest.price)} تغییر کرده است. مبلغ جدید را بررسی و دوباره تأیید کنید؛ هیچ پرداختی انجام نشده است.`);
+        return;
+      }
       const result = await api.orders.create({
         productId: selectedProduct.id,
+        expectedUnitPrice: selectedProduct.price,
         quantity: normalizedQuantity,
         paymentMethod,
         ...(values ? { fieldValues: values } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
       });
+      if (!mounted.current) return;
+      setPriceNotice("");
 
       if (result.payment) {
         window.location.assign(result.payment.redirectUrl);
         return;
       }
       setCreatedOrder(result.order);
+      if (paymentMethod === "WALLET") {
+        // Refresh the server balance independently of the successful order.
+        // A failed balance read must not suggest retrying the purchase.
+        const epoch = ++walletEpoch.current;
+        setWalletStatus({ loading: true, balance: null });
+        void api.wallet.summary().then((summary) => {
+          if (mounted.current && epoch === walletEpoch.current) setWalletStatus({ loading: false, balance: checkoutWalletBalance(summary) });
+        }).catch(() => {
+          if (mounted.current && epoch === walletEpoch.current) setWalletStatus({ loading: false, balance: null });
+        });
+      }
     } catch (error) {
+      if (!mounted.current) return;
+      const changedPrice = checkoutPriceChange(error);
+      if (changedPrice !== null) {
+        replaceProduct({ ...selectedProduct, price: changedPrice });
+        setPriceNotice(`قیمت واحد اکنون ${formatCurrency(changedPrice)} است. مبلغ جدید را بررسی و دوباره تأیید کنید؛ هنوز سفارش یا پرداختی ثبت نشده است.`);
+        return;
+      }
       setSubmitError(apiErrorMessage(error));
     } finally {
-      setSubmitting(false);
+      submitLock.current = false;
+      if (mounted.current) setSubmitting(false);
     }
   }
 
@@ -526,6 +537,7 @@ export function StorefrontClient() {
               </div>
             ) : (
               <form className="space-y-5 p-5" onSubmit={handleSubmit}>
+              <fieldset disabled={submitting} className="space-y-5">
               <div>
                 <h2 className="text-base font-bold">جزئیات صورت‌حساب</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -616,7 +628,7 @@ export function StorefrontClient() {
                       <span>
                         <span className="block text-sm font-bold">پرداخت از کیف پول</span>
                         <span className="mt-1 block text-xs/5 text-muted-foreground">
-                          موجودی فعلی: {formatCurrency(user.wallet?.balance ?? 0)}
+                          موجودی فعلی: {walletStatus?.loading ? "در حال تازه‌سازی..." : walletStatus && walletStatus.balance === null ? "دریافت موجودی به‌روز انجام نشد" : formatCurrency(walletStatus?.balance ?? user.wallet?.balance ?? 0)}
                         </span>
                       </span>
                     </label>
@@ -656,6 +668,8 @@ export function StorefrontClient() {
                     />
                   </div>
 
+                  {priceNotice ? <div role="status" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-7 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">{priceNotice}</div> : null}
+
                   {submitError ? (
                     <div className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
                       <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -683,7 +697,7 @@ export function StorefrontClient() {
                     ) : (
                       <ShoppingCart className="size-4" />
                     )}
-                    {paymentMethod === "JIBIT"
+                    {priceNotice ? "تأیید مبلغ جدید و ادامهٔ خرید" : paymentMethod === "JIBIT"
                       ? "پرداخت مستقیم با جیبیت"
                       : "ثبت و پرداخت از کیف پول"}
                   </Button>
@@ -693,6 +707,8 @@ export function StorefrontClient() {
                   از صفحهٔ اصلی محصول موردنظر را انتخاب کنید تا صورت‌حساب آن اینجا نمایش داده شود.
                 </div>
               )}
+              <p className="text-xs leading-6 text-muted-foreground">پیش از پرداخت، مبلغ با سرور بررسی می‌شود؛ مبلغ سفارش ثبت‌شده ثابت می‌ماند.</p>
+              </fieldset>
               </form>
             )}
           </Card>

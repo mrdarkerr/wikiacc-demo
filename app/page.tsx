@@ -38,6 +38,7 @@ import { Card } from "@/components/ui/card";
 import { DialogOverlay } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { usePublicProducts } from "@/lib/use-public-products";
 import { DEFAULT_SITE_CONTENT, formatCopyright } from "@/lib/site-content";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
 import type { Product, SiteContent } from "@/types/api";
@@ -82,10 +83,7 @@ export default function Home() {
   const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
   const [cmsPreview, setCmsPreview] = useState(false);
   const [selectedSection, setSelectedSection] = useState<CmsSection | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [productsError, setProductsError] = useState("");
-  const [loadVersion, setLoadVersion] = useState(0);
+  const { products, loading: productsLoading, error: productsError, refresh: refreshProducts } = usePublicProducts();
   const previewContentReceived = useRef(false);
 
   useEffect(() => {
@@ -141,30 +139,8 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-
-    api.catalog
-      .products()
-      .then((result) => {
-        if (active) setProducts(result.products);
-      })
-      .catch(() => {
-        if (active) setProductsError("دریافت محصولات انجام نشد. لطفاً دوباره تلاش کنید.");
-      })
-      .finally(() => {
-        if (active) setProductsLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [loadVersion]);
-
   function retryProducts() {
-    setProductsLoading(true);
-    setProductsError("");
-    setLoadVersion((value) => value + 1);
+    void refreshProducts();
   }
 
   function handleCmsClickCapture(event: ReactMouseEvent<HTMLElement>) {
