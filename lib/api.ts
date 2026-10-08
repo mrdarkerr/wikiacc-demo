@@ -3,6 +3,12 @@ import type {
   AdminDeliveryItem,
   AdminDeliveryPool,
   AdminOrder,
+  AdminProduct,
+  PricingInput,
+  PricingQuote,
+  PricingSettings,
+  PricingStatus,
+  UpdatePricingSettings,
   AdminShareBoxSettings,
   AdminTelegramSettings,
   UpdateAdminTelegramSettings,
@@ -64,19 +70,13 @@ type QueryValue = string | number | boolean | null | undefined;
 type ApiFetchOptions = Omit<RequestInit, "body"> & {
   body?: BodyInit | Record<string, unknown> | null;
   query?: Record<string, QueryValue>;
+  timeoutMs?: number;
 };
 
-export class ApiError extends Error {
-  status: number;
-  payload?: ApiErrorResponse;
-
-  constructor(status: number, message: string, payload?: ApiErrorResponse) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.payload = payload;
-  }
-}
+import { ApiError } from "./api-error";
+import { pricingQuoteResponse, pricingSettingsResponse, pricingStatusResponse } from "./pricing-response";
+import { publicProductResponse, publicProductsResponse } from "./catalog-response";
+export { ApiError } from "./api-error";
 
 function normalizeUrl(path: string, query?: Record<string, QueryValue>) {
   const isAbsolute = /^https?:\/\//i.test(path);
@@ -108,85 +108,85 @@ function isJsonBody(body: ApiFetchOptions["body"]): body is Record<string, unkno
 
 async function readJson<T>(response: Response): Promise<T | undefined> {
   const text = await response.text();
-  return text ? (JSON.parse(text) as T) : undefined;
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new ApiError(response.ok ? 502 : response.status, "پاسخ سرور قابل خواندن نیست؛ دوباره تلاش کنید.", {
+      error: { code: "API_INVALID_RESPONSE", message: "پاسخ سرور قابل خواندن نیست." },
+    });
+  }
 }
 
-export async function apiFetchWithMeta<T>(
+async function request<T>(
   path: string,
-  { body, headers, query, ...init }: ApiFetchOptions = {},
-): Promise<ApiResponse<T>> {
+  { body, headers, query, timeoutMs = 30000, ...init }: ApiFetchOptions = {},
+): Promise<ApiResponse<T> | undefined> {
   const requestHeaders = new Headers(headers);
-
-  if (!requestHeaders.has("Accept")) {
-    requestHeaders.set("Accept", "application/json");
-  }
-
+  if (!requestHeaders.has("Accept")) requestHeaders.set("Accept", "application/json");
   const jsonBody = isJsonBody(body);
-  if (jsonBody && !requestHeaders.has("Content-Type")) {
-    requestHeaders.set("Content-Type", "application/json");
-  }
+  if (jsonBody && !requestHeaders.has("Content-Type")) requestHeaders.set("Content-Type", "application/json");
+  if (init.signal?.aborted) throw init.signal.reason ?? new DOMException("Aborted", "AbortError");
 
-  const response = await fetch(normalizeUrl(path, query), {
-    cache: "no-store",
-    credentials: "include",
-    ...init,
-    body: jsonBody ? JSON.stringify(body) : body,
-    headers: requestHeaders,
+  const controller = new AbortController();
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const timeoutError = () => new ApiError(0, "پاسخ سرور در مهلت مقرر نرسید؛ وضعیت عملیات را پیش از تلاش مجدد بررسی کنید.", {
+    error: { code: "API_TIMEOUT", message: "مهلت دریافت پاسخ سرور تمام شد." },
   });
-
-  const payload = await readJson<ApiResponse<T> | ApiErrorResponse>(response);
-
-  if (!response.ok) {
-    const errorPayload = payload as ApiErrorResponse | undefined;
-    throw new ApiError(
-      response.status,
-      errorPayload?.error?.message ?? "خطا در ارتباط با سرور",
-      errorPayload,
-    );
+  const cancelled = new Promise<never>((_resolve, reject) => {
+    onAbort = () => {
+      controller.abort(init.signal?.reason);
+      reject(init.signal?.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    init.signal?.addEventListener("abort", onAbort, { once: true });
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(timeoutError());
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      (async () => {
+        const response = await fetch(normalizeUrl(path, query), {
+          ...init, cache: "no-store", credentials: "include", signal: controller.signal,
+          body: jsonBody ? JSON.stringify(body) : body, headers: requestHeaders,
+        });
+        if (response.status === 204) return undefined;
+        const payload = await readJson<ApiResponse<T> | ApiErrorResponse>(response);
+        if (!response.ok) {
+          const errorPayload = payload as ApiErrorResponse | undefined;
+          throw new ApiError(response.status, errorPayload?.error?.message ?? "خطا در ارتباط با سرور", errorPayload);
+        }
+        if (!payload || typeof payload !== "object" || !("data" in payload)) {
+          throw new ApiError(502, "ساختار پاسخ سرور معتبر نیست.", {
+            error: { code: "API_INVALID_RESPONSE", message: "ساختار پاسخ سرور معتبر نیست." },
+          });
+        }
+        return payload as ApiResponse<T>;
+      })(), cancelled,
+    ]);
+  } catch (error) {
+    if (init.signal?.aborted) throw init.signal.reason ?? error;
+    if (timedOut) throw timeoutError();
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(0, "ارتباط با سرور قطع شد؛ وضعیت عملیات را پیش از تلاش مجدد بررسی کنید.", {
+      error: { code: "API_NETWORK_ERROR", message: "ارتباط با سرور برقرار نشد." },
+    });
+  } finally {
+    clearTimeout(timer);
+    if (onAbort) init.signal?.removeEventListener("abort", onAbort);
   }
-
-  return payload as ApiResponse<T>;
 }
 
-export async function apiFetch<T>(
-  path: string,
-  { body, headers, query, ...init }: ApiFetchOptions = {},
-): Promise<T> {
-  const requestHeaders = new Headers(headers);
+export async function apiFetchWithMeta<T>(path: string, options: ApiFetchOptions = {}): Promise<ApiResponse<T>> {
+  return await request<T>(path, options) as ApiResponse<T>;
+}
 
-  if (!requestHeaders.has("Accept")) {
-    requestHeaders.set("Accept", "application/json");
-  }
-
-  const jsonBody = isJsonBody(body);
-  if (jsonBody && !requestHeaders.has("Content-Type")) {
-    requestHeaders.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(normalizeUrl(path, query), {
-    cache: "no-store",
-    credentials: "include",
-    ...init,
-    body: jsonBody ? JSON.stringify(body) : body,
-    headers: requestHeaders,
-  });
-
-  const payload = await readJson<ApiResponse<T> | ApiErrorResponse>(response);
-
-  if (!response.ok) {
-    const errorPayload = payload as ApiErrorResponse | undefined;
-    throw new ApiError(
-      response.status,
-      errorPayload?.error?.message ?? "خطا در ارتباط با سرور",
-      errorPayload,
-    );
-  }
-
-  if (payload && "data" in payload) {
-    return payload.data as T;
-  }
-
-  return payload as T;
+export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  return (await request<T>(path, options))?.data as T;
 }
 
 export const api = {
@@ -209,8 +209,9 @@ export const api = {
   },
   catalog: {
     categories: () => apiFetch<{ categories: ProductCategory[] }>("/categories"),
-    products: (query?: { category?: string }) =>
-      apiFetch<{ products: Product[] }>("/products", { query }),
+    product: (slug: string, signal?: AbortSignal) => apiFetch<{ product: Product }>(`/products/${encodeURIComponent(slug)}`, { signal }).then(publicProductResponse),
+    products: (query?: { category?: string }, signal?: AbortSignal) =>
+      apiFetch<{ products: Product[] }>("/products", { query, signal }).then(publicProductsResponse),
   },
   orders: {
     create: (body: CreateOrderRequest) =>
@@ -271,6 +272,13 @@ export const api = {
       ),
   },
   admin: {
+    dashboard: (signal?: AbortSignal) => apiFetch<PricingStatus>("/admin/dashboard", { signal }).then(pricingStatusResponse),
+    pricing: {
+      getSettings: (signal?: AbortSignal) => apiFetch<{ settings: PricingSettings }>("/admin/pricing/settings", { signal }).then(pricingSettingsResponse),
+      updateSettings: (body: UpdatePricingSettings) => apiFetch<{ settings: PricingSettings }>("/admin/pricing/settings", { method: "PATCH", body }).then(pricingSettingsResponse),
+      status: (signal?: AbortSignal) => apiFetch<PricingStatus>("/admin/pricing/status", { signal }).then(pricingStatusResponse),
+      preview: (body: PricingInput, signal?: AbortSignal) => apiFetch<{ pricing: PricingQuote }>("/admin/pricing/preview", { method: "POST", body, signal }).then(pricingQuoteResponse),
+    },
     siteContent: {
       get: () => apiFetch<AdminSiteContentState>("/admin/site-content"),
       saveDraft: (body: SaveAdminSiteContentRequest) =>
@@ -329,25 +337,25 @@ export const api = {
         }),
     },
     products: {
-      list: () => apiFetch<{ products: Product[] }>("/admin/products"),
+      list: () => apiFetch<{ products: AdminProduct[] }>("/admin/products"),
       create: (body: CreateAdminProductRequest) =>
-        apiFetch<{ product: Product }>("/admin/products", {
+        apiFetch<{ product: AdminProduct }>("/admin/products", {
           body,
           method: "POST",
         }),
       update: (id: string, body: UpdateAdminProductRequest) =>
-        apiFetch<{ product: Product }>(`/admin/products/${id}`, {
+        apiFetch<{ product: AdminProduct }>(`/admin/products/${id}`, {
           body,
           method: "PATCH",
         }),
       setActive: (id: string, body: SetAdminProductActiveRequest) =>
-        apiFetch<{ product: Product }>(`/admin/products/${id}/active`, {
+        apiFetch<{ product: AdminProduct }>(`/admin/products/${id}/active`, {
           body,
           method: "PATCH",
         }),
       remove: (id: string) =>
         apiFetch<
-          | { action: "ARCHIVED"; product: Product }
+          | { action: "ARCHIVED"; product: AdminProduct }
           | { action: "DELETED"; productId: string }
         >(`/admin/products/${id}`, { method: "DELETE" }),
     },

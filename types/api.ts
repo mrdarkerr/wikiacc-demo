@@ -8,6 +8,7 @@ export type AdminTelegramSettings = {
   ticketEventsEnabled: boolean;
   paymentEventsEnabled: boolean;
   fulfillmentEventsEnabled: boolean;
+  exchangeRateEventsEnabled: boolean;
   updatedAt: string | null;
 };
 export type UpdateAdminTelegramSettings = Partial<Omit<AdminTelegramSettings, "hasBotToken" | "botTokenHint" | "updatedAt">> & { botToken?: string };
@@ -259,13 +260,57 @@ export type Product = {
   sortOrder: number;
   category?: ProductCategory | null;
   deliveryPool?: DeliveryPoolSummary | null;
-  shareboxCategoryId: string | null;
-  shareboxCategoryName: string | null;
+
   features: ProductFeature[];
   fields: ProductField[];
   _count?: {
     orderItems?: number;
   };
+};
+
+export type PriceCurrency = "TOMAN" | "USD";
+export type ProfitType = "TOMAN" | "USD" | "PERCENT";
+export type ExchangeRate = {
+  rateToman: number;
+  source: "WALLEX" | "FALLBACK" | "DEFAULT";
+  symbol: "USDTTMN";
+  status: "FRESH" | "STALE" | "FALLBACK" | "DEFAULT";
+  stale: boolean;
+  fetchedAt: string | null;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastErrorCode: string | null;
+  staleAfterSeconds: number;
+};
+export type PricingInput = { priceCurrency: PriceCurrency; basePrice: string; profit?: string; quantity?: number };
+export type PricingQuote = {
+  priceCurrency: PriceCurrency; basePrice: string; profitType: ProfitType; profitValue: string;
+  baseToman: number; profitToman: number; unitPrice: number; quantity: number; totalAmount: number; totalProfit: number;
+  exchangeRate: ExchangeRate;
+};
+export type PricingSettings = {
+  id: "default"; fallbackRateToman: number; staleAfterSeconds: number; alertCooldownSeconds: number;
+  createdAt?: string; updatedAt?: string;
+};
+export type UpdatePricingSettings = Partial<Pick<PricingSettings, "fallbackRateToman" | "staleAfterSeconds" | "alertCooldownSeconds">>;
+export type ScheduledPricingJob = {
+  name: string; nextRunAt: string; leaseExpiresAt: string | null;
+  lastStartedAt: string | null; lastFinishedAt: string | null; lastSuccessAt: string | null;
+  lastErrorCode: string | null; runCount: number; failureCount: number;
+};
+export type PricingStatus = { exchangeRate: ExchangeRate; jobs: ScheduledPricingJob[] };
+export type AdminProduct = Product & {
+  priceCurrency: PriceCurrency; basePrice: string | null; profitType: ProfitType; profitValue: string;
+  shareboxCategoryId: string | null; shareboxCategoryName: string | null;
+  // Active/archive responses do not contain a quote; never use legacy price as selling price.
+  pricing?: PricingQuote;
+};
+export type AdminOrderItem = OrderItem & {
+  product?: AdminProduct | null;
+  priceCurrencySnapshot: PriceCurrency | null; basePriceSnapshot: string | null;
+  profitTypeSnapshot: ProfitType | null; profitValueSnapshot: string | null;
+  exchangeRateSnapshot: number | null; rateSourceSnapshot: ExchangeRate["source"] | null; rateFetchedAtSnapshot: string | null;
+  baseTomanSnapshot: number | null; profitTomanSnapshot: number | null; totalProfitSnapshot: number | null;
 };
 
 export type OrderStatus =
@@ -376,6 +421,7 @@ export type CreateTicketRequest = {
 export type CreateOrderRequest = {
   productId: string;
   quantity?: number;
+  expectedUnitPrice?: number;
   paymentMethod?: PaymentMethod;
   fieldValues?: Record<string, string>;
   note?: string;
@@ -479,15 +525,11 @@ export type PaymentAttemptSummary = {
   updatedAt: string;
 };
 
-export type AdminOrder = Order & {
+export type AdminOrder = Omit<Order, "items"> & {
   adminNote?: string | null;
   paymentAttempts: PaymentAttemptSummary[];
   user?: Pick<User, "id" | "email" | "name" | "phone"> | null;
-  items: Array<
-    OrderItem & {
-      product?: Product | null;
-    }
-  >;
+  items: AdminOrderItem[];
 };
 
 export type DeliveryItemStatus =
@@ -602,7 +644,10 @@ export type CreateAdminProductRequest = {
   title: string;
   description?: string;
   type: ProductType;
-  price: number;
+  price?: number; // Legacy TOMAN-only API input. Dynamic forms send basePrice instead.
+  priceCurrency?: PriceCurrency;
+  basePrice?: string;
+  profit?: string;
   categoryId?: string;
   deliveryPoolId?: string;
   shareboxCategoryId?: string | null;
