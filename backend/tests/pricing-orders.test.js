@@ -9,8 +9,8 @@ beforeAll(async () => {
   app = await buildApp({ prisma: db.prisma, logger: false, enableJibitReconciliation: false });
   user = await db.prisma.user.create({ data: { name: "Pricing buyer", wallet: { create: { balance: 100000000 } } } });
   const admin = await db.prisma.user.create({ data: { name: "Pricing admin", role: "ADMIN" } });
-  cookie = `wikiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
-  adminCookie = `wikiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
+  cookie = `gimiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
+  adminCookie = `gimiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
   product = await db.prisma.product.create({ data: { title: "USD subscription", slug: "usd-wallet-snapshot", type: "CUSTOM_FORM", price: 0, priceCurrency: "USD", basePrice: "2.5", profitType: "PERCENT", profitValue: "10" } });
 });
 afterAll(async () => { await app?.close(); await db.close(); });

@@ -10,8 +10,8 @@ beforeAll(async () => {
   app = await buildApp({ prisma: db.prisma, logger: false, wallexClient, enableJibitReconciliation: false });
   const admin = await db.prisma.user.create({ data: { name: "Pricing admin", role: "ADMIN" } });
   const user = await db.prisma.user.create({ data: { name: "Pricing buyer" } });
-  adminCookie = `wikiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
-  userCookie = `wikiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
+  adminCookie = `gimiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
+  userCookie = `gimiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
 });
 afterAll(async () => { await app?.close(); await db.close(); });
 describe("pricing product API", () => {

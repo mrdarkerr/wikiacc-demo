@@ -10,7 +10,7 @@ beforeAll(async () => {
   const { buildApp } = await import("../backend/src/app.js");
   app = await buildApp({ prisma: db.prisma, logger: false, enableJibitReconciliation: false });
   const admin = await db.prisma.user.create({ data: { name: "Contract admin", role: "ADMIN" } });
-  cookie = `wikiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
+  cookie = `gimiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
 });
 afterAll(async () => { await app?.close(); await db?.close(); });
 afterEach(() => vi.unstubAllGlobals());

@@ -20,6 +20,9 @@ describe("exchange-rate Telegram incidents", () => {
     }
     await db.prisma.$transaction((tx) => checkRateHealth(tx, { now: new Date(at.getTime() + 300000) }));
     expect(await db.prisma.telegramQueueJob.count()).toBe(1);
+    const alert = await db.prisma.telegramQueueJob.findFirst();
+    expect(alert.messageText).toContain("جیمی‌اکانت");
+    expect(alert.messageText).not.toContain("ویکی‌اکانت");
     await db.prisma.$transaction((tx) => checkRateHealth(tx, { now: new Date(at.getTime() + 420000) }));
     expect(await db.prisma.telegramQueueJob.count()).toBe(1);
     expect(await db.prisma.exchangeRateSyncState.findUnique({ where: { id: "USD_TOMAN" } })).toMatchObject({ lastAttemptAt: null });

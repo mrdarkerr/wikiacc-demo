@@ -20,7 +20,7 @@ export async function checkRateHealth(tx, { now = new Date(), errorCode } = {}) 
       const event = await enqueueTelegramEvent(tx, {
         category: "EXCHANGE_RATE", eventType: "EXCHANGE_RATE_STALE",
         key: `${incidentId}:${now.getTime()}`, referenceType: "EXCHANGE_RATE", referenceId: incidentId,
-        text: ["⚠️ اختلال به‌روزرسانی نرخ دلار ویکی‌اکانت", `کد: ${failed ? safeWallexErrorCode({ code: failed }) : "EXCHANGE_RATE_STALE"}`,
+        text: ["⚠️ اختلال به‌روزرسانی نرخ دلار جیمی‌اکانت", `کد: ${failed ? safeWallexErrorCode({ code: failed }) : "EXCHANGE_RATE_STALE"}`,
           `نرخ مورد استفاده: ${rate.rateToman.toLocaleString("fa-IR")} تومان`, `منبع: ${rate.source}`,
           `آخرین دریافت معتبر: ${rate.fetchedAt?.toISOString() ?? "ندارد"}`,
           "خرید با آخرین نرخ معتبر یا نرخ پشتیبان ادامه دارد."].join("\n"),

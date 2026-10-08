@@ -24,7 +24,7 @@ it("serves and charges last-good rates through a failed cycle and recovers on th
   await updateTelegramSettings(db.prisma, { enabled: true, destinationChatId: "123456789", botToken: "123456789:pricing_job_fixture_only_abcdef" });
   const product = await db.prisma.product.create({ data: { title: "Job priced product", slug: "job-priced-product", type: "CUSTOM_FORM", price: 0, priceCurrency: "USD", basePrice: "2", profitType: "TOMAN", profitValue: "10000" } });
   const user = await db.prisma.user.create({ data: { name: "Job buyer", wallet: { create: { balance: 100000000 } } } });
-  const cookie = `wikiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
+  const cookie = `gimiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
   const currentPrice = async () => (await app.inject({ url: "/api/v1/products/job-priced-product" })).json().data.product.price;
   expect(await currentPrice()).toBe(550000);
   clock = new Date(clock.getTime() + 120000);

@@ -8,7 +8,7 @@ beforeAll(async () => {
   app = await buildApp({ prisma: db.prisma, logger: false, enableJibitReconciliation: false, jibitCallbackUrl: "https://example.invalid/callback",
     jibitClient: { origin: "https://example.invalid", createPurchase() { throw new Error("Provider must not be contacted on price mismatch"); } } });
   user = await db.prisma.user.create({ data: { name: "Consent buyer", wallet: { create: { balance: 1000000 } } } });
-  cookie = `wikiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
+  cookie = `gimiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
   product = await db.prisma.product.create({ data: { slug: "price-consent", title: "Consent product", type: "CUSTOM_FORM", price: 100000, basePrice: "100000" } });
 });
 afterAll(async () => { await app?.close(); await db.close(); });
