@@ -22,4 +22,10 @@ All success fields are required, nullable values are explicit, and objects rejec
 - Regenerate and compare committed spec/SDK for drift with `npm run generate:finance`.
 - Browser acceptance uses an isolated scratch SQLite DB, synthetic test orders persisted through Prisma and real Fastify APIs. No production credentials, customer data, payment, SMS, or Telegram messages required. Mobile screenshots are responsive Android Chrome emulation, not an APK/device test.
 
+## Verified local acceptance
+
+Backend suite: 17 files / 161 tests passing. Frontend suite: 10 files / 44 tests passing. TypeScript, scoped ESLint, production Next build and OpenAPI/SDK regeneration drift check passed. Browser used the real local APIs with 300 synthetic persisted orders; report totals matched rendered money. Weekly older/newer navigation, historical unknown-margin warning, malformed-response error/retry, and a delayed weekly request superseded by daily selection were exercised. No horizontal page overflow at 320, 390, 768 and 1440 viewport widths; only the chart scrolls horizontally. Final browser error capture was empty. Screenshots cover both changed financial sections in desktop and Android Chrome responsive emulation; not a physical device test.
+
+Dependency audit is not clean: existing application/toolchain advisories remain, and the new development-only OpenAPI generator has a transitive high advisory. No broad dependency upgrades were included in this scoped feature. Review/update dependencies separately before treating the repository as security-clean.
+
 Deployment requires explicit approval; deploy backend and generated-client frontend together. No migration required. Rollback only this finance feature to its parent revision without undoing the already-deployed dynamic pricing code/schema.
