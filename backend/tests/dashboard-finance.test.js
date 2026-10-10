@@ -14,8 +14,9 @@ beforeAll(async () => {
   await app.ready();
   const admin = await db.prisma.user.create({ data: { name: "Finance tester", role: "ADMIN" } });
   buyer = await db.prisma.user.create({ data: { name: "Finance tester", role: "USER" } });
-  cookie = `wikiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
-  userCookie = `wikiacc_session=${app.jwt.sign({ id: buyer.id, role: "USER" })}`;
+  const { env } = await import("../src/config/env.js");
+  cookie = `${env.SESSION_COOKIE_NAME}=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
+  userCookie = `${env.SESSION_COOKIE_NAME}=${app.jwt.sign({ id: buyer.id, role: "USER" })}`;
   product = await db.prisma.product.create({ data: { slug: "finance-test", title: "Test", type: "CUSTOM_FORM", price: 100 } });
 });
 beforeEach(async () => { await db.prisma.orderItem.deleteMany(); await db.prisma.order.deleteMany(); });
