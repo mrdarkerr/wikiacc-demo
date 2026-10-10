@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "generate:finance": "node backend/scripts/export-finance-openapi.js && openapi-ts",
+    "test:frontend": "backend/node_modules/.bin/vitest run --config vitest.frontend.config.mts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "latest",
@@ -19,9 +21,11 @@
     "react": "latest",
     "react-dom": "latest",
     "tailwind-merge": "latest",
-    "tailwindcss-animate": "latest"
+    "tailwindcss-animate": "latest",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.99.0",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
