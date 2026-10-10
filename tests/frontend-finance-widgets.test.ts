@@ -20,8 +20,18 @@ describe("financial dashboard presentation", () => {
     const report = zGetFinanceHistoryResponse.parse({ data: { ...await history(emptyDb), totals: { turnover: 900, profit: 60, orderCount: 3, knownProfitItemCount: 2, unknownProfitItemCount: 1 } } }).data;
     const html = renderToStaticMarkup(createElement(FinanceHistoryPanel, { report, pending: false, interval: "daily", onInterval: () => {}, onPage: () => {} }));
     expect(html).toContain("سود ثبت‌شدهٔ بخشی از فروش");
-    expect(html).toContain("سابقهٔ سود ندارند");
+    expect(html).not.toContain("سابقهٔ سود ندارند");
     expect(html).toContain("سود خالص");
+  });
+  it("keeps unknown forecast profit without the historical-margin notice", async () => {
+    const orders = ["2026-09-20", "2026-09-21", "2026-09-22"].map((day) => ({ createdAt: new Date(`${day}T10:00:00Z`), totalAmount: 300, items: [{ totalProfitSnapshot: null }] }));
+    const db = { order: { findFirst: async () => ({ createdAt: orders[0].createdAt }), findMany: async () => orders } };
+    const report = zGetFinanceForecastResponse.parse({ data: await forecast(db, new Date("2026-10-10T10:00:00Z")) }).data;
+    expect(report.status).toBe("READY");
+    expect(report.horizons.every((h) => h.profit === null)).toBe(true);
+    const html = renderToStaticMarkup(createElement(FinanceForecastPanel, { report }));
+    expect(html).toContain("نامشخص");
+    expect(html).not.toContain("به دلیل نبود سابقهٔ سود");
   });
   it("renders forecast horizons separately and explains insufficient data without zero estimates", async () => {
     const report = zGetFinanceForecastResponse.parse({ data: await forecast(emptyDb) }).data;

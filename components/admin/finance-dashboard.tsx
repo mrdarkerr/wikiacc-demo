@@ -48,7 +48,6 @@ export function FinanceHistoryPanel({ report, pending, interval, error, onRetry,
             <p className="mt-2 text-xs text-muted-foreground">سود ثبت‌شده هنگام سفارش؛ پیش از کسر هزینه‌ها</p>
           </div>
         </div>
-        {partial ? <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-6 text-amber-700 dark:text-amber-300">{formatNumber(report.totals.unknownProfitItemCount)} قلم سفارش سابقهٔ سود ندارند؛ عدد سود فقط بخش دارای سابقه را پوشش می‌دهد.</p> : null}
         <div className="flex flex-wrap items-center justify-between gap-3"><Legend /><p className="text-[11px] text-muted-foreground lg:hidden">← نمودار را افقی بکشید →</p></div>
         <div className="overflow-x-auto rounded-lg border border-border p-3" tabIndex={0} aria-label="نمودار مالی؛ برای بازه‌های بیشتر افقی پیمایش کنید">
           <div className="flex min-w-[740px] items-end gap-4" dir="ltr">
@@ -96,7 +95,6 @@ export function FinanceForecastPanel({ report }: { report: FinanceForecast }) {
           </div>
         </div>)}
       </div>
-      {report.sample.unknownProfitItemCount > 0 ? <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">به دلیل نبود سابقهٔ سود برای بخشی از سفارش‌های نمونه، پیش‌بینی سود نامشخص است.</p> : null}
       <p className="text-xs leading-6 text-muted-foreground">{range(report.sample.startDate, report.sample.endDate)}؛ روزهای بدون فروش هم محاسبه شده‌اند. امروزِ ناقص در نمونه نیست. این برآورد تضمین درآمد یا پیش‌بینی نرخ دلار نیست؛ کارمزد و هزینه‌های جانبی از سود کسر نشده‌اند.</p>
     </div>
   </AdminSection>;
