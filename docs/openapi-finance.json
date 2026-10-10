@@ -1,0 +1,607 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GimiAcc Admin Finance API",
+    "version": "0.1.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "adminSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "gimiacc_session",
+        "description": "Existing authenticated ADMIN session"
+      }
+    },
+    "schemas": {
+      "def-0": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "title": "FinanceError"
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/admin/finance/history": {
+      "get": {
+        "operationId": "getFinanceHistory",
+        "summary": "Paginated TOMAN turnover and frozen product margin",
+        "tags": [
+          "Admin finance"
+        ],
+        "description": "Paid orders excluding cancelled/refunded; grouped by order creation in Tehran. Weeks Saturday–Friday, 8 weeks/page; days 7/page. page=1 is newest. Beyond oldest page is clamped. Historical unknown margins are null; partial known sums retain unknown item counts. No 200-order limit.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly"
+              ],
+              "default": "daily"
+            },
+            "in": "query",
+            "name": "interval",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "in": "query",
+            "name": "page",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "currency",
+                        "timeZone",
+                        "dateBasis",
+                        "profitBasis",
+                        "generatedAt",
+                        "interval",
+                        "range",
+                        "pagination",
+                        "totals",
+                        "points"
+                      ],
+                      "properties": {
+                        "currency": {
+                          "type": "string",
+                          "enum": [
+                            "TOMAN"
+                          ]
+                        },
+                        "timeZone": {
+                          "type": "string",
+                          "enum": [
+                            "Asia/Tehran"
+                          ]
+                        },
+                        "dateBasis": {
+                          "type": "string",
+                          "enum": [
+                            "ORDER_CREATED_AT"
+                          ]
+                        },
+                        "profitBasis": {
+                          "type": "string",
+                          "enum": [
+                            "FROZEN_PRODUCT_MARGIN_BEFORE_FEES"
+                          ]
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "interval": {
+                          "type": "string",
+                          "enum": [
+                            "daily",
+                            "weekly"
+                          ]
+                        },
+                        "range": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "startDate",
+                            "endDate"
+                          ],
+                          "properties": {
+                            "startDate": {
+                              "type": "string",
+                              "format": "date"
+                            },
+                            "endDate": {
+                              "type": "string",
+                              "format": "date"
+                            }
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "page",
+                            "pageSize",
+                            "totalPages",
+                            "hasOlder",
+                            "hasNewer"
+                          ],
+                          "properties": {
+                            "page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "pageSize": {
+                              "type": "integer",
+                              "enum": [
+                                7,
+                                8
+                              ]
+                            },
+                            "totalPages": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "hasOlder": {
+                              "type": "boolean"
+                            },
+                            "hasNewer": {
+                              "type": "boolean"
+                            }
+                          }
+                        },
+                        "totals": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "turnover",
+                            "profit",
+                            "orderCount",
+                            "knownProfitItemCount",
+                            "unknownProfitItemCount"
+                          ],
+                          "properties": {
+                            "turnover": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Integer TOMAN; never IRR or current USD conversion."
+                            },
+                            "profit": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Null means unknown/unavailable, not zero. Profit excludes fees and operating expenses.",
+                              "nullable": true
+                            },
+                            "orderCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "knownProfitItemCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "unknownProfitItemCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          }
+                        },
+                        "points": {
+                          "type": "array",
+                          "minItems": 7,
+                          "maxItems": 8,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "startDate",
+                              "endDate",
+                              "isPartial",
+                              "turnover",
+                              "profit",
+                              "orderCount",
+                              "knownProfitItemCount",
+                              "unknownProfitItemCount"
+                            ],
+                            "properties": {
+                              "startDate": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "endDate": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "isPartial": {
+                                "type": "boolean"
+                              },
+                              "turnover": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Integer TOMAN; never IRR or current USD conversion."
+                              },
+                              "profit": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Null means unknown/unavailable, not zero. Profit excludes fees and operating expenses.",
+                                "nullable": true
+                              },
+                              "orderCount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "knownProfitItemCount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "unknownProfitItemCount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/finance/forecast": {
+      "get": {
+        "operationId": "getFinanceForecast",
+        "summary": "7/30-day turnover and product-margin estimates",
+        "tags": [
+          "Admin finance"
+        ],
+        "description": "Trailing daily average of up to 28 complete Tehran days (zero-sale days included), excluding today. At least 7 observed days and 3 paid orders required. Future ranges start tomorrow. Profit estimate null if any historical item margin is unknown. Not a guaranteed forecast or net profit; no prediction of future exchange rates.",
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "currency",
+                        "timeZone",
+                        "dateBasis",
+                        "profitBasis",
+                        "generatedAt",
+                        "method",
+                        "status",
+                        "sample",
+                        "horizons"
+                      ],
+                      "properties": {
+                        "currency": {
+                          "type": "string",
+                          "enum": [
+                            "TOMAN"
+                          ]
+                        },
+                        "timeZone": {
+                          "type": "string",
+                          "enum": [
+                            "Asia/Tehran"
+                          ]
+                        },
+                        "dateBasis": {
+                          "type": "string",
+                          "enum": [
+                            "ORDER_CREATED_AT"
+                          ]
+                        },
+                        "profitBasis": {
+                          "type": "string",
+                          "enum": [
+                            "FROZEN_PRODUCT_MARGIN_BEFORE_FEES"
+                          ]
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "method": {
+                          "type": "string",
+                          "enum": [
+                            "TRAILING_DAILY_AVERAGE"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "READY",
+                            "INSUFFICIENT_DATA"
+                          ]
+                        },
+                        "sample": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "startDate",
+                            "endDate",
+                            "observedDays",
+                            "turnover",
+                            "profit",
+                            "orderCount",
+                            "knownProfitItemCount",
+                            "unknownProfitItemCount"
+                          ],
+                          "properties": {
+                            "startDate": {
+                              "type": "string",
+                              "format": "date"
+                            },
+                            "endDate": {
+                              "type": "string",
+                              "format": "date"
+                            },
+                            "observedDays": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 28
+                            },
+                            "turnover": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Integer TOMAN; never IRR or current USD conversion."
+                            },
+                            "profit": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Null means unknown/unavailable, not zero. Profit excludes fees and operating expenses.",
+                              "nullable": true
+                            },
+                            "orderCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "knownProfitItemCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "unknownProfitItemCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          }
+                        },
+                        "horizons": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 2,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "days",
+                              "startDate",
+                              "endDate",
+                              "turnover",
+                              "profit"
+                            ],
+                            "properties": {
+                              "days": {
+                                "type": "integer",
+                                "enum": [
+                                  7,
+                                  30
+                                ]
+                              },
+                              "startDate": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "endDate": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "turnover": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Null means unknown/unavailable, not zero. Profit excludes fees and operating expenses.",
+                                "nullable": true
+                              },
+                              "profit": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Null means unknown/unavailable, not zero. Profit excludes fees and operating expenses.",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

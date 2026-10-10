@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
   CheckCircle2,
   ClipboardList,
   Clock3,
@@ -24,6 +23,7 @@ import { AdminSection, AdminState } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { Button } from "@/components/ui/button";
 import { ExchangeRateCard } from "@/components/admin/exchange-rate-card";
+import { FinanceDashboard } from "@/components/admin/finance-dashboard";
 import { api, ApiError } from "@/lib/api";
 import type { AdminOrder, AdminTicket, AdminUser, AdminProduct as Product } from "@/types/api";
 
@@ -41,83 +41,6 @@ type Metric = {
   value: string;
 };
 
-type RevenueInterval = "daily" | "weekly";
-
-type RevenuePoint = {
-  label: string;
-  revenue: number;
-  start: Date;
-};
-
-const revenueNumberFormatter = new Intl.NumberFormat("fa-IR", {
-  compactDisplay: "short",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-
-function startOfDay(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-}
-
-function startOfWeek(value: Date) {
-  const day = startOfDay(value);
-  const daysSinceSaturday = (day.getDay() + 1) % 7;
-  day.setDate(day.getDate() - daysSinceSaturday);
-  return day;
-}
-
-function addDays(value: Date, days: number) {
-  const result = new Date(value);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function buildRevenueSeries(
-  orders: AdminOrder[],
-  interval: RevenueInterval,
-): RevenuePoint[] {
-  const isDaily = interval === "daily";
-  const pointCount = isDaily ? 7 : 8;
-  const step = isDaily ? 1 : 7;
-  const currentPeriodStart = isDaily
-    ? startOfDay(new Date())
-    : startOfWeek(new Date());
-  const firstPeriodStart = addDays(
-    currentPeriodStart,
-    -(pointCount - 1) * step,
-  );
-  const points = Array.from({ length: pointCount }, (_, index) => {
-    const start = addDays(firstPeriodStart, index * step);
-    const label = new Intl.DateTimeFormat("fa-IR", {
-      day: "numeric",
-      month: "short",
-      ...(isDaily ? { weekday: "short" as const } : {}),
-    }).format(start);
-
-    return { label, revenue: 0, start };
-  });
-
-  const paidOrders = orders.filter(
-    (order) =>
-      order.paymentStatus === "PAID" &&
-      order.status !== "CANCELLED" &&
-      order.status !== "REFUNDED",
-  );
-
-  paidOrders.forEach((order) => {
-    const createdAt = new Date(order.createdAt);
-    const orderPeriodStart = isDaily
-      ? startOfDay(createdAt)
-      : startOfWeek(createdAt);
-    const point = points.find(
-      ({ start }) => start.getTime() === orderPeriodStart.getTime(),
-    );
-
-    if (point) point.revenue += order.totalAmount;
-  });
-
-  return points;
-}
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError
@@ -134,8 +57,7 @@ export default function AdminDashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [revenueInterval, setRevenueInterval] =
-    useState<RevenueInterval>("daily");
+
 
   useEffect(() => {
     let active = true;
@@ -224,40 +146,18 @@ export default function AdminDashboardPage() {
     [data],
   );
 
-  const revenueSeries = useMemo(
-    () => buildRevenueSeries(data.orders, revenueInterval),
-    [data.orders, revenueInterval],
-  );
-  const totalRevenue = revenueSeries.reduce(
-    (total, point) => total + point.revenue,
-    0,
-  );
-  const maximumRevenue = Math.max(
-    ...revenueSeries.map((point) => point.revenue),
-    0,
-  );
-
-  if (loading) {
-    return <AdminState>در حال دریافت اطلاعات ادمین...</AdminState>;
-  }
-
-  if (error) {
-    return (
-      <AdminSection title="خطا در دریافت اطلاعات">
-        <div className="space-y-4">
-          <AdminState tone="danger">{error}</AdminState>
-          <Button asChild>
-            <Link href="/login">ورود دوباره</Link>
-          </Button>
-        </div>
-      </AdminSection>
-    );
-  }
 
   return (
     <div className="space-y-6">
       <ExchangeRateCard dashboard />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {loading ? <AdminState>در حال دریافت اطلاعات ادمین...</AdminState> : error ? (
+        <AdminSection title="خطا در دریافت اطلاعات">
+          <div className="space-y-4">
+            <AdminState tone="danger">{error}</AdminState>
+            <Button asChild><Link href="/login">ورود دوباره</Link></Button>
+          </div>
+        </AdminSection>
+      ) : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {metrics.map((metric) => {
           const Icon = metric.icon;
           return (
@@ -274,97 +174,11 @@ export default function AdminDashboardPage() {
             </Link>
           );
         })}
-      </div>
+      </div>}
 
-      <AdminSection
-        action={
-          <div
-            aria-label="بازه نمایش درآمد"
-            className="flex rounded-md bg-muted p-1"
-            role="group"
-          >
-            <Button
-              aria-pressed={revenueInterval === "daily"}
-              className="h-8 px-3"
-              size="sm"
-              type="button"
-              variant={revenueInterval === "daily" ? "default" : "ghost"}
-              onClick={() => setRevenueInterval("daily")}
-            >
-              روزانه
-            </Button>
-            <Button
-              aria-pressed={revenueInterval === "weekly"}
-              className="h-8 px-3"
-              size="sm"
-              type="button"
-              variant={revenueInterval === "weekly" ? "default" : "ghost"}
-              onClick={() => setRevenueInterval("weekly")}
-            >
-              هفتگی
-            </Button>
-          </div>
-        }
-        description={
-          revenueInterval === "daily"
-            ? "درآمد سفارش‌های پرداخت‌شده در ۷ روز اخیر"
-            : "درآمد سفارش‌های پرداخت‌شده در ۸ هفته اخیر"
-        }
-        title="درآمد"
-      >
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">جمع درآمد این بازه</p>
-            <p className="mt-1 text-2xl font-bold">{formatCurrency(totalRevenue)}</p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <BarChart3 className="size-4" />
-            سفارش‌های لغوشده و بازپرداختی محاسبه نشده‌اند
-          </div>
-        </div>
+      <FinanceDashboard />
 
-        <div className="w-full overflow-x-auto pb-2">
-          <div
-            aria-label={`نمودار درآمد ${revenueInterval === "daily" ? "روزانه" : "هفتگی"}`}
-            className="flex h-64 min-w-[560px] items-end gap-3 border-b border-border px-2 pt-8"
-            role="img"
-          >
-            {revenueSeries.map((point) => {
-              const height =
-                maximumRevenue === 0
-                  ? 0
-                  : Math.max((point.revenue / maximumRevenue) * 100, 3);
-
-              return (
-                <div
-                  key={point.start.toISOString()}
-                  className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"
-                >
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {point.revenue
-                      ? `${revenueNumberFormatter.format(point.revenue)} ت`
-                      : "۰"}
-                  </span>
-                  <div className="flex h-full w-full items-end">
-                    <div
-                      className="w-full rounded-t-md bg-accent/80 transition-all group-hover:bg-accent"
-                      style={{
-                        height: point.revenue ? `${height}%` : "4px",
-                      }}
-                      title={`${point.label}: ${formatCurrency(point.revenue)}`}
-                    />
-                  </div>
-                  <span className="min-h-10 text-center text-xs leading-5 text-muted-foreground">
-                    {point.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </AdminSection>
-
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+      {!loading && !error ? <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
         <AdminSection
           action={
             <Button asChild size="sm" variant="outline">
@@ -436,7 +250,7 @@ export default function AdminDashboardPage() {
             {!data.tickets.length ? <AdminState>تیکتی ثبت نشده است.</AdminState> : null}
           </div>
         </AdminSection>
-      </div>
+      </div> : null}
     </div>
   );
 }
