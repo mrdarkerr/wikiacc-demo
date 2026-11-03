@@ -441,7 +441,7 @@ export function StorefrontClient() {
                     ) : null}
                   </div>
                   {selectedProduct.description ? (
-                    <p className="mt-3 max-w-2xl text-sm/7 text-muted-foreground">
+                    <p className="mt-3 max-w-2xl whitespace-pre-line text-sm/7 text-muted-foreground">
                       {selectedProduct.description}
                     </p>
                   ) : null}
