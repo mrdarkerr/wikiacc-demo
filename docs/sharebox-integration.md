@@ -53,11 +53,15 @@ ShareBox license cards show stacked Android and Windows download buttons in wall
 Set these **public, build-time** variables in the frontend `.env.production` (not `backend/.env`) to override the default download URLs:
 
 ```dotenv
-NEXT_PUBLIC_SHAREBOX_ANDROID_DOWNLOAD_URL=https://wikiacc.ir/dl/sharebox-android-v0.7.7-release.apk
-NEXT_PUBLIC_SHAREBOX_WINDOWS_DOWNLOAD_URL=https://wikiacc.ir/dl/ShareBox-0.2.4-x64-Setup.exe
+NEXT_PUBLIC_SHAREBOX_ANDROID_DOWNLOAD_URL=https://wikiacc.ir/dl/sharebox-android-v0.8.0-release.apk
+NEXT_PUBLIC_SHAREBOX_WINDOWS_DOWNLOAD_URL=https://wikiacc.ir/dl/ShareBox-0.2.5-x64-Setup.exe
 ```
 
 Unset or blank values use the URLs above. After changing them, rebuild the frontend with `npm run build` and restart it; a restart alone does not update Next.js public environment values. Use public HTTPS download URLs without credentials; these values are visible to customers. The download server must serve attachments (the default Wikiacc URLs do); browsers may ignore the `download` attribute for cross-origin URLs.
+
+Customer downloads are hosted on the WikiAcc server in `/var/www/wikiacc-downloads/`, exposed by Nginx at `https://wikiacc.ir/dl/`; they do not use `git.moja-dev.ir`. The identical installer and APK are also distributed in the `mrdarkerr/wikiacc-demo` release `sharebox-clients-android-0.8.0-windows-0.2.5`, with SHA-256 checksums and source-release provenance. Keep versioned files immutable and verify hosted hashes before switching these links. Existing order cards use these same current frontend links; no order or license rewrite is needed.
+
+Android 0.8.0 uses the existing MrDark signer rather than the lost 0.7.x identity: upgrading from 0.7.x requires uninstall/reinstall and loses local app data. Windows 0.2.5 is unsigned and can trigger SmartScreen; Android Play Protect behavior is not guaranteed by a valid APK signature. Republishing these files does not resolve either warning.
 
 ## Verification commands
 

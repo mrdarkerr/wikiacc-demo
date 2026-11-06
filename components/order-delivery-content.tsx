@@ -13,9 +13,9 @@ type DeliveryContentListProps = {
 };
 
 const androidDownloadUrl = process.env.NEXT_PUBLIC_SHAREBOX_ANDROID_DOWNLOAD_URL?.trim()
-  || "https://wikiacc.ir/dl/sharebox-android-v0.7.7-release.apk";
+  || "https://wikiacc.ir/dl/sharebox-android-v0.8.0-release.apk";
 const windowsDownloadUrl = process.env.NEXT_PUBLIC_SHAREBOX_WINDOWS_DOWNLOAD_URL?.trim()
-  || "https://wikiacc.ir/dl/ShareBox-0.2.4-x64-Setup.exe";
+  || "https://wikiacc.ir/dl/ShareBox-0.2.5-x64-Setup.exe";
 
 const expiryFormatter = new Intl.DateTimeFormat("fa-IR", {
   dateStyle: "medium",
