@@ -24,6 +24,12 @@ After any claim/attempt, automatic refund/cancellation/manual delivery is blocke
 4. Generate Prisma client, activate built frontend/backend, verify HTTPS pages/assets, admin-only settings and authenticated non-crediting webhook rejection. Configure both secrets privately; then publish the catalog product.
 5. Schema is additive (two new tables); keep it on rollback. Disable the product and integration first. Once new paid orders exist, prefer a forward fix; old Prisma does not recognize the new product enum, and old workers cannot fulfill these jobs. Never restore an old financial database after reopening payment writers.
 
+## Published acceptance
+
+The live application/frontend build is from `ef09e0e6934c2843c6e21f0666e2b889f9dc0880`. Product `superip-reseller-wallet` is active at `/store?product=superip-reseller-wallet`; integration settings are enabled and configured. Public catalog readback, desktop/mobile product rendering, linked browser assets and backend health passed. The real production client made an authenticated HTTPS request with amount zero and received the expected validation rejection; no real wallet credit or payment was made. Focused financial/component tests, typecheck and production build passed; full-tree lint retains pre-existing generated-finance errors outside this scope.
+
+Backups: live `/opt/wikiacc/backups/superip-wallet-release`, offhost `/root/backups/wikiacc/superip-wallet`. Final quiescent snapshot SHA-256 `eeeaf80d786937614ca8bbc347e79c2d25ecee06b5b79b97ea779e5476007048`; two isolated and two live migration runs preserved all 30 original tables' contents. The prior frontend build is retained as `previous-next` in the live backup directory. Acceptance/provenance is under `/root/.hermes/cache/scratch/wikiacc-superip-release/` on dev. Never restore this pre-release financial snapshot after new purchases; follow the forward-fix boundary above.
+
 ## Targeted tests
 
 `npm --prefix backend test -- tests/superip.test.js tests/sharebox.test.js tests/price-consent.test.js tests/pricing-orders.test.js tests/api.test.js`
