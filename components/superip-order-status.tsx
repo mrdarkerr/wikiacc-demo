@@ -19,9 +19,13 @@ export function SuperipOrderStatus({ order }: { order: Order }) {
                 تومان
               </p>
               <p role="status">
-                {order.paymentStatus !== "PAID"
-                  ? "در انتظار پرداخت"
-                  : superipStatusLabel(job?.status)}
+                {order.status === "REFUNDED" || order.paymentStatus === "REFUNDED"
+                  ? "مبلغ سفارش بازپرداخت شده است"
+                  : order.status === "CANCELLED"
+                    ? "سفارش لغو شده است"
+                    : order.paymentStatus !== "PAID"
+                      ? "در انتظار پرداخت"
+                      : superipStatusLabel(job?.status)}
               </p>
               {job?.status === "REVIEW_REQUIRED" && (
                 <p className="text-xs text-muted-foreground">

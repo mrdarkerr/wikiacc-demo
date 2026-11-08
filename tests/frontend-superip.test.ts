@@ -3,7 +3,15 @@ import {
   walletCreditInput,
   orderNeedsFulfillmentPolling,
 } from "../lib/superip";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { SuperipOrderStatus } from "../components/superip-order-status";
 import type { Order } from "../types/api";
+it("renders terminal order states before pending wallet state", () => {
+  const order = { paymentStatus: "PAID", status: "CANCELLED", items: [{id:"item",priceSnapshot:1000,productTypeSnapshot:"SUPERIP_WALLET",superipFulfillment:{username:"agent.one",amount:1000,status:"PENDING"}}]} as Order;
+  expect(renderToStaticMarkup(createElement(SuperipOrderStatus,{order}))).toContain("سفارش لغو شده است");
+  expect(renderToStaticMarkup(createElement(SuperipOrderStatus,{order:{...order,status:"REFUNDED",paymentStatus:"REFUNDED"}}))).toContain("مبلغ سفارش بازپرداخت شده است");
+});
 describe("wallet credit checkout", () => {
   it("normalizes user input and rejects fractional or out of bounds amounts", () => {
     expect(walletCreditInput("Agent.One", "۱۲۰۰۰")).toEqual({
