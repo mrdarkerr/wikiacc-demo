@@ -62,6 +62,11 @@ const navItems = [
     label: "اعلان‌های تلگرام",
   },
   {
+    href: "/admin/superip",
+    icon: KeyRound,
+    label: "شارژ سوپر ایپی",
+  },
+  {
     href: "/admin/sharebox",
     icon: KeyRound,
     label: "شیر‌باکس",

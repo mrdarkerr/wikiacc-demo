@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, RotateCcw, Save } from "lucide-react";
 
+import { SuperipOrderStatus } from "@/components/superip-order-status";
 import { DeliveryContentList } from "@/components/order-delivery-content";
 import { itemDeliveryContents } from "@/lib/sharebox";
 import {
@@ -308,6 +309,13 @@ export default function AdminOrderDetailPage() {
         </div>
       </div>
 
+      <SuperipOrderStatus order={order} />
+      {order.items.some(item=>item.superipFulfillment) && <AdminSection title="عملیات شارژ سوپر ایپی">
+        {order.items.map(item=>item.superipFulfillment?.lastErrorCode && <p key={item.id} className="text-sm" dir="ltr">{item.superipFulfillment.lastErrorCode}</p>)}
+        <Button type="button" disabled={saving || order.paymentStatus!=="PAID" || !order.items.some(item=>["RETRY","REVIEW_REQUIRED"].includes(item.superipFulfillment?.status??""))} onClick={async()=>{
+          setSaving(true);setError("");try{const result=await api.admin.superip.retry(order.id);await loadOrder();setMessage(result.queued?"شارژ با همان شناسه در صف تلاش مجدد قرار گرفت.":"سفارشی برای تلاش مجدد وجود ندارد.");}catch{setError("تلاش مجدد تأیید نشد؛ سفارش را تازه‌سازی کنید.");}finally{setSaving(false);}
+        }}>تلاش مجدد شارژ با همان شناسه</Button>
+      </AdminSection>}
       <OrderFinancialSnapshot items={order.items} />
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">

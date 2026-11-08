@@ -5,7 +5,7 @@ function isProduct(value: unknown): value is Product {
   if (!value || typeof value !== "object") return false;
   const product = value as Record<string, unknown>;
   return typeof product.id === "string" && typeof product.slug === "string" && typeof product.title === "string"
-    && ["INSTANT_DELIVERY", "CUSTOM_FORM", "SHAREBOX"].includes(String(product.type))
+    && ["INSTANT_DELIVERY", "CUSTOM_FORM", "SHAREBOX", "SUPERIP_WALLET"].includes(String(product.type))
     && Number.isInteger(product.price) && typeof product.price === "number" && product.price >= 0 && product.price <= 2147483647
     && Array.isArray(product.fields) && Array.isArray(product.features);
 }

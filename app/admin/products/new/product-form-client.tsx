@@ -237,7 +237,8 @@ export function AdminProductFormClient() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const preview = usePricingPreview(productForm);
+  const isWalletCredit = productForm.type === "SUPERIP_WALLET";
+  const preview = usePricingPreview(isWalletCredit ? {...productForm,priceCurrency:"TOMAN",basePrice:"0",profit:"0"} : productForm);
 
 
   function resetForm() {
@@ -671,11 +672,12 @@ export function AdminProductFormClient() {
           )}
         </AdminSection>
 
-        {!loading ? <ProductPricingSection form={productForm} preview={preview} disabled={saving} onChange={(patch) => setProductForm((current) => ({ ...current, ...patch }))} /> : null}
+        {!loading && !isWalletCredit ? <ProductPricingSection form={productForm} preview={preview} disabled={saving} onChange={(patch) => setProductForm((current) => ({ ...current, ...patch }))} /> : null}
 
+        {isWalletCredit && <AdminSection title="مبلغ دلخواه">مشتری نام کاربری و مبلغ شارژ را وارد می‌کند. مبلغ پرداخت و شارژ یکسان است و قیمت ثابت یا سود اضافه ندارد. <Link href="/admin/superip" className="text-primary">تنظیم اتصال سوپر ایپی</Link></AdminSection>}
         <AdminSection title="نوع محصول">
           <div className="grid gap-3 md:grid-cols-3">
-            {(["CUSTOM_FORM", "INSTANT_DELIVERY", "SHAREBOX"] as ProductType[]).map(
+            {(["CUSTOM_FORM", "INSTANT_DELIVERY", "SHAREBOX", "SUPERIP_WALLET"] as ProductType[]).map(
               (type) => {
                 const active = productForm.type === type;
                 const Icon =
@@ -718,7 +720,7 @@ export function AdminProductFormClient() {
                           ? "دریافت اطلاعات سفارش با فیلدهای قابل تنظیم"
                           : type === "INSTANT_DELIVERY"
                             ? "تحویل خودکار محتوای آماده بعد از خرید"
-                            : "صدور خودکار لایسنس از دسته انتخابی شیر‌باکس"}
+                            : type === "SUPERIP_WALLET" ? "شارژ کیف پول نماینده با نام کاربری و مبلغ دلخواه" : "صدور خودکار لایسنس از دسته انتخابی شیر‌باکس"}
                       </span>
                     </span>
                   </button>

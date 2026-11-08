@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Eye, Plus, RefreshCw, X } from "lucide-react";
 
+import { SuperipOrderStatus } from "@/components/superip-order-status";
 import { DeliveryContentList } from "@/components/order-delivery-content";
+import { orderNeedsFulfillmentPolling as orderNeedsShareBoxPolling } from "@/lib/superip";
 import { itemDeliveryContents } from "@/lib/sharebox";
 import { formatCurrency, formatDate } from "@/components/panel/formatters";
 import { PanelSection } from "@/components/panel/panel-section";
@@ -13,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { DialogOverlay } from "@/components/ui/dialog";
 import { api, ApiError } from "@/lib/api";
 import {
-  orderNeedsShareBoxPolling,
+
   shareBoxItemNeedsPolling,
 } from "@/lib/sharebox";
 import type { ApiMeta, Order } from "@/types/api";
@@ -141,10 +143,10 @@ export default function OrdersPage() {
                         <p className="mt-1 font-medium">
                           {deliveries.length
                             ? orderNeedsShareBoxPolling(order)
-                              ? `${deliveries.length} مورد آماده · در حال صدور لایسنس`
+                              ? `${deliveries.length} مورد آماده · در حال تکمیل سفارش`
                               : `${deliveries.length} مورد آماده`
                             : orderNeedsShareBoxPolling(order)
-                              ? "در حال صدور لایسنس"
+                              ? "در حال تکمیل سفارش"
                               : "هنوز محتوایی ثبت نشده است"}
                         </p>
                       </div>
@@ -206,7 +208,7 @@ export default function OrdersPage() {
                             </span>
                           ) : orderNeedsShareBoxPolling(order) ? (
                             <span className="text-amber-600 dark:text-amber-300">
-                              در حال صدور لایسنس
+                              در حال تکمیل سفارش
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -325,7 +327,7 @@ function OrderDialog({
         .catch(() => {
           if (active) {
             setRefreshError(
-              "تازه‌سازی خودکار وضعیت صدور انجام نشد. سفارش ثبت شده است.",
+              "تازه‌سازی خودکار وضعیت تحویل انجام نشد. سفارش ثبت شده است.",
             );
           }
         })
@@ -401,6 +403,7 @@ function OrderDialog({
           </div>
         </div>
 
+        <SuperipOrderStatus order={order} />
         <div className="mt-5 space-y-4">
           {order.items.map((item) => (
             <article className="rounded-md border border-border p-4" key={item.id}>
@@ -450,7 +453,7 @@ function OrderDialog({
                 )}
                 {shareBoxItemNeedsPolling(item) ? (
                   <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">
-                    در حال صدور لایسنس
+                    در حال تکمیل سفارش
                   </p>
                 ) : null}
               </div>

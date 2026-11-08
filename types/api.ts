@@ -208,7 +208,7 @@ export type LoginResponse = {
   user: User;
 };
 
-export type ProductType = "CUSTOM_FORM" | "INSTANT_DELIVERY" | "SHAREBOX";
+export type ProductType = "CUSTOM_FORM" | "INSTANT_DELIVERY" | "SHAREBOX" | "SUPERIP_WALLET";
 export type FieldType = "TEXT" | "EMAIL" | "PHONE" | "TEXTAREA" | "SELECT";
 
 export type ProductField = {
@@ -375,6 +375,7 @@ export type OrderItem = {
   fieldValues: OrderFieldValue[];
   deliveries: OrderDelivery[];
   shareboxFulfillments?: ShareBoxFulfillment[];
+  superipFulfillment?: { id:string;username:string;amount:number;status:string;attempts:number;lastErrorCode:string|null;receiptId:string|null;deliveredAt:string|null } | null;
 };
 
 export type Order = {
@@ -419,6 +420,7 @@ export type CreateTicketRequest = {
 };
 
 export type CreateOrderRequest = {
+  superip?: { username: string; amount: number };
   productId: string;
   quantity?: number;
   expectedUnitPrice?: number;
