@@ -12,6 +12,10 @@ Lightweight Fastify backend for the GimiAcc storefront MVP.
   - `CUSTOM_FORM`: customer submits required order fields after purchase.
   - `INSTANT_DELIVERY`: the product consumes one or more ready delivery items from a delivery pool.
 
+## Super IP wallet products
+
+See [Super IP wallet integration](../docs/superip-wallet.md) for variable-amount checkout, paid-only fulfillment, secret configuration, retry and additive migration boundaries.
+
 ## Local setup
 
 ```bash

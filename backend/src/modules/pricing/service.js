@@ -3,6 +3,11 @@ import { calculatePrice, normalizeAmount, parseProfit } from "./calculator.js";
 import { getEffectiveRate } from "../exchange-rates/service.js";
 
 export function prepareProductPricing(input, current = null) {
+  if ((input.type ?? current?.type) === "SUPERIP_WALLET") {
+    if ((input.priceCurrency && input.priceCurrency !== "TOMAN") || Number(input.basePrice ?? input.price ?? 0) !== 0 || (input.profit !== undefined && String(input.profit) !== "0"))
+      throw badRequest("SUPERIP_VARIABLE_PRICE", "Wallet amount is selected at checkout, without markup");
+    return {price:0,priceCurrency:"TOMAN",basePrice:"0",profitType:"TOMAN",profitValue:"0"};
+  }
   const currency = input.priceCurrency ?? current?.priceCurrency ?? "TOMAN";
   if (input.price !== undefined && (input.basePrice !== undefined || currency === "USD")) {
     throw badRequest("PRICING_LEGACY_AMBIGUOUS", "Use basePrice explicitly for dynamic prices; do not mix price and basePrice");

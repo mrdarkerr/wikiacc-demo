@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { superipCheckoutInput } from "../superip/checkout.js";
 
 export const orderFieldValueSchema = z.record(
   z.string().min(1).max(64),
@@ -7,6 +8,7 @@ export const orderFieldValueSchema = z.record(
 
 export const createOrderSchema = z.object({
   productId: z.string().min(1),
+  superip: superipCheckoutInput.optional(),
   quantity: z.number().int().min(1).max(10).default(1),
   expectedUnitPrice: z.number().int().min(0).max(2147483647).optional(),
   paymentMethod: z.enum(["WALLET", "JIBIT"]).default("WALLET"),

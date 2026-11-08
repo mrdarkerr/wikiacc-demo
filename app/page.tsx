@@ -543,6 +543,7 @@ function productInitials(title: string) {
 }
 
 function productTypeLabel(product: Product) {
+  if (product.type === "SUPERIP_WALLET") return "شارژ کیف پول نمایندگی";
   if (product.type === "SHAREBOX") return "لایسنس شیر‌باکس";
   if (product.type === "INSTANT_DELIVERY") return "تحویل فوری";
   return "سفارش اختصاصی";
@@ -584,8 +585,8 @@ function ServiceCard({ product, index }: { product: Product; index: number }) {
         <div>
           <div className="text-xs opacity-60">شروع قیمت از</div>
           <div className="mt-1 whitespace-nowrap text-2xl font-extrabold">
-            {formatPrice(product.price)}
-            <span className="me-1 text-sm font-medium opacity-70"> تومان</span>
+            {product.type === "SUPERIP_WALLET" ? "مبلغ دلخواه" : formatPrice(product.price)}
+            {product.type !== "SUPERIP_WALLET" && <span className="me-1 text-sm font-medium opacity-70"> تومان</span>}
           </div>
         </div>
         <Button

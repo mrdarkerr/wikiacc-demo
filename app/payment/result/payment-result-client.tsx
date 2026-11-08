@@ -13,12 +13,13 @@ import {
   RefreshCw,
 } from "lucide-react";
 
+import { SuperipOrderStatus } from "@/components/superip-order-status";
 import { DeliveryContentList } from "@/components/order-delivery-content";
 import { itemDeliveryContents } from "@/lib/sharebox";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
-import { orderNeedsShareBoxPolling } from "@/lib/sharebox";
+import { orderNeedsFulfillmentPolling as orderNeedsShareBoxPolling } from "@/lib/superip";
 import type { DirectPaymentResult, Order } from "@/types/api";
 
 type ResultStatus = DirectPaymentResult["status"];
@@ -115,7 +116,7 @@ export function PaymentResultClient() {
         .catch(() => {
           if (active) {
             setFulfillmentRefreshError(
-              "تازه‌سازی خودکار وضعیت صدور انجام نشد. پرداخت شما تأیید شده است.",
+              "تازه‌سازی خودکار وضعیت تحویل انجام نشد. پرداخت شما تأیید شده است.",
             );
           }
         })
@@ -177,6 +178,7 @@ export function PaymentResultClient() {
               title="پرداخت با موفقیت تأیید شد"
               description={`سفارش ${orderCode(order)} ثبت و پرداخت شده است.`}
             />
+            <SuperipOrderStatus order={order} />
             {deliveries.length ? (
               <div className="mt-6 space-y-3 rounded-md border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
                 <p className="text-sm font-bold text-emerald-800 dark:text-emerald-100">
@@ -185,15 +187,15 @@ export function PaymentResultClient() {
                 <DeliveryContentList deliveries={deliveries} />
                 {waitingForShareBox ? (
                   <p className="text-xs text-amber-700 dark:text-amber-200">
-                    صدور باقی لایسنس‌ها ادامه دارد و وضعیت خودکار تازه می‌شود.
+                    تکمیل باقی سفارش ادامه دارد و وضعیت خودکار تازه می‌شود.
                   </p>
                 ) : null}
               </div>
             ) : waitingForShareBox ? (
               <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-                <p className="font-medium">در حال صدور لایسنس</p>
+                <p className="font-medium">در حال تکمیل سفارش</p>
                 <p className="mt-1 text-xs leading-6">
-                  پرداخت تأیید شده و وضعیت صدور به‌صورت خودکار تازه می‌شود.
+                  پرداخت تأیید شده و وضعیت تحویل به‌صورت خودکار تازه می‌شود.
                 </p>
                 <Button
                   className="mt-3"

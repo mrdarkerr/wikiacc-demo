@@ -27,6 +27,9 @@ export async function getProductBySlug(prisma, slug) {
 }
 
 export function validateProductInput(input) {
+  if (input.type === "SUPERIP_WALLET" && (input.deliveryPoolId || input.fields?.length)) {
+    throw badRequest("SUPERIP_PRODUCT_INVALID", "Wallet products cannot use delivery pools or editable form fields");
+  }
   if (input.type === "CUSTOM_FORM" && input.deliveryPoolId) {
     throw badRequest(
       "CUSTOM_PRODUCT_CANNOT_USE_DELIVERY_POOL",

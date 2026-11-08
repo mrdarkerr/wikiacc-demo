@@ -282,6 +282,7 @@ export default function AdminProductsPage() {
             <option value="ALL">همه نوع ها</option>
             <option value="CUSTOM_FORM">فرم اختصاصی</option>
             <option value="INSTANT_DELIVERY">تحویل فوری</option>
+            <option value="SUPERIP_WALLET">شارژ سوپر ایپی</option>
             <option value="SHAREBOX">شیر‌باکس</option>
           </Select>
           <Select

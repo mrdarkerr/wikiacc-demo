@@ -286,7 +286,7 @@ async function markSuccessful(prisma, attempt, purchase) {
       if (item.productTypeSnapshot === "INSTANT_DELIVERY") {
         await fulfillReservedDeliveryItems(tx, item.id, item.quantity);
         orderStatus = "DELIVERED";
-      } else if (item.productTypeSnapshot === "SHAREBOX") {
+      } else if (["SHAREBOX", "SUPERIP_WALLET"].includes(item.productTypeSnapshot)) {
         orderStatus = "READY";
       } else {
         const suppliedKeys = new Set(item.fieldValues.map((field) => field.keySnapshot));

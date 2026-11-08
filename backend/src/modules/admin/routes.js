@@ -23,6 +23,8 @@ import {
   removeAvailableDeliveryItem,
 } from "../delivery/service.js";
 import { enqueueOrderCompletedNotification } from "../sms/notifications.js";
+import { SUPERIP_SELECT } from "../superip/checkout.js";
+import { assertSuperipChangeAllowed, retrySuperipOrder } from "../superip/fulfillment.js";
 import { SHAREBOX_FULFILLMENT_SELECT } from "../sharebox/constants.js";
 import {
   assertShareboxStatusChangeAllowed,
@@ -82,6 +84,7 @@ const adminOrderInclude = {
     include: {
       product: true,
       deliveries: true,
+      superipFulfillment: { select: SUPERIP_SELECT },
       shareboxFulfillments: {
         select: SHAREBOX_FULFILLMENT_SELECT,
         orderBy: { unitIndex: "asc" },
@@ -171,6 +174,7 @@ export async function adminRoutes(app, options) {
           "Direct payment status cannot change before payment reconciliation",
         );
       }
+      await assertSuperipChangeAllowed(tx, current.id, input.status);
       await assertShareboxStatusChangeAllowed(
         tx,
         current.id,
@@ -214,6 +218,11 @@ export async function adminRoutes(app, options) {
       throw badRequest("ORDER_NOT_REFUNDABLE", "Order is not refundable");
     }
     return ok(reply, result);
+  });
+
+  app.post("/orders/:id/superip/retry", async (request, reply) => {
+    const params = parse(idParamsSchema, request.params);
+    return ok(reply, { queued: await retrySuperipOrder(app.prisma, params.id) });
   });
 
   app.post("/orders/:id/sharebox/retry", async (request, reply) => {

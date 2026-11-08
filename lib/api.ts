@@ -414,6 +414,11 @@ export const api = {
         body: { useCurrentConfiguration: true }, method: "POST",
       }),
     },
+    superip: {
+      getSettings: () => apiFetch<{settings:{enabled:boolean;configured:boolean;endpoint:string}}>("/admin/superip/settings"),
+      updateSettings: (body:{enabled:boolean;endpoint:string;secret?:string}) => apiFetch<{settings:{enabled:boolean;configured:boolean;endpoint:string}}>("/admin/superip/settings",{method:"PATCH",body}),
+      retry: (id:string) => apiFetch<{queued:number}>(`/admin/orders/${id}/superip/retry`,{method:"POST",body:{}}),
+    },
     sharebox: {
       getSettings: () =>
         apiFetch<{ settings: AdminShareBoxSettings }>(

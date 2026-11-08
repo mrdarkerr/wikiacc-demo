@@ -23,12 +23,13 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { OtpAuthForm } from "@/components/auth/otp-auth-form";
+import { SuperipOrderStatus } from "@/components/superip-order-status";
 import { DeliveryContentList } from "@/components/order-delivery-content";
 import { itemDeliveryContents } from "@/lib/sharebox";
 import { api, ApiError } from "@/lib/api";
 import { checkoutPriceChange, checkoutWalletBalance } from "@/lib/checkout";
 import { usePublicProducts } from "@/lib/use-public-products";
-import { orderNeedsShareBoxPolling } from "@/lib/sharebox";
+import { walletCreditInput, orderNeedsFulfillmentPolling as orderNeedsShareBoxPolling } from "@/lib/superip";
 import { dashboardPath, useCurrentUser } from "@/lib/use-current-user";
 import type {
   Order,
@@ -53,6 +54,7 @@ function deliveryMessages(order: Order) {
 }
 
 function productTypeLabel(product: Product) {
+  if (product.type === "SUPERIP_WALLET") return "شارژ کیف پول نمایندگی";
   if (product.type === "SHAREBOX") return "لایسنس شیر‌باکس";
   if (product.type === "INSTANT_DELIVERY") return "تحویل فوری";
   return "سفارش اختصاصی";
@@ -115,6 +117,7 @@ function apiErrorMessage(error: unknown) {
   }
 
   const code = error.payload?.error?.code;
+  if (code?.startsWith("SUPERIP_")) return "شارژ سوپر ایپی در دسترس نیست یا اطلاعات ورودی معتبر نیست؛ نام کاربری و مبلغ را بررسی کنید.";
   if (code === "PRICE_CHANGED") return "قیمت محصول تغییر کرده است؛ قیمت تازه را بررسی و خرید را دوباره تأیید کنید.";
   if (code === "PRICING_AMOUNT_TOO_LARGE") return "مبلغ این خرید از محدودهٔ مجاز بیشتر است؛ تعداد را کاهش دهید.";
   if (code === "PAYMENT_AMOUNT_INVALID") return "پرداخت مستقیم برای این مبلغ ممکن نیست؛ از کیف پول استفاده کنید یا با پشتیبانی تماس بگیرید.";
@@ -172,6 +175,8 @@ export function StorefrontClient() {
   const { products, loading, error: loadError, replaceProduct } = usePublicProducts();
   const [fieldValues, setFieldValues] = useState<FieldValues>({});
   const [quantity, setQuantity] = useState(1);
+  const [resellerUsername, setResellerUsername] = useState("");
+  const [creditAmount, setCreditAmount] = useState("100000");
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("JIBIT");
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
@@ -221,7 +226,7 @@ export function StorefrontClient() {
         .catch(() => {
           if (active) {
             setFulfillmentRefreshError(
-              "تازه‌سازی خودکار وضعیت صدور کامل نشد؛ سفارش شما ثبت شده است.",
+              "تازه‌سازی خودکار وضعیت تحویل کامل نشد؛ سفارش شما ثبت شده است.",
             );
           }
         })
@@ -246,7 +251,9 @@ export function StorefrontClient() {
     typeof availableDeliveryItems === "number" &&
     availableDeliveryItems > 0 &&
     quantity > availableDeliveryItems;
-  const totalAmount = selectedProduct ? selectedProduct.price * quantity : 0;
+  const isWalletCredit = selectedProduct?.type === "SUPERIP_WALLET";
+  const creditInput = walletCreditInput(resellerUsername, creditAmount);
+  const totalAmount = isWalletCredit ? (walletCreditInput("preview", creditAmount)?.amount ?? 0) : selectedProduct ? selectedProduct.price * quantity : 0;
 
   function updateFieldValue(key: string, value: string) {
     setFieldValues((current) => ({ ...current, [key]: value }));
@@ -269,7 +276,8 @@ export function StorefrontClient() {
       return;
     }
 
-    const normalizedQuantity = Math.min(10, Math.max(1, quantity || 1));
+    if (isWalletCredit && !creditInput) { setSubmitError("نام کاربری انگلیسی و مبلغ صحیح بین ۱٬۰۰۰ تا ۲۰۰٬۰۰۰٬۰۰۰ تومان وارد کنید."); return; }
+    const normalizedQuantity = isWalletCredit ? 1 : Math.min(10, Math.max(1, quantity || 1));
     const values =
       selectedProduct.type === "CUSTOM_FORM"
         ? Object.fromEntries(
@@ -300,13 +308,14 @@ export function StorefrontClient() {
       const latest = (await api.catalog.product(selectedProduct.slug)).product;
       if (!mounted.current) return;
       replaceProduct(latest);
-      if (latest.price !== selectedProduct.price) {
-        setPriceNotice(`قیمت واحد از ${formatCurrency(selectedProduct.price)} به ${formatCurrency(latest.price)} تغییر کرده است. مبلغ جدید را بررسی و دوباره تأیید کنید؛ هیچ پرداختی انجام نشده است.`);
+      if (latest.type !== selectedProduct.type || (!isWalletCredit && latest.price !== selectedProduct.price)) {
+        setPriceNotice(`قیمت واحد از ${isWalletCredit ? "مبلغ دلخواه" : formatCurrency(selectedProduct.price)} به ${formatCurrency(latest.price)} تغییر کرده است. مبلغ جدید را بررسی و دوباره تأیید کنید؛ هیچ پرداختی انجام نشده است.`);
         return;
       }
       const result = await api.orders.create({
         productId: selectedProduct.id,
-        expectedUnitPrice: selectedProduct.price,
+        expectedUnitPrice: isWalletCredit ? totalAmount : selectedProduct.price,
+        ...(isWalletCredit && creditInput ? {superip: creditInput} : {}),
         quantity: normalizedQuantity,
         paymentMethod,
         ...(values ? { fieldValues: values } : {}),
@@ -463,7 +472,7 @@ export function StorefrontClient() {
                   <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-border pt-5">
                     <div>
                       <p className="text-xs text-muted-foreground">قیمت واحد</p>
-                      <p className="mt-1 text-xl font-bold">{formatCurrency(selectedProduct.price)}</p>
+                      <p className="mt-1 text-xl font-bold">{isWalletCredit ? "مبلغ دلخواه" : formatCurrency(selectedProduct.price)}</p>
                     </div>
                     <Button asChild variant="outline">
                       <Link href="/#services">
@@ -549,14 +558,19 @@ export function StorefrontClient() {
 
               {selectedProduct ? (
                 <>
+                  {isWalletCredit && <div className="space-y-4 rounded-md border border-primary/30 p-4">
+                    <label className="block text-sm">نام کاربری نمایندگی سوپر ایپی<Input className="mt-2" dir="ltr" required value={resellerUsername} maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{2,63}" onChange={event=>setResellerUsername(event.target.value)} /></label>
+                    <label className="block text-sm">مبلغ شارژ (تومان)<Input className="mt-2" dir="ltr" inputMode="numeric" required value={creditAmount} onChange={event=>setCreditAmount(event.target.value)} /></label>
+                    <p className="text-xs text-muted-foreground">همین مبلغ پس از پرداخت به کیف پول این نام کاربری اضافه می‌شود. نام کاربری را دقیق بررسی کنید؛ شارژ انجام‌شده قابل بازگشت خودکار نیست.</p>
+                  </div>}
                   <div className="rounded-md border border-border bg-muted/40 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm text-muted-foreground">مبلغ واحد</span>
                       <span className="font-medium">
-                        {formatCurrency(selectedProduct.price)}
+                        {isWalletCredit ? "مبلغ دلخواه" : formatCurrency(selectedProduct.price)}
                       </span>
                     </div>
-                    <div className="mt-3 flex items-center justify-between gap-3">
+                    <div hidden={isWalletCredit} className="mt-3 flex items-center justify-between gap-3">
                       <label className="text-sm text-muted-foreground" htmlFor="quantity">
                         تعداد
                       </label>
@@ -570,7 +584,8 @@ export function StorefrontClient() {
                         }
                         min={1}
                         type="number"
-                        value={quantity}
+                        disabled={isWalletCredit}
+                        value={isWalletCredit ? 1 : quantity}
                         onChange={(event) =>
                           setQuantity(Number.parseInt(event.target.value, 10) || 1)
                         }
@@ -793,11 +808,12 @@ function OrderResult({
           <p className="font-medium">
             سفارش {orderCode(order)} ثبت و پرداخت شد.
           </p>
+          <SuperipOrderStatus order={order} />
           {deliveries.length ? (
             <DeliveryContentList className="mt-3 text-foreground" deliveries={deliveries} />
           ) : waitingForShareBox ? (
             <p className="mt-1 text-emerald-700 dark:text-emerald-200">
-              در حال صدور لایسنس؛ وضعیت به‌صورت خودکار تازه می‌شود.
+              در حال تکمیل سفارش؛ وضعیت به‌صورت خودکار تازه می‌شود.
             </p>
           ) : (
             <p className="mt-1 text-emerald-700 dark:text-emerald-200">
@@ -806,7 +822,7 @@ function OrderResult({
           )}
           {deliveries.length && waitingForShareBox ? (
             <p className="mt-2 text-emerald-700 dark:text-emerald-200">
-              صدور باقی لایسنس‌ها ادامه دارد و وضعیت خودکار تازه می‌شود.
+              تکمیل باقی سفارش ادامه دارد و وضعیت خودکار تازه می‌شود.
             </p>
           ) : null}
           {refreshError ? (

@@ -15,7 +15,7 @@ export function publicOrder(order) {
   if (!order) return order;
   const result = pick(order, ["id", "userId", "walletTransactionId", "status", "paymentStatus", "paymentMethod", "totalAmount", "note", "createdAt", "updatedAt", "tickets"]);
   if (order.items) result.items = order.items.map((item) => ({
-    ...pick(item, ["id", "orderId", "productId", "titleSnapshot", "priceSnapshot", "productTypeSnapshot", "quantity", "createdAt", "fieldValues", "deliveries", "shareboxFulfillments"]),
+    ...pick(item, ["id", "orderId", "productId", "titleSnapshot", "priceSnapshot", "productTypeSnapshot", "quantity", "createdAt", "fieldValues", "deliveries", "shareboxFulfillments", "superipFulfillment"]),
     ...(item.product ? { product: publicProduct(item.product, item.priceSnapshot) } : {}),
   }));
   return result;
