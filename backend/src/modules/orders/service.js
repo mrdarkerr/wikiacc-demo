@@ -1,3 +1,4 @@
+import { superipCheckout, superipPricedProduct, createSuperipSnapshot } from "../superip/checkout.js";
 import { MAX_TOMAN } from "../pricing/calculator.js";
 import { quoteProduct } from "../pricing/service.js";
 import { pricingSnapshot, publicOrder } from "../pricing/order-snapshot.js";
@@ -92,7 +93,8 @@ export async function createPendingJibitOrder(
       shareboxBaseUrl,
     );
     const quantity = input.quantity ?? 1;
-    const pricing = await quoteProduct(tx, product, quantity);
+    const superipSnapshot = await superipCheckout(tx, product, input);
+    const pricing = await quoteProduct(tx, superipPricedProduct(product, superipSnapshot), quantity);
     if (input.expectedUnitPrice !== undefined && input.expectedUnitPrice !== pricing.unitPrice) {
       throw conflict("PRICE_CHANGED", "Product price has changed; confirm the current price", {
         unitPrice: pricing.unitPrice, totalAmount: pricing.totalAmount,
@@ -160,6 +162,7 @@ export async function createPendingJibitOrder(
     if (product.type === "INSTANT_DELIVERY") {
       await reserveDeliveryItems(tx, product.deliveryPoolId, orderItem.id, quantity);
     }
+    await createSuperipSnapshot(tx, orderItem, superipSnapshot);
     await createShareboxFulfillmentSnapshots(tx, {
       order,
       orderItem,
@@ -250,7 +253,8 @@ export async function createOrder(
       shareboxBaseUrl,
     );
     const quantity = input.quantity ?? 1;
-    const pricing = await quoteProduct(tx, product, quantity);
+    const superipSnapshot = await superipCheckout(tx, product, input);
+    const pricing = await quoteProduct(tx, superipPricedProduct(product, superipSnapshot), quantity);
     if (input.expectedUnitPrice !== undefined && input.expectedUnitPrice !== pricing.unitPrice) {
       throw conflict("PRICE_CHANGED", "Product price has changed; confirm the current price", {
         unitPrice: pricing.unitPrice, totalAmount: pricing.totalAmount,
@@ -285,7 +289,7 @@ export async function createOrder(
     const initialStatus =
       product.type === "INSTANT_DELIVERY"
         ? "DELIVERED"
-        : product.type === "SHAREBOX"
+        : ["SHAREBOX", "SUPERIP_WALLET"].includes(product.type)
           ? "READY"
           : fieldState.complete
             ? "AWAITING_ADMIN"
@@ -345,6 +349,7 @@ export async function createOrder(
     if (product.type === "INSTANT_DELIVERY") {
       await allocateDeliveryItems(tx, product.deliveryPoolId, orderItem.id, quantity);
     }
+    await createSuperipSnapshot(tx, orderItem, superipSnapshot);
     await createShareboxFulfillmentSnapshots(tx, {
       order,
       orderItem,

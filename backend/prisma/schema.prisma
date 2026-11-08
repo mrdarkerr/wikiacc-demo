@@ -21,6 +21,7 @@ enum ProductType {
   CUSTOM_FORM
   INSTANT_DELIVERY
   SHAREBOX
+  SUPERIP_WALLET
 }
 
 enum ShareboxFulfillmentStatus {
@@ -255,6 +256,7 @@ model OrderItem {
   fieldValues         OrderFieldValue[]
   deliveries          OrderDelivery[]
   shareboxFulfillments ShareboxFulfillment[]
+  superipFulfillment SuperipFulfillment?
   titleSnapshot       String
   priceSnapshot       Int
   priceCurrencySnapshot String?
@@ -322,6 +324,34 @@ model OrderDelivery {
   deliveredAt     DateTime     @default(now())
 
   @@unique([deliveryItemId])
+}
+
+model SuperipSettings {
+  id String @id
+  enabled Boolean @default(false)
+  endpoint String
+  secretEncrypted String?
+  updatedAt DateTime @updatedAt
+}
+
+model SuperipFulfillment {
+  id String @id @default(cuid())
+  orderItemId String @unique
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  username String
+  amount Int
+  endpoint String
+  reference String @unique
+  status String @default("PENDING")
+  attempts Int @default(0)
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  nextAttemptAt DateTime @default(now())
+  lastErrorCode String?
+  receiptId String?
+  deliveredAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([status, nextAttemptAt])
 }
 
 model ShareboxSettings {

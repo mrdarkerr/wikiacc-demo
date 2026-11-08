@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const productTypeSchema = z.enum(["CUSTOM_FORM", "INSTANT_DELIVERY", "SHAREBOX"]);
+export const productTypeSchema = z.enum(["CUSTOM_FORM", "INSTANT_DELIVERY", "SHAREBOX", "SUPERIP_WALLET"]);
 export const fieldTypeSchema = z.enum(["TEXT", "EMAIL", "PHONE", "TEXTAREA", "SELECT"]);
 
 export const productFieldInputSchema = z.object({

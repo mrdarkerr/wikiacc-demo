@@ -1,3 +1,4 @@
+import { SUPERIP_SELECT } from "../superip/checkout.js";
 import { SHAREBOX_FULFILLMENT_SELECT } from "../sharebox/constants.js";
 
 export function listUserOrders(prisma, userId, { page = 1, perPage = 20 } = {}) {
@@ -8,6 +9,7 @@ export function listUserOrders(prisma, userId, { page = 1, perPage = 20 } = {}) 
         include: {
           product: true,
           deliveries: true,
+          superipFulfillment: { select: SUPERIP_SELECT },
           shareboxFulfillments: {
             select: SHAREBOX_FULFILLMENT_SELECT,
             orderBy: { unitIndex: "asc" },
@@ -34,6 +36,7 @@ export function getUserOrder(prisma, userId, orderId) {
         include: {
           product: { include: { fields: { orderBy: { sortOrder: "asc" } } } },
           deliveries: true,
+          superipFulfillment: { select: SUPERIP_SELECT },
           shareboxFulfillments: {
             select: SHAREBOX_FULFILLMENT_SELECT,
             orderBy: { unitIndex: "asc" },

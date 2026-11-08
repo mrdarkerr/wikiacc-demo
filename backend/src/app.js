@@ -1,4 +1,7 @@
 import Fastify from "fastify";
+import { createSuperipClient } from "./modules/superip/client.js";
+import { startSuperipWorker } from "./modules/superip/fulfillment.js";
+import { adminSuperipRoutes } from "./modules/superip/admin-routes.js";
 import formbody from "@fastify/formbody";
 import rateLimit from "@fastify/rate-limit";
 
@@ -138,6 +141,7 @@ export async function buildApp(options = {}) {
     prefix: "/api/v1/admin",
     shareboxClient,
   });
+  await app.register(adminSuperipRoutes, { prefix: "/api/v1/admin/superip" });
   await app.register(adminPricingRoutes, { prefix: "/api/v1/admin" });
   await app.register(adminFinanceRoutes, { prefix: "/api/v1/admin/finance" });
   await app.register(adminShareboxRoutes, {
@@ -182,6 +186,10 @@ export async function buildApp(options = {}) {
     });
   }
 
+  if (options.superipWorkerOptions?.enabled ?? env.NODE_ENV !== "test") {
+    const worker = startSuperipWorker(app.prisma, options.superipClient ?? createSuperipClient(), {logger:app.log,...options.superipWorkerOptions});
+    app.addHook("onClose", () => worker.stop());
+  }
   const shareboxWorkerOptions = options.shareboxWorkerOptions ?? {};
   const shareboxWorkerEnabled =
     shareboxWorkerOptions.enabled ?? env.NODE_ENV !== "test";
