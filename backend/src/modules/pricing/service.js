@@ -33,6 +33,7 @@ export function publicProduct(product, sellingPrice) {
   if (!product) return product;
   const result = pick(product, ["id", "categoryId", "deliveryPoolId", "slug", "title", "description", "type", "isActive", "archivedAt", "sortOrder", "createdAt", "updatedAt"]);
   result.price = sellingPrice;
+  if (product.type === "SUPERIP_WALLET") result.superipMinAmount = product.superipMinAmount ?? 1000;
   if (product.category !== undefined) result.category = pick(product.category, ["id", "slug", "title", "description", "isActive", "sortOrder"]);
   if (product.deliveryPool !== undefined) result.deliveryPool = pick(product.deliveryPool, ["id", "slug", "title", "description", "_count"]);
   if (product.features) result.features = product.features.map((f) => pick(f, ["id", "productId", "title", "sortOrder", "createdAt", "updatedAt"]));

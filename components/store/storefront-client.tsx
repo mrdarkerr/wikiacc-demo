@@ -117,6 +117,7 @@ function apiErrorMessage(error: unknown) {
   }
 
   const code = error.payload?.error?.code;
+  if (code === "SUPERIP_BELOW_MINIMUM") return "مبلغ شارژ از حداقل این محصول کمتر است؛ صفحه را تازه‌سازی و مبلغ را اصلاح کنید.";
   if (code?.startsWith("SUPERIP_")) return "شارژ سوپر ایپی در دسترس نیست یا اطلاعات ورودی معتبر نیست؛ نام کاربری و مبلغ را بررسی کنید.";
   if (code === "PRICE_CHANGED") return "قیمت محصول تغییر کرده است؛ قیمت تازه را بررسی و خرید را دوباره تأیید کنید.";
   if (code === "PRICING_AMOUNT_TOO_LARGE") return "مبلغ این خرید از محدودهٔ مجاز بیشتر است؛ تعداد را کاهش دهید.";
@@ -176,7 +177,7 @@ export function StorefrontClient() {
   const [fieldValues, setFieldValues] = useState<FieldValues>({});
   const [quantity, setQuantity] = useState(1);
   const [resellerUsername, setResellerUsername] = useState("");
-  const [creditAmount, setCreditAmount] = useState("100000");
+  const [creditAmount, setCreditAmount] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("JIBIT");
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
@@ -252,8 +253,10 @@ export function StorefrontClient() {
     availableDeliveryItems > 0 &&
     quantity > availableDeliveryItems;
   const isWalletCredit = selectedProduct?.type === "SUPERIP_WALLET";
-  const creditInput = walletCreditInput(resellerUsername, creditAmount);
-  const totalAmount = isWalletCredit ? (walletCreditInput("preview", creditAmount)?.amount ?? 0) : selectedProduct ? selectedProduct.price * quantity : 0;
+  const creditMinimum = selectedProduct?.superipMinAmount ?? 1000;
+  const creditValue = creditAmount ?? String(creditMinimum);
+  const creditInput = walletCreditInput(resellerUsername, creditValue, creditMinimum);
+  const totalAmount = isWalletCredit ? (walletCreditInput("preview", creditValue, creditMinimum)?.amount ?? 0) : selectedProduct ? selectedProduct.price * quantity : 0;
 
   function updateFieldValue(key: string, value: string) {
     setFieldValues((current) => ({ ...current, [key]: value }));
@@ -276,7 +279,7 @@ export function StorefrontClient() {
       return;
     }
 
-    if (isWalletCredit && !creditInput) { setSubmitError("نام کاربری انگلیسی و مبلغ صحیح بین ۱٬۰۰۰ تا ۲۰۰٬۰۰۰٬۰۰۰ تومان وارد کنید."); return; }
+    if (isWalletCredit && !creditInput) { setSubmitError(`نام کاربری انگلیسی و مبلغ صحیح از ${formatCurrency(creditMinimum)} تا ۲۰۰٬۰۰۰٬۰۰۰ تومان وارد کنید.`); return; }
     const normalizedQuantity = isWalletCredit ? 1 : Math.min(10, Math.max(1, quantity || 1));
     const values =
       selectedProduct.type === "CUSTOM_FORM"
@@ -308,6 +311,10 @@ export function StorefrontClient() {
       const latest = (await api.catalog.product(selectedProduct.slug)).product;
       if (!mounted.current) return;
       replaceProduct(latest);
+      if (isWalletCredit && creditInput && creditInput.amount < (latest.superipMinAmount ?? 1000)) {
+        setPriceNotice(`حداقل مبلغ شارژ به ${formatCurrency(latest.superipMinAmount ?? 1000)} تغییر کرده است. مبلغ را بررسی کنید؛ هیچ پرداختی انجام نشده است.`);
+        return;
+      }
       if (latest.type !== selectedProduct.type || (!isWalletCredit && latest.price !== selectedProduct.price)) {
         setPriceNotice(`قیمت واحد از ${isWalletCredit ? "مبلغ دلخواه" : formatCurrency(selectedProduct.price)} به ${formatCurrency(latest.price)} تغییر کرده است. مبلغ جدید را بررسی و دوباره تأیید کنید؛ هیچ پرداختی انجام نشده است.`);
         return;
@@ -473,6 +480,7 @@ export function StorefrontClient() {
                     <div>
                       <p className="text-xs text-muted-foreground">قیمت واحد</p>
                       <p className="mt-1 text-xl font-bold">{isWalletCredit ? "مبلغ دلخواه" : formatCurrency(selectedProduct.price)}</p>
+                      {isWalletCredit && <p className="mt-2 text-sm">حداقل مبلغ شارژ: {formatCurrency(creditMinimum)}</p>}
                     </div>
                     <Button asChild variant="outline">
                       <Link href="/#services">
@@ -560,7 +568,8 @@ export function StorefrontClient() {
                 <>
                   {isWalletCredit && <div className="space-y-4 rounded-md border border-primary/30 p-4">
                     <label className="block text-sm">نام کاربری نمایندگی سوپر ایپی<Input className="mt-2" dir="ltr" required value={resellerUsername} maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{2,63}" onChange={event=>setResellerUsername(event.target.value)} /></label>
-                    <label className="block text-sm">مبلغ شارژ (تومان)<Input className="mt-2" dir="ltr" inputMode="numeric" required value={creditAmount} onChange={event=>setCreditAmount(event.target.value)} /></label>
+                    <label className="block text-sm">مبلغ شارژ (تومان)<Input className="mt-2" dir="ltr" inputMode="numeric" required value={creditValue} onChange={event=>setCreditAmount(event.target.value)} /></label>
+                    <p className="text-sm">حداقل مبلغ شارژ: {formatCurrency(creditMinimum)}</p>
                     <p className="text-xs text-muted-foreground">همین مبلغ پس از پرداخت به کیف پول این نام کاربری اضافه می‌شود. نام کاربری را دقیق بررسی کنید؛ شارژ انجام‌شده قابل بازگشت خودکار نیست.</p>
                   </div>}
                   <div className="rounded-md border border-border bg-muted/40 p-4">

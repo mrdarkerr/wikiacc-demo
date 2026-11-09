@@ -1,4 +1,5 @@
 "use client";
+import { walletCreditInput } from "@/lib/superip";
 
 import type { FormEvent, KeyboardEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -51,6 +52,7 @@ const fieldTypeLabels: Record<FieldType, string> = {
 };
 
 type ProductForm = {
+  superipMinAmount: string;
   slug: string;
   title: string;
   description: string;
@@ -81,6 +83,7 @@ type FeatureDraft = {
 };
 
 const initialProductForm: ProductForm = {
+  superipMinAmount: "1000",
   categoryId: "",
   deliveryPoolId: "",
   shareboxCategoryId: "",
@@ -252,6 +255,7 @@ export function AdminProductFormClient() {
   function populateProduct(product: Product) {
     setEditingProductId(product.id);
     setProductForm({
+      superipMinAmount: String(product.superipMinAmount ?? 1000),
       categoryId: product.category?.id ?? "",
       deliveryPoolId: product.deliveryPool?.id ?? "",
       shareboxCategoryId: product.shareboxCategoryId ?? "",
@@ -432,6 +436,10 @@ export function AdminProductFormClient() {
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
+    if (isWalletCredit && !walletCreditInput("minimum", productForm.superipMinAmount)) {
+      setError("حداقل مبلغ باید عدد صحیح بین ۱٬۰۰۰ تا ۲۰۰٬۰۰۰٬۰۰۰ تومان باشد.");
+      return;
+    }
     if (!preview.input || !preview.pricing || preview.pending || preview.error) {
       setError(preview.error || "ابتدا پیش‌نمایش معتبر قیمت را دریافت کنید.");
       return;
@@ -509,6 +517,7 @@ export function AdminProductFormClient() {
         sortOrder: Number(productForm.sortOrder || 0),
         title: productForm.title.trim(),
         type: productForm.type,
+        ...(isWalletCredit ? {superipMinAmount: walletCreditInput("minimum", productForm.superipMinAmount)!.amount} : {}),
         ...(deliveryPoolId ? { deliveryPoolId } : {}),
         ...(shareboxCategoryId &&
         (!editingProductId || shareboxCategoryId !== savedShareBoxCategory?.id)
@@ -674,7 +683,13 @@ export function AdminProductFormClient() {
 
         {!loading && !isWalletCredit ? <ProductPricingSection form={productForm} preview={preview} disabled={saving} onChange={(patch) => setProductForm((current) => ({ ...current, ...patch }))} /> : null}
 
-        {isWalletCredit && <AdminSection title="مبلغ دلخواه">مشتری نام کاربری و مبلغ شارژ را وارد می‌کند. مبلغ پرداخت و شارژ یکسان است و قیمت ثابت یا سود اضافه ندارد. <Link href="/admin/superip" className="text-primary">تنظیم اتصال سوپر ایپی</Link></AdminSection>}
+        {isWalletCredit && <AdminSection title="مبلغ دلخواه">
+          <p>مشتری نام کاربری و مبلغ شارژ را وارد می‌کند. مبلغ پرداخت و شارژ یکسان است و قیمت ثابت یا سود اضافه ندارد.</p>
+          <label className="mt-4 block text-sm" htmlFor="superip-minimum">حداقل مبلغ شارژ (تومان)</label>
+          <Input id="superip-minimum" className="mt-2" dir="ltr" inputMode="numeric" required value={productForm.superipMinAmount} onChange={event=>setProductForm(current=>({...current,superipMinAmount:event.target.value}))} />
+          <p className="mt-2 text-xs text-muted-foreground">خرید با مبلغ کمتر از این حداقل مجاز نیست. سفارش‌های قبلی تغییر نمی‌کنند.</p>
+          <Link href="/admin/superip" className="text-primary">تنظیم اتصال سوپر ایپی</Link>
+        </AdminSection>}
         <AdminSection title="نوع محصول">
           <div className="grid gap-3 md:grid-cols-3">
             {(["CUSTOM_FORM", "INSTANT_DELIVERY", "SHAREBOX", "SUPERIP_WALLET"] as ProductType[]).map(

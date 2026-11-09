@@ -1,6 +1,6 @@
 import type { Order } from "@/types/api";
 import { orderNeedsShareBoxPolling } from "./sharebox";
-export function walletCreditInput(username: string, value: string) {
+export function walletCreditInput(username: string, value: string, minimum = 1000) {
   const normalized = value
     .replace(/[۰-۹]/g, (c) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(c)))
     .replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c)));
@@ -10,7 +10,7 @@ export function walletCreditInput(username: string, value: string) {
   )
     return null;
   const amount = Number(normalized);
-  return Number.isSafeInteger(amount) && amount >= 1000 && amount <= 200000000
+  return Number.isSafeInteger(amount) && amount >= Math.max(1000, minimum) && amount <= 200000000
     ? { username: username.toLowerCase(), amount }
     : null;
 }

@@ -30,6 +30,12 @@ The live application/frontend build is from `ef09e0e6934c2843c6e21f0666e2b889f9d
 
 Backups: live `/opt/wikiacc/backups/superip-wallet-release`, offhost `/root/backups/wikiacc/superip-wallet`. Final quiescent snapshot SHA-256 `eeeaf80d786937614ca8bbc347e79c2d25ecee06b5b79b97ea779e5476007048`; two isolated and two live migration runs preserved all 30 original tables' contents. The prior frontend build is retained as `previous-next` in the live backup directory. Acceptance/provenance is under `/root/.hermes/cache/scratch/wikiacc-superip-release/` on dev. Never restore this pre-release financial snapshot after new purchases; follow the forward-fix boundary above.
 
+## Per-product minimum
+
+Admins can set `superipMinAmount` on product create/edit (integer toman, 1,000–200,000,000; default 1,000). Public wallet-product responses expose it. Checkout displays/initializes this minimum, validates it before submission and refreshes it before creating an order. The server enforces the current product minimum inside wallet/direct-payment order creation before any debit or payment attempt. Existing accepted orders retain their immutable amount and are not revalidated against a later minimum.
+
+Existing databases require the additive `SUPERIP_MIGRATION_OFFLINE_ACK=1 node scripts/apply-superip-minimum-migration.js` with backend writers stopped and a verified backup. It adds only the Product column with default 1,000 and is repeatable. Changing the active product to 2,000,000 is a separate scoped catalog setting, not a migration of historical orders or every other product.
+
 ## Targeted tests
 
 `npm --prefix backend test -- tests/superip.test.js tests/sharebox.test.js tests/price-consent.test.js tests/pricing-orders.test.js tests/api.test.js`
