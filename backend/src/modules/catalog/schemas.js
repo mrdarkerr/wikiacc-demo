@@ -23,6 +23,7 @@ const productInputSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   type: productTypeSchema,
   price: z.number().int().nonnegative().max(2147483647).optional(),
+  superipMinAmount: z.number().int().min(1000).max(200000000).optional(),
   priceCurrency: z.enum(["TOMAN", "USD"]).optional(),
   basePrice: z.union([z.string().trim().min(1).max(24), z.number().nonnegative()]).optional(),
   profit: z.union([z.string().trim().max(32), z.number().nonnegative()]).optional(),

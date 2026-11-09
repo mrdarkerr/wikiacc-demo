@@ -13,6 +13,11 @@ it("renders terminal order states before pending wallet state", () => {
   expect(renderToStaticMarkup(createElement(SuperipOrderStatus,{order:{...order,status:"REFUNDED",paymentStatus:"REFUNDED"}}))).toContain("مبلغ سفارش بازپرداخت شده است");
 });
 describe("wallet credit checkout", () => {
+  it("enforces the selected product minimum including Persian amounts", () => {
+    expect(walletCreditInput("agent.one", "۱۹۹۹۹۹۹", 2000000)).toBeNull();
+    expect(walletCreditInput("agent.one", "۲۰۰۰۰۰۰", 2000000)).toEqual({username:"agent.one",amount:2000000});
+    expect(walletCreditInput("agent.one", "200000000", 2000000)?.amount).toBe(200000000);
+  });
   it("normalizes user input and rejects fractional or out of bounds amounts", () => {
     expect(walletCreditInput("Agent.One", "۱۲۰۰۰")).toEqual({
       username: "agent.one",

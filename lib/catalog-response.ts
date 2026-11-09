@@ -7,6 +7,7 @@ function isProduct(value: unknown): value is Product {
   return typeof product.id === "string" && typeof product.slug === "string" && typeof product.title === "string"
     && ["INSTANT_DELIVERY", "CUSTOM_FORM", "SHAREBOX", "SUPERIP_WALLET"].includes(String(product.type))
     && Number.isInteger(product.price) && typeof product.price === "number" && product.price >= 0 && product.price <= 2147483647
+    && (product.superipMinAmount === undefined || (typeof product.superipMinAmount === "number" && Number.isInteger(product.superipMinAmount) && product.superipMinAmount >= 1000 && product.superipMinAmount <= 200000000))
     && Array.isArray(product.fields) && Array.isArray(product.features);
 }
 function invalid(): never { throw new ApiError(502, "قیمت محصولات دریافت نشد؛ دوباره تلاش کنید.", { error: { code: "API_INVALID_RESPONSE", message: "قیمت محصولات دریافت نشد؛ دوباره تلاش کنید." } }); }

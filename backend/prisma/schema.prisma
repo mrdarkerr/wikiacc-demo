@@ -154,6 +154,7 @@ model Product {
   type           ProductType
   shareboxCategoryId   String?
   shareboxCategoryName String?
+  superipMinAmount Int @default(1000)
   price          Int
   priceCurrency  String           @default("TOMAN")
   basePrice      String?

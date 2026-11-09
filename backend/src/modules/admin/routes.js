@@ -319,6 +319,7 @@ export async function adminRoutes(app, options) {
         title: input.title,
         description: input.description,
         type: input.type,
+        superipMinAmount: input.superipMinAmount,
         shareboxCategoryId: shareboxCategory?.id,
         shareboxCategoryName: shareboxCategory?.name,
         ...pricingData,
@@ -404,6 +405,7 @@ export async function adminRoutes(app, options) {
           title: input.title,
           description: input.description,
           type: input.type,
+          superipMinAmount: input.superipMinAmount,
           ...(merged.type === "SHAREBOX"
             ? shareboxCategory
               ? {

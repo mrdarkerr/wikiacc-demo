@@ -30,6 +30,8 @@ export async function superipCheckout(tx, product, input) {
       "SUPERIP_INPUT_INVALID",
       "Enter a valid username and integer toman amount between 1,000 and 200,000,000",
     );
+  const minimum = product.superipMinAmount ?? 1000;
+  if (parsed.data.amount < minimum) throw badRequest("SUPERIP_BELOW_MINIMUM", "Amount is below the product minimum", {minimum});
   const settings = await getSettings(tx);
   if (!settings?.enabled || !settings.secretEncrypted)
     throw serviceUnavailable(

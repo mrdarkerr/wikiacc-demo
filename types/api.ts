@@ -249,6 +249,7 @@ export type DeliveryPoolSummary = {
 };
 
 export type Product = {
+  superipMinAmount?: number;
   id: string;
   slug: string;
   title: string;
@@ -650,6 +651,7 @@ export type CreateAdminProductRequest = {
   priceCurrency?: PriceCurrency;
   basePrice?: string;
   profit?: string;
+  superipMinAmount?: number;
   categoryId?: string;
   deliveryPoolId?: string;
   shareboxCategoryId?: string | null;

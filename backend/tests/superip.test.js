@@ -213,6 +213,35 @@ it("HTTP client sends exact immutable body, refuses redirects and redacts upstre
     code: "HTTP_401",
   });
 });
+it("product minimum is configurable, public and enforced before wallet or direct payment", async () => {
+  const made = await request("POST", "/api/v1/admin/products", {slug:"minimum-credit",title:"Minimum credit",type:"SUPERIP_WALLET",basePrice:"0",superipMinAmount:2000000});
+  expect(made.statusCode,made.body).toBe(201);
+  const product=made.json().data.product;
+  expect(product.superipMinAmount).toBe(2000000);
+  const publicRead=await request("GET",`/api/v1/products/${product.slug}`);
+  expect(publicRead.json().data.product.superipMinAmount).toBe(2000000);
+  for(const value of [0,999,1.5,200000001,null]) expect((await request("PATCH",`/api/v1/admin/products/${product.id}`,{superipMinAmount:value})).statusCode).toBe(400);
+  const payload={productId:product.id,superip:{username:"agent.min",amount:1999999},expectedUnitPrice:1999999};
+  const before=await app.prisma.wallet.findUnique({where:{userId:user.id}});
+  const rejected=await request("POST","/api/v1/orders",payload,userCookie);
+  expect(rejected.statusCode).toBe(400);
+  expect(rejected.json().error.code).toBe("SUPERIP_BELOW_MINIMUM");
+  expect((await app.prisma.wallet.findUnique({where:{userId:user.id}})).balance).toBe(before.balance);
+  const {createPendingJibitOrder}=await import("../src/modules/orders/service.js");
+  const attempt={attemptId:"minimum-attempt",clientReferenceNumber:"minimum-reference",reconcileAfter:new Date()};
+  await expect(createPendingJibitOrder(app.prisma,user.id,payload,attempt)).rejects.toMatchObject({code:"SUPERIP_BELOW_MINIMUM"});
+  const pending=await createPendingJibitOrder(app.prisma,user.id,{...payload,superip:{username:"agent.min",amount:2000000},expectedUnitPrice:2000000},attempt);
+  expect(pending.attempt.providerAmountRial).toBe(20000000);
+  expect((await request("PATCH",`/api/v1/admin/products/${product.id}`,{superipMinAmount:3000000})).json().data.product.superipMinAmount).toBe(3000000);
+  expect((await request("PATCH",`/api/v1/admin/products/${product.id}`,{title:"Renamed minimum"})).json().data.product.superipMinAmount).toBe(3000000);
+  const frozen=await app.prisma.superipFulfillment.findFirst({where:{orderItem:{productId:product.id}}});
+  expect(frozen.amount).toBe(2000000);
+  await request("PATCH",`/api/v1/admin/products/${product.id}`,{superipMinAmount:2000000});
+  await app.prisma.wallet.update({where:{userId:user.id},data:{balance:3000000}});
+  const bought=await request("POST","/api/v1/orders",{...payload,superip:{username:"agent.min",amount:2000000},expectedUnitPrice:2000000},userCookie);
+  expect(bought.statusCode,bought.body).toBe(201);
+  expect(bought.json().data.order.totalAmount).toBe(2000000);
+});
 it("admin-only webhook settings encrypt secret and never expose it", async () => {
   const url = "/api/v1/admin/superip/settings";
   expect((await request("GET", url, undefined, userCookie)).statusCode).toBe(
