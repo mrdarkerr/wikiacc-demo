@@ -11,6 +11,7 @@ execFileSync(process.execPath, ["scripts/apply-schema.js"], {
   stdio: "inherit",
 });
 const { buildApp } = await import("../src/app.js");
+const { env } = await import("../src/config/env.js");
 let app, adminCookie, userCookie, user;
 const endpoint = "https://reseller.superip-app.com/api/reseller/wallet-webhook";
 const secret = "test-superip-webhook-secret-with-32-chars";
@@ -22,8 +23,8 @@ beforeAll(async () => {
   user = await app.prisma.user.create({
     data: { name: "Customer", wallet: { create: { balance: 500000 } } },
   });
-  adminCookie = `wikiacc_session=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
-  userCookie = `wikiacc_session=${app.jwt.sign({ id: user.id, role: "USER" })}`;
+  adminCookie = `${env.SESSION_COOKIE_NAME}=${app.jwt.sign({ id: admin.id, role: "ADMIN" })}`;
+  userCookie = `${env.SESSION_COOKIE_NAME}=${app.jwt.sign({ id: user.id, role: "USER" })}`;
 });
 afterAll(async () => {
   await app?.close();
@@ -80,7 +81,7 @@ it("variable wallet purchase snapshots recipient and exact amount, validates bef
     where: { orderItemId: order.items[0].id },
   });
   expect(job.amount).toBe(12000);
-  expect(job.reference).toContain(order.items[0].id);
+  expect(job.reference).toBe(`gimiacc:${order.items[0].id}`);
   expect(
     (await app.prisma.wallet.findUnique({ where: { userId: user.id } }))
       .balance,

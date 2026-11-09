@@ -48,7 +48,7 @@ export async function createSuperipSnapshot(tx, item, snapshot) {
     data: {
       ...snapshot,
       orderItemId: item.id,
-      reference: `wikiacc:${item.id}`,
+      reference: `gimiacc:${item.id}`,
     },
   });
 }

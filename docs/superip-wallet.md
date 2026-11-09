@@ -24,7 +24,11 @@ After any claim/attempt, automatic refund/cancellation/manual delivery is blocke
 4. Generate Prisma client, activate built frontend/backend, verify HTTPS pages/assets, admin-only settings and authenticated non-crediting webhook rejection. Configure both secrets privately; then publish the catalog product.
 5. Schema is additive (two new tables); keep it on rollback. Disable the product and integration first. Once new paid orders exist, prefer a forward fix; old Prisma does not recognize the new product enum, and old workers cannot fulfill these jobs. Never restore an old financial database after reopening payment writers.
 
-## Published acceptance
+## GimiAcc brand boundary
+
+This branch preserves GimiAcc branding, assets, configured cookie, GMA payment identifiers and existing ShareBox download URLs. The upstream merge deliberately excludes unrelated download and description-renderer changes. New fulfillment references use `gimiacc:<full order item id>`; already persisted references must never be rewritten. GimiAcc keeps its own database and encryption key; only the explicitly configured integration credential is shared with the existing receiver. The receiver currently uses the historical `wikiacc-webhook` integration audit label for this shared connection.
+
+## Upstream WikiAcc published acceptance
 
 The live application/frontend build is from `ef09e0e6934c2843c6e21f0666e2b889f9dc0880`. Product `superip-reseller-wallet` is active at `/store?product=superip-reseller-wallet`; integration settings are enabled and configured. Public catalog readback, desktop/mobile product rendering, linked browser assets and backend health passed. The real production client made an authenticated HTTPS request with amount zero and received the expected validation rejection; no real wallet credit or payment was made. Focused financial/component tests, typecheck and production build passed; full-tree lint retains pre-existing generated-finance errors outside this scope.
 
