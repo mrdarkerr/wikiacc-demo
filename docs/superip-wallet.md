@@ -1,6 +1,6 @@
 # Super IP reseller wallet product
 
-`SUPERIP_WALLET` is a variable-amount product, not an editable custom form. Title, description, features, category, active/archive state follow the existing catalog. Static price/base/profit are zero; the customer selects 1,000–200,000,000 integer toman, quantity one. Charged amount equals credited principal; profit snapshot is zero. Both wallet and Jibit checkout snapshot the lower-case ASCII username, principal, complete HTTPS endpoint and `wikiacc:<full order item id>` reference inside the order transaction. Jibit uses the existing rial conversion and verification path.
+`SUPERIP_WALLET` is a variable-amount product, not an editable custom form. Title, description, features, category, active/archive state follow the existing catalog. Static price/base/profit are zero; the customer selects 1,000–200,000,000 integer toman, quantity one. Charged amount equals credited principal; profit snapshot is zero. Both wallet and Jibit checkout snapshot the lower-case ASCII username, principal, complete HTTPS endpoint and `gimiacc:<full order item id>` reference inside the order transaction. Jibit uses the existing rial conversion and verification path.
 
 ## Ownership and API
 
@@ -27,6 +27,12 @@ After any claim/attempt, automatic refund/cancellation/manual delivery is blocke
 ## GimiAcc brand boundary
 
 This branch preserves GimiAcc branding, assets, configured cookie, GMA payment identifiers and existing ShareBox download URLs. The upstream merge deliberately excludes unrelated download and description-renderer changes. New fulfillment references use `gimiacc:<full order item id>`; already persisted references must never be rewritten. GimiAcc keeps its own database and encryption key; only the explicitly configured integration credential is shared with the existing receiver. The receiver currently uses the historical `wikiacc-webhook` integration audit label for this shared connection.
+
+## GimiAcc published acceptance
+
+Application/build revision: `edeae75a10483480abe6f3c16d1e6ba97e716567`, merged into the dedicated `gimiacc` branch. Product `/store?product=superip-reseller-wallet` is active on `gimiacc.com`; its integration is configured with the existing receiver credential, encrypted with GimiAcc's own key. The receiver and WikiAcc settings were not changed. An authenticated amount-zero request from GimiAcc's real client confirmed HTTPS/authentication without a wallet credit.
+
+The final quiescent snapshot SHA-256 is `3fe722d967cac7ff8c94bb9d8f7bf91fd055c711455f7ebe78893c783d253a11`. Backups are retained at `/opt/gimiacc/backups/superip-wallet-release` on live and `/root/backups/gimiacc/superip-wallet` on dev. Two isolated and two live additive migrations preserved all 29 original tables. Backend/frontend environment and PM2 configuration hashes stayed unchanged. The public product page retained GimiAcc title/logo and loaded all observed application assets successfully; public health passed and unauthenticated settings returned 401. This acceptance does not include a real payment or customer credit.
 
 ## Upstream WikiAcc published acceptance
 
